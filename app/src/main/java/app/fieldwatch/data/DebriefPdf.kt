@@ -1,5 +1,7 @@
 package app.fieldwatch.data
 
+import app.fieldwatch.domain.LanguageText
+
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.DashPathEffect
@@ -40,33 +42,39 @@ import kotlin.math.abs
  * is drawn and finished before the next starts.
  */
 object DebriefPdf {
+    /** Debrief and Compare pages use the phone sans. That face covers Cyrillic. */
+    const val PDF_SANS = "sans-serif"
+
+    /** Characters placed on the page. Nothing is stripped, including Cyrillic. */
+    fun charactersDrawn(text: String): String = text
+
     private const val PAGE_W = 612
     private const val PAGE_H = 792
     private const val MARGIN = 48f
     private const val HEADER_H = 40f
     private const val FOOTER_H = 36f
-    private val INK = Color.parseColor("#12171C")
-    private val MUTED = Color.parseColor("#4A5560")
-    private val PHOS = Color.parseColor("#0B7A48")
-    private val HEADER_BG = Color.parseColor("#063D26")
-    private val ALERT_BG = Color.parseColor("#FFF6E5")
-    private val ALERT_BAR = Color.parseColor("#C47A00")
-    private val RULE = Color.parseColor("#C5CDD4")
-    private val TAKE_BG = Color.parseColor("#E8F5EE")
-    private val META_RULE = Color.parseColor("#E2E8ED")
-    private val PLOT_PANEL = Color.parseColor("#F4F7F5")
-    private val PLOT_INNER = Color.parseColor("#FFFFFF")
-    private val PLOT_GRID = Color.parseColor("#E4EBE6")
-    private val PATH_OTHER = Color.parseColor("#4A6FA5")
-    private val AIRCRAFT = Color.parseColor("#C47A00")
-    private val AIRCRAFT_INK = Color.parseColor("#111111")
-    private val CLASS_DISC = Color.parseColor("#FFB020")
-    private val PILOT_INK = Color.parseColor("#3D4A55")
-    private val PILOT_FILL = Color.parseColor("#F4F7FB")
-    private val PATH_STAY = Color.parseColor("#35D683")
-    private val DOT_ATTENTION = Color.parseColor("#E53935")
-    private val DOT_BOOKMARK = Color.parseColor("#0288D1")
-    private val GNSS_INK = Color.parseColor("#B91C1C")
+    private val INK by lazy { Color.parseColor("#12171C") }
+    private val MUTED by lazy { Color.parseColor("#4A5560") }
+    private val PHOS by lazy { Color.parseColor("#0B7A48") }
+    private val HEADER_BG by lazy { Color.parseColor("#063D26") }
+    private val ALERT_BG by lazy { Color.parseColor("#FFF6E5") }
+    private val ALERT_BAR by lazy { Color.parseColor("#C47A00") }
+    private val RULE by lazy { Color.parseColor("#C5CDD4") }
+    private val TAKE_BG by lazy { Color.parseColor("#E8F5EE") }
+    private val META_RULE by lazy { Color.parseColor("#E2E8ED") }
+    private val PLOT_PANEL by lazy { Color.parseColor("#F4F7F5") }
+    private val PLOT_INNER by lazy { Color.parseColor("#FFFFFF") }
+    private val PLOT_GRID by lazy { Color.parseColor("#E4EBE6") }
+    private val PATH_OTHER by lazy { Color.parseColor("#4A6FA5") }
+    private val AIRCRAFT by lazy { Color.parseColor("#C47A00") }
+    private val AIRCRAFT_INK by lazy { Color.parseColor("#111111") }
+    private val CLASS_DISC by lazy { Color.parseColor("#FFB020") }
+    private val PILOT_INK by lazy { Color.parseColor("#3D4A55") }
+    private val PILOT_FILL by lazy { Color.parseColor("#F4F7FB") }
+    private val PATH_STAY by lazy { Color.parseColor("#35D683") }
+    private val DOT_ATTENTION by lazy { Color.parseColor("#E53935") }
+    private val DOT_BOOKMARK by lazy { Color.parseColor("#0288D1") }
+    private val GNSS_INK by lazy { Color.parseColor("#B91C1C") }
     private const val MARK_STAY = 1
     private const val MARK_SLATE = 2
     private const val MARK_AMBER = 3
@@ -131,7 +139,7 @@ object DebriefPdf {
         val out = ArrayList<Block>()
         out += titleBlock(doc.pdfTitle)
         out += spacer(6f)
-        out += sectionHead("", "Disclaimer", alert = false)
+        out += sectionHead("", LanguageText.text("ui.disclaimer.label"), alert = false)
         doc.disclaimer.split("\n\n").forEach { para ->
             chunkText(para.trim().ifBlank { " " }, CONTENT_W, 9f, muted = true).forEach { sl ->
                 out += textBlock(sl)
@@ -156,7 +164,7 @@ object DebriefPdf {
             out += spacer(10f)
         }
         for (section in doc.sections) {
-            if (section.title == "Extra attention" && doc.extraAttention.isNotEmpty()) {
+            if (section.title == LanguageText.text("chrome.extra.attention") && doc.extraAttention.isNotEmpty()) {
                 out += sectionHead(section.number, section.title, alert = true)
                 out += spacer(4f)
                 doc.extraAttention.forEach { hit ->
@@ -225,9 +233,9 @@ object DebriefPdf {
             isAntiAlias = true
         }
         drawLegendSwatch(canvas, MARGIN, y + 3f, PHOS)
-        canvas.drawText("Wi-Fi", MARGIN + 14f, y + 10f, paint)
+        canvas.drawText(LanguageText.text("radio.wifi"), MARGIN + 14f, y + 10f, paint)
         drawLegendSwatch(canvas, MARGIN + 58f, y + 3f, PATH_OTHER)
-        canvas.drawText("BLE", MARGIN + 72f, y + 10f, paint)
+        canvas.drawText(LanguageText.text("radio.ble"), MARGIN + 72f, y + 10f, paint)
     }
 
     private fun drawLegendSwatch(canvas: Canvas, x: Float, y: Float, color: Int) {
@@ -414,7 +422,7 @@ object DebriefPdf {
             }
             val fixes = fig.tracks.filter { it.aircraft }.sumOf { it.samples.size }
             val right = if (fig.tracks.all { it.aircraft } && fixes == 1) {
-                "1 advertised fix"
+                LanguageText.text("ui.1.advertised.fix")
             } else {
                 "$len  ·  $span"
             }
@@ -671,8 +679,8 @@ object DebriefPdf {
                 textSize = 7.5f
                 isAntiAlias = true
             }
-            canvas.drawText("Start", ox(pts.first().x) + 6f, oy(pts.first().y) - 4f, lab)
-            canvas.drawText("End", ox(pts.last().x) + 6f, oy(pts.last().y) - 4f, lab)
+            canvas.drawText(LanguageText.text("ui.start.label"), ox(pts.first().x) + 6f, oy(pts.first().y) - 4f, lab)
+            canvas.drawText(LanguageText.text("ui.end.label"), ox(pts.last().x) + 6f, oy(pts.last().y) - 4f, lab)
         }
     }
 
@@ -683,22 +691,22 @@ object DebriefPdf {
         val out = ArrayList<LegendSwatch>()
         when {
             phone.size >= 2 -> {
-                out += LegendSwatch("This sit", MARK_STAY)
-                out += LegendSwatch("Second sit", MARK_SLATE)
+                out += LegendSwatch(LanguageText.text("ui.sit.label.2"), MARK_STAY)
+                out += LegendSwatch(LanguageText.text("ui.second.sit"), MARK_SLATE)
             }
-            phone.any { it.samples.size >= 2 } -> out += LegendSwatch("Stay", MARK_STAY)
+            phone.any { it.samples.size >= 2 } -> out += LegendSwatch(LanguageText.text("ui.stay.label"), MARK_STAY)
         }
         val craft = fig.tracks.filter { it.aircraft }
         if (craft.isNotEmpty()) {
-            out += LegendSwatch("Advertised", MARK_AMBER)
-            if (craft.any { it.secondary }) out += LegendSwatch("Second advertised", MARK_AMBER_DASH)
+            out += LegendSwatch(LanguageText.text("ui.advertised.label"), MARK_AMBER)
+            if (craft.any { it.secondary }) out += LegendSwatch(LanguageText.text("ui.second.advertised"), MARK_AMBER_DASH)
         }
-        if (fig.dots.any { it.extraAttention }) out += LegendSwatch("Extra attention", MARK_RED)
-        if (fig.dots.any { it.named }) out += LegendSwatch("MAC alert", MARK_BLUE)
-        if (fig.dots.any { !it.extraAttention && !it.named }) out += LegendSwatch("Signature alert", MARK_ALERT)
-        if (fig.pilots.isNotEmpty()) out += LegendSwatch("Operator", MARK_PILOT)
+        if (fig.dots.any { it.extraAttention }) out += LegendSwatch(LanguageText.text("chrome.extra.attention"), MARK_RED)
+        if (fig.dots.any { it.named }) out += LegendSwatch(LanguageText.text("ui.mac.alert"), MARK_BLUE)
+        if (fig.dots.any { !it.extraAttention && !it.named }) out += LegendSwatch(LanguageText.text("ui.signature.alert"), MARK_ALERT)
+        if (fig.pilots.isNotEmpty()) out += LegendSwatch(LanguageText.text("ui.operator.label.2"), MARK_PILOT)
         if (fig.gnss.any { !it.secondary }) out += LegendSwatch("GNSS", MARK_GNSS)
-        if (fig.gnss.any { it.secondary }) out += LegendSwatch("Second GNSS", MARK_GNSS_2)
+        if (fig.gnss.any { it.secondary }) out += LegendSwatch(LanguageText.text("ui.second.gnss"), MARK_GNSS_2)
         return out
     }
 
@@ -973,7 +981,7 @@ object DebriefPdf {
         val craft = fig.craftKeys.filter { it.isNotBlank() }
         if (piles.isEmpty() && craft.isEmpty() && fig.gnss.isEmpty()) return emptyList()
         val out = ArrayList<Block>()
-        out += sectionHead("", "Path key", alert = false)
+        out += sectionHead("", LanguageText.text("ui.path.key"), alert = false)
         out += spacer(4f)
         piles.forEachIndexed { i, pile ->
             out += pathKeyRow(i + 1, pile)
@@ -994,7 +1002,7 @@ object DebriefPdf {
         val radios = pile.members.joinToString("  ·  ") { m ->
             val d = m.dot
             val kind = if (d.kind.name == "WIFI") "WIFI" else "BLE"
-            val tag = if (d.extraAttention) "Extra attention" else null
+            val tag = if (d.extraAttention) LanguageText.text("chrome.extra.attention") else null
             val fleets = d.fleetNames.filter { it.isNotBlank() }.joinToString(", ")
             val obs = d.observerNotes.trim().takeIf { it.isNotEmpty() }?.let { "Observer: $it" }
             val who = listOfNotNull(kind, d.label.ifBlank { d.mac }, fleets.ifBlank { null }, tag, obs)
@@ -1162,7 +1170,7 @@ object DebriefPdf {
         val innerW = CONTENT_W - 24
         val radio = layout(hit.radioLabel, innerW, 9f, muted = false, bold = true)
         val note = layout(hit.note, innerW, 9.5f, muted = false)
-        val foot = layout("Pattern match, not identity. Not a safety finding.", innerW, 8f, muted = true)
+        val foot = layout(LanguageText.text("ui.pattern.match.not.identity"), innerW, 8f, muted = true)
         val h = 22f + radio.height + 6f + note.height + 8f + foot.height + 12f
         return Block(h) { canvas, y ->
             val box = RectF(MARGIN - 6f, y, PAGE_W - MARGIN + 6f, y + h - 4f)
@@ -1250,7 +1258,7 @@ object DebriefPdf {
             textSize = 8f
             isAntiAlias = true
         }
-        canvas.drawText("Off Grid Pete LLC  ·  operationally sensitive", MARGIN, PAGE_H - 18f, f)
+        canvas.drawText(LanguageText.text("ui.off.grid.pete.llc"), MARGIN, PAGE_H - 18f, f)
         val pn = "$page / $total"
         canvas.drawText(pn, PAGE_W - MARGIN - f.measureText(pn), PAGE_H - 18f, f)
     }
@@ -1291,16 +1299,17 @@ object DebriefPdf {
         muted: Boolean,
         bold: Boolean = false,
     ): StaticLayout {
+        val shown = charactersDrawn(text)
         val tp = TextPaint().apply {
             color = if (muted) MUTED else INK
             textSize = size
             isAntiAlias = true
             typeface = Typeface.create(
-                Typeface.SANS_SERIF,
+                PDF_SANS,
                 if (bold) Typeface.BOLD else Typeface.NORMAL,
             )
         }
-        return StaticLayout.Builder.obtain(text, 0, text.length, tp, width.coerceAtLeast(40))
+        return StaticLayout.Builder.obtain(shown, 0, shown.length, tp, width.coerceAtLeast(40))
             .setAlignment(Layout.Alignment.ALIGN_NORMAL)
             .setLineSpacing(2f, 1f)
             .setIncludePad(false)

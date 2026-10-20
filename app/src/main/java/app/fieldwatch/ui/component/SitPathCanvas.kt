@@ -1,5 +1,7 @@
 package app.fieldwatch.ui.component
 
+import app.fieldwatch.domain.LanguageText
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -215,9 +217,9 @@ fun SitPathCanvas(
                 val start = lay.path.first()
                 val end = lay.path.last()
                 drawStartDot(start.x, start.y)
-                val startT = measurer.measure("Start", labelStyle)
+                val startT = measurer.measure(LanguageText.text("ui.start.label"), labelStyle)
                 drawText(startT, topLeft = Offset((start.x + 8f).coerceAtMost(size.width - startT.size.width), start.y - 6f))
-                val endLabel = if (model.live) "Now" else "End"
+                val endLabel = if (model.live) LanguageText.text("ui.now.label") else LanguageText.text("ui.end.label")
                 val endT = measurer.measure(endLabel, labelStyle)
                 drawText(
                     endT,
@@ -288,7 +290,7 @@ fun SitPathCanvas(
                     .padding(8.dp),
             ) {
                 Text(
-                    if (gnssCard.size == 1) "GNSS detection" else "${gnssCard.size} GNSS detections",
+                    if (gnssCard.size == 1) LanguageText.text("ui.gnss.detection") else "${gnssCard.size} GNSS detections",
                     style = MaterialTheme.typography.labelSmall,
                     color = muted,
                 )
@@ -304,7 +306,7 @@ fun SitPathCanvas(
                         color = muted,
                     )
                     Text(
-                        pin.detail.trim().ifBlank { "Signal changed." },
+                        pin.detail.trim().ifBlank { LanguageText.text("ui.signal.changed") },
                         style = MaterialTheme.typography.bodySmall,
                         color = track,
                     )
@@ -322,7 +324,7 @@ fun SitPathCanvas(
                     .padding(8.dp),
             ) {
                 Text(
-                    if (selected.members.size == 1) "1 alert here" else "${selected.members.size} alerts here",
+                    if (selected.members.size == 1) LanguageText.text("ui.1.alert.here") else "${selected.members.size} alerts here",
                     style = MaterialTheme.typography.labelSmall,
                     color = muted,
                 )
@@ -398,8 +400,8 @@ private fun pathMarkers(
     if (lay.path.size < 2 || width < 8f) return emptyList()
     val start = lay.path.first()
     val end = lay.path.last()
-    val startText = measurer.measure("Start", labelStyle)
-    val endText = measurer.measure(if (live) "Now" else "End", labelStyle)
+    val startText = measurer.measure(LanguageText.text("ui.start.label"), labelStyle)
+    val endText = measurer.measure(if (live) LanguageText.text("ui.now.label") else LanguageText.text("ui.end.label"), labelStyle)
     return listOf(
         hitMarker(start, 12f, startText, width, dx = 8f, dy = -6f),
         hitMarker(end, 12f, endText, width, dx = 10f, dy = -(endText.size.height + 4f).toFloat()),

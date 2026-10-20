@@ -2,11 +2,11 @@
 
 Requirements for a later implementation. This document does not authorize that work by itself. Do not start it until asked. When asked, implement this document and stop there. Do not ship, tag, sideload, or open a GitHub Release unless that request says so.
 
-The official Fieldwatch APK stays English. Someone else may write a language file. A user imports that file on the phone. They do not fork the repo, they do not sign an APK, and they do not publish another Fieldwatch. Off Grid Pete LLC does not review language packs. The app must say that before a pack is applied.
+English in the APK is the source of truth. The APK also carries a bundled language for each NATO member language listed below. Those files start as an AI draft. A missing line stays English. The phone language selects a bundled language when one matches. Every other language is a file the user imports. Fieldwatch does not download either kind. Off Grid Pete LLC does not review an imported pack. The app must say that before an imported pack is applied. A bundled language shows a different official sentence, the AI sentence below. The Language page also shows the author-guide sentence. A pack cannot hide any of these sentences.
 
 ## Outcome
 
-Settings can import one language pack, export an English template, and remove the pack. With no pack, every app sentence is the English compiled into the APK. With a pack, a line the pack translates is shown in that language, and every other line stays English.
+Settings has its own Language page. From there the user can follow the phone, choose English or a bundled language, import one language pack, export an English template, and remove an imported pack. With nothing else selected, a matching phone language uses the bundled file, and every other phone stays English. A line the active language translates is shown in that language. Every missing or rejected line stays English.
 
 The pack changes words on the screen. It cannot add a control, change what a button does, change a setting, change the catalog, open a link, or replace the APK.
 
@@ -31,7 +31,7 @@ These paths stay closed to pack text:
 - Spoken phrases go to text-to-speech as plain text, not markup.
 - PDF and notification text are drawn as plain characters.
 - A translated line written to CSV still goes through `CsvCells`.
-- The official sentence that packs are not reviewed or certified is compiled into the APK. The pack cannot replace, shorten, or hide it.
+- The official sentences are compiled into the APK. That is the not-reviewed sentence, the AI sentence, and the author-guide sentence. A pack cannot replace, shorten, or hide any of them.
 - Keys the app does not already have are dropped. A key cannot select a feature.
 
 The app stores only the cleaned string map it wrote itself. On the next start it parses that file with the same rules. If that parse fails, the phone returns to English. The original import file is not kept and not parsed again.
@@ -40,9 +40,46 @@ Reject the whole file when the JSON is nested deeper than one object of strings,
 
 ## Where packs live
 
-Do not add a translations folder to the Fieldwatch repo. Do not create an Off Grid Pete language-pack repo, and do not have the app download packs from GitHub or from anywhere else. A pack hosted by Off Grid Pete LLC would read as official even with a README that says the files are not verified.
+Bundled languages are files in this repo, packaged into the APK. The app does not download them. Do not add any other language to this repo, and do not create an Off Grid Pete language-pack repo. A language that is not in the list below is hosted by whoever wrote it. The user obtains that file and imports it.
 
-A translator copies the English template, fills in the lines they want, and hosts that JSON file themselves. The user obtains the file and imports it. The phone keeps one cleaned pack in app-private storage. Export settings does not include it.
+Only the active language is parsed, once, when it is chosen and again on the next process start. The other bundled files stay compressed and unread. A bundled file uses the same line rules as an import. A line that is too long, or whose placeholders do not match, stays English. An imported pack is stored as the cleaned map the app writes. Export settings does not include that file, and it does not include the Language page choice. Follow the phone, English, or a bundled language stays on this phone, the same way the TAK tag does.
+
+The bundled files start as an AI draft and may be incomplete. A missing line stays English. While a bundled language is active, the Language page shows this compiled sentence: "This language was translated with AI. If a line is wrong, please open a GitHub issue." The same sentence is shown once when that language is first selected, including when the phone language selects it on first launch. It is not a pack key.
+
+## Bundled languages
+
+Match the phone's language, not the country. `fr` and `fr-CA` both use French. The default choice is to follow the phone. An explicit choice in Settings stays until the user changes it. An imported pack replaces the bundled language until it is removed. Remove then returns to the phone language when that language is bundled, and to English when it is not.
+
+| Language | Tags that select it |
+| --- | --- |
+| Albanian | `sq` |
+| Bulgarian | `bg` |
+| Croatian | `hr`, `cnr`, and `sr-ME` |
+| Czech | `cs` |
+| Danish | `da` |
+| Dutch | `nl` |
+| Estonian | `et` |
+| Finnish | `fi` |
+| French | `fr` |
+| German | `de` |
+| Greek | `el` |
+| Hungarian | `hu` |
+| Icelandic | `is` |
+| Italian | `it` |
+| Latvian | `lv` |
+| Lithuanian | `lt` |
+| Macedonian | `mk` |
+| Norwegian | `nb`, `nn`, and `no` |
+| Polish | `pl` |
+| Portuguese | `pt` |
+| Romanian | `ro` |
+| Slovak | `sk` |
+| Slovenian | `sl` |
+| Spanish | `es` |
+| Swedish | `sv` |
+| Turkish | `tr` |
+
+English is the compiled map, not a bundled file. A phone set to Luxembourgish (`lb`) stays English. French and German cover Luxembourg, so `fr-LU` and `de-LU` follow those files. A Montenegrin phone uses the Croatian file. A Serbian phone (`sr` without `ME`) stays English. Any other language stays English until the user imports a file.
 
 ## What is translated
 
@@ -58,36 +95,38 @@ These stay out of the pack:
 
 - The launcher name. `strings.xml` keeps `app_name` as Fieldwatch.
 - The user manual, `instruction.txt`, the changelog, and the README. Those are English documents.
-- The stock catalog and any catalog the user imports. Signature names, notes, Extra attention, and decode labels stay in that file. Class names are app sentences, not catalog rows. Phase 1 leaves them English. A later phase can put them in this pack. Catalog prose is a separate overlay, described in `docs/signature-localization-options.md`. Phase 1 does not build that overlay.
+- The stock catalog and any catalog the user imports. Signature names stay English. Notes, Extra attention, and decode labels stay in the English catalog. The bundled languages in this pack do not translate them. A separate file, described in `docs/signature-localization-options.md`, can supply those translations. The user exports that file, translates it, and imports it. This pack does not include it, and this document does not build it. Class names and the short spoken class names are app sentences and are in this pack. The class chip uses the `classchip` slot.
+- Protocol and brand names, written as they are in English: Wi-Fi, Bluetooth, GPS, GNSS, USB, PDF, CSV, ATAK, SSID, MAC, RSSI, and OUI. Ordinary words are translated. Fieldwatch terms such as sit, signature, and Extra attention are translated into plain words in that language.
 - Anything heard on the air: names, SSIDs, manufacturer data, OUIs, MACs, RSSI.
 - Anything the user typed: observer notes, custom signature names, watch phrases, preset names, sit notes.
 - Machine-readable exports. WiGLE CSV, sit and log CSV column headers, TAK/CoT tags, and other protocol or file-format tokens stay English. A translated header would break a file someone already parses.
+- The readable text on an ATAK pin stays English, including the remarks the app writes. CoT tags stay English. A pack does not change either. A callsign or name heard on the air, or one the user typed, is still sent as stored. A team whose phones are in different languages then reads the same pin.
 - Numbers the app formats for files and coordinates. Those keep `Locale.US` and the existing `String.format` calls. A pack string is never the format pattern.
 - Which voice line is spoken, and in what order. A pack may translate a fixed phrase. It must not change the watch priority. The first matching signature watch still gets the single spoken phrase. A named radio with Alert on still speaks its own name only when that watch receives the phrase. A phrase the user wrote is spoken as stored.
 
-Decoded values, radio rows, and catalog hits are data. The Live row fields that change all the time (name, MAC, RSSI, and the catalog class) are not looked up in the pack.
+Decoded values, radio rows, and catalog hits are data. The Live row fields that change all the time (name, MAC, and RSSI) are not looked up in the pack. The class label is.
 
 ## Fallback
 
-English in the APK is the source of truth. The lookup returns the pack line only when all of these are true:
+English in the APK is the source of truth. The same lookup serves a bundled language and an imported pack. It returns that line only when all of these are true:
 
-- A pack is loaded.
+- A bundled language or an imported pack is active.
 - The key is present.
 - The value is not blank after trimming.
-- The placeholders in the pack line are exactly the placeholders in the English line. Same names. Order may differ. Repeating a placeholder the English line uses is fine.
+- The placeholders in the line are exactly the placeholders in the English line. Same names. Order may differ. Repeating a placeholder the English line uses is fine.
 
 Every other case returns the English sentence:
 
-- No pack is loaded.
-- The pack file failed to load.
+- No bundled language is active and no imported pack is loaded.
+- The active file failed to load.
 - The key is absent.
 - The value is empty or whitespace.
 - The pack line drops a placeholder, or it adds a `{token}` the English line does not have.
 - The app is about to fill a placeholder and does not have a value for it.
 
-A translation that is present and complete is shown even when the pack was written for an older Fieldwatch. If the English sentence later changes under the same key, the old translation stays until the pack is updated. The app does not compare the wording. If that English change adds or removes a placeholder, the placeholder rule above sends that one line back to English.
+A translation that is present and complete is shown even when it was written for an older Fieldwatch. If the English sentence later changes under the same key, the old translation stays until that language is updated. The app does not compare the wording. If that English change adds or removes a placeholder, the placeholder rule above sends that one line back to English.
 
-An unknown key in the pack is ignored. The pack cannot create a label the app does not already have.
+An unknown key is ignored. A language file cannot create a label the app does not already have.
 
 ## Lookup and runtime cost
 
@@ -95,9 +134,9 @@ There is one lookup, usable from Compose and from the domain layer (reports, PDF
 
 The English sentences live in one compiled map of key to text. Screens read that map through the lookup. A new sentence is added to the map and read through the lookup. A literal written only at the call site will never be translated.
 
-With no pack, the lookup checks that the map is absent and returns the English string. It does not read a file and it does not parse JSON.
+With neither a bundled language nor an imported pack, the lookup checks that the map is absent and returns the English string. It does not read a file and it does not parse JSON.
 
-On import, the file is parsed once, checked, and stored as the cleaned map. On process start, that stored map is loaded once before the first screen. The open screen redraws once when a pack is applied or removed.
+On import, and when a bundled language is chosen, the file is parsed once, checked, and kept as the cleaned map. On process start, that map is loaded once before the first screen. The open screen redraws once when the language changes.
 
 A lookup is a map read, a blank check, and a placeholder-name check against the English line. Placeholder sets for the English lines are computed when the English map is built. Filling `{n}` is a single plain replace with the value the app passes. The inserted value is literal text. It is not scanned for placeholders or format markers. `%s` and `%n` in a pack line are characters on screen.
 
@@ -107,7 +146,7 @@ Scanning, signature matching, and laying out the Live list remain the work that 
 
 ## File format
 
-One JSON object, UTF-8. A leading byte-order mark is stripped before parsing. Unknown top-level fields are ignored. `strings` values are JSON strings. A value that is an object, array, or number is dropped.
+One JSON object, UTF-8. A leading byte-order mark is stripped before parsing. Unknown top-level fields are ignored. `strings` values are JSON strings. A value that is an object, array, or number rejects the whole file. The language already on the phone stays in place.
 
 ```json
 {
@@ -141,7 +180,7 @@ Reject the whole file, and leave any pack already on the phone in place, when:
 - `format` is missing or wrong. A settings pack gets "That is a settings pack. Use Import settings." A signature pack gets "That is a signature pack. Use Import signatures." Anything else gets "Not a Fieldwatch language pack."
 - `formatVersion` is missing or not a positive integer.
 - `language` is missing or blank after cleaning.
-- `strings` is missing or is not an object.
+- `strings` is missing or is not an object, or any value in it is not a string.
 - The file has more than 2000 entries in `strings`.
 - After the line rules below, no known key has usable text.
 
@@ -162,25 +201,29 @@ The stored pack is the cleaned result the app writes: language name, accepted ta
 
 ## First launch
 
-The phone language does not switch Fieldwatch. It only decides whether to show a one-time door. The app stays English until a pack is imported.
+Follow the bundled-language table. A match selects that language and shows the AI sentence once. It does not show the import door.
 
-Show the door once, before the disclaimer, when the phone language is not English, no pack is loaded, and the user has not already dismissed it. Import opens the file picker immediately. If the user backs out of the picker, the door stays up. Continue in English closes the door and stores that choice. Do not show it again after an update. Settings keeps Import language pack for later.
+Show the import door once, before the disclaimer, when the phone language is not English, no bundled language matches, no pack is loaded, and the user has not already dismissed it. Import opens the file picker immediately. If the user backs out of the picker, the door stays up. Continue in English closes the door and stores that choice. Do not show it again after an update. The Language page keeps Import language pack for later.
 
 The door says that Fieldwatch is in English, and that the user can import a language-pack file if they already have one. It does not say a pack is waiting to be downloaded.
 
 The door also shows this official sentence: "Language packs are made by other people. They are not reviewed or certified by Off Grid Pete LLC."
 
-That sentence, and the rest of the door, is compiled into the APK. It is not a pack key. A pack must not be able to replace, shorten, or hide it. For a phone language you are willing to write yourself, ship that short door in that language. Any other language gets the English door.
+That sentence, the AI sentence, and the rest of the door are compiled into the APK. They are not pack keys. A pack must not be able to replace, shorten, or hide them. The import door is English.
 
-## Import, replace, and remove
+## Language page
 
-Settings gets three actions, placed with the other import and export actions:
+Language is its own page in Settings, on the same list as Appearance, Scanning, and the rest. It is not part of Settings backup. The row shows the language in use, such as French or English.
 
-- Import language pack…
-- Export English template…
-- Remove language pack, shown only while a pack is loaded.
+The page does three jobs:
 
-Also show the current language: "English", or the cleaned language name.
+- Set. Follow the phone, English, or one bundled language. Follow the phone is the usual choice. An explicit choice stays until the user changes it. Choosing English turns a bundled language off on this phone. It does not delete that language from the app.
+- Add. Import language pack… opens the file picker for a language that is not bundled. Fieldwatch does not download a language.
+- Remove. Remove language pack is shown only while an imported pack is loaded. It deletes that file. The page then returns to Follow the phone.
+
+Export English template is on this page for someone writing a file. It is not part of everyday use. Next to it, the page shows this compiled sentence: "To write a language file, export the English template and follow the author guide on GitHub." The link points at the author guide in this repo. The app does not download the guide. The sentence is not a pack key, and a pack cannot change it.
+
+The page shows the current language: "English", the bundled language name, or the cleaned name of an imported pack. While a bundled language is active and no imported pack has replaced it, the page shows the AI sentence. An imported pack does not get that sentence. Its confirm dialog shows the not-reviewed sentence instead.
 
 Import uses the same kind of document picker as Import settings. Reading and parsing run off the main thread. Nothing is stored until the user confirms.
 
@@ -191,15 +234,16 @@ The confirm dialog shows:
 - How many lines will change.
 - How many English lines will stay English.
 - How many lines in the file were ignored, including lines that were too long for their slot.
+- How many keys are new since this pack, when `writtenFor` is present and comparable. That count is the keys added after that version which this pack does not translate. Those keys are included in the stay-English count. Omit this line when `writtenFor` is missing or not a version the app can compare. A mismatch still does not reject the pack.
 - The same official sentence as the door: "Language packs are made by other people. They are not reviewed or certified by Off Grid Pete LLC." This sentence is compiled into the APK and is not a pack key. The pack cannot replace it.
 
 The buttons are Import and Cancel. Cancel leaves the current language alone. Import replaces the whole pack. It does not merge. A key that was translated before, and is absent from the new pack, returns to English.
 
-Remove asks for confirmation, then deletes the stored pack and redraws the open screen in English.
+Remove asks for confirmation, then deletes the stored pack. The open screen redraws in the phone's bundled language, or in English when the phone language is not bundled.
 
 These leave the language pack alone:
 
-- Import settings and Export settings.
+- Import settings and Export settings. Neither copies the Language page choice or the imported file.
 - Import signatures, export signatures, and Update stock catalog.
 - Restore defaults.
 
@@ -215,7 +259,9 @@ There is no second hand-maintained copy of the English text. The template is gen
 
 Keys stay stable. Renaming a key makes existing packs show English for that line. Prefer a new key over renaming one.
 
-Changing the English text under the same key is allowed. Packs keep their old line until they are updated, unless the placeholders changed.
+Each key records the app version that added it. Keys that arrive with the first map share that version. The confirm dialog uses this to count keys new since `writtenFor`.
+
+Changing the English text under the same key is allowed when the meaning stays the same. Packs keep their old line until they are updated, unless the placeholders changed. When the meaning of a safety sentence changes, give it a new key so the old translation falls back to English. Nothing watches the sentences in the background. The edit that changes the English includes this check.
 
 The first implementation moves the existing user-visible chrome onto the map. Wording stays the same. This is not a copy edit.
 
@@ -225,7 +271,9 @@ Every later user-visible sentence goes into the map. Tests cover the lookup. A t
 
 The token grammar is `{` + a letter followed by letters, digits, or underscores + `}`. The first version has no plural categories, no gender, and no select. A count is digits inside one sentence that reads correctly for any count. Translators write that one sentence.
 
-The phone locale does not select a language. The imported pack is the only switch. Layout direction stays as it is today. The language tag does not flip the app to right-to-left.
+In Polish, Czech, Latvian, and other Slavic or Baltic languages, one sentence that reads right for every count gets awkward. For version 1 the author guide tells them to use a form such as `count: {n}`. Do not add plural categories to make those sentences agree.
+
+The phone language selects a bundled language, as listed above. It does not change the Android locale, layout direction, or number formats. The language tag does not flip the app to right-to-left. An imported pack replaces the bundled language until it is removed.
 
 ## Screen fit
 
@@ -236,8 +284,13 @@ Each English key has a slot, compiled into the app. The pack cannot change a key
 | Slot | Where it is used | Cap | How it is drawn |
 | --- | --- | --- | --- |
 | `tab` | Bottom bar: Live, Filters, Signatures, Reports, Settings | 18 characters | At most two lines. A longer word stays inside its tab. |
+| `classchip` | Class names on the Filters chips. Two chips share a row, at 11sp, with an icon, on one line. | 18 characters | One line. A longer name would ellipsize, so it is dropped and the English name stays. The spoken class name uses `control`, not this slot. |
 | `control` | Chips, buttons, one-line rows, and fixed spoken phrases | Twice the English length, at most 48 characters | Chips stay one line and ellipsize. The row of chips wraps. Full-width buttons may use two lines. List rows keep today's one-line ellipsis. A spoken phrase stays a short phrase. |
 | `body` | Dialogs, the tour, empty states, Diagnostics explanations, report sentences, and PDF sentences | Three times the English length, at least 80 characters, at most 700 | Wrap. Dialogs and pages scroll. Do not ellipsize a warning. PDF text wraps inside the margins. |
+
+Eighteen characters fits most tab words and the class chips. The longest English class names are about 14 characters and already fit. Twice that length would ellipsize on the chip, so the class chip uses 18. A German compound, and the same kind of long word in other languages, can pass that cap. The author guide tells them to pick a shorter word. A line over the cap stays English. The dialog counts it as ignored. It does not name the word.
+
+On-screen text uses the phone's font. That font covers Cyrillic, so Bulgarian and Macedonian do not need a font in the APK. The Debrief and Compare PDFs must draw those letters too. A test renders a Cyrillic line in a Debrief PDF and fails if those characters are missing.
 
 The file cap of 256 KiB, the language name cap of 40 characters, and the cap of 2000 keys stay. Those protect the phone from a huge file. They are not the visual rule.
 
@@ -266,39 +319,53 @@ The implementation is done when these are true:
 - A line containing `<script>`, `javascript:`, `intent:`, `file:`, `content:`, or a URL is shown as characters. The test fails if any of those cause a WebView, an HTML render, a fetched URL, or an intent.
 - A nested JSON value, a second document after the object, and a file that is a zip or an APK are rejected. A pack already on the phone stays in place.
 - The official not-reviewed sentence is the compiled sentence, even when the loaded pack has a key that tries to replace it.
+- The AI sentence is the compiled sentence. A pack key cannot replace it. It is shown when a bundled language is first selected, and on the Language page while that language is active and no imported pack has replaced it.
+- The author-guide sentence is the compiled sentence. A pack key cannot replace it. It is shown next to Export English template, and its link points at the guide in this repo.
+- Language is its own Settings page. Settings backup does not contain the language actions.
 - Applying a pack does not change the Android locale, the watchlist, settings, the catalog, or which voice phrase is chosen.
 - An unknown key is ignored. An unknown top-level field is ignored.
 - Empty file, garbage, a settings pack, a signature pack, a file over 256 KiB, and a pack with no usable known lines are rejected. A pack already on the phone stays in place.
 - Newlines are kept only when the English line has a newline. Bidirectional marks are removed.
 - Confirm is required before apply. Cancel does not change the language.
 - A second pack replaces the first. Keys only in the first pack return to English.
-- Remove restores English and deletes the stored pack.
-- Import settings, import signatures, catalog update, and restore defaults do not change the language pack.
+- Remove deletes the stored pack. A bundled phone language returns. Any other phone returns to English.
+- Import settings, import signatures, catalog update, and restore defaults do not change the language or the Language page choice. Export settings does not include either.
 - Process start loads the stored map once. A stored line whose placeholders no longer match the English falls back to English.
 - A translated line written to CSV still gets the formula guard.
 - The English template contains every key and is generated from the map.
 - Fixed voice phrases can be translated. The choice of which phrase speaks is unchanged. A user-written phrase is unchanged.
 - WiGLE and other machine-readable headers stay English.
+- ATAK pin remarks and CoT tags stay English. A pack key cannot change them.
+- A Debrief PDF page draws a Cyrillic sentence, and the test fails if those characters are missing.
+- When `writtenFor` is an older known version, confirm reports how many keys were added after it and are not translated. When `writtenFor` is missing, that count is omitted and the pack still loads.
 - The launcher name stays Fieldwatch.
+- A French phone selects bundled French without an import. A language that is not bundled stays English. Luxembourgish stays English. `fr-LU` selects French and `de-LU` selects German. Croatian, Montenegrin, and `sr-ME` select Croatian. Serbian (`sr` without `ME`) stays English.
+- A missing key in a bundled language stays English.
+- A class-chip line longer than 18 characters stays English. The spoken class name may be longer, up to its `control` cap.
+- The English lines that use Wi-Fi, Bluetooth, GPS, GNSS, USB, PDF, CSV, ATAK, SSID, MAC, RSSI, or OUI still contain those words.
 
 ## Author guide
 
 People who write a pack need their own English instructions. The phone manual is for the person importing a file. The author guide is for the person producing one. Write the author guide with the feature, after the English map exists, so it can point at Export English template and not at a hand-copied key list.
 
-Put the guide in this repo as documentation of the format. It does not contain translated packs, and it is not a place for people to upload one.
+Put the guide in this repo as documentation of the format. It does not contain translated packs, and it is not a place for people to upload one. The Language page links to that file. The link is compiled into the app.
 
 The guide needs to say:
 
 - A pack is a JSON file. It does not replace the APK, and it is not a fork. Off Grid Pete LLC does not review or certify it. The author hosts the file. Fieldwatch does not publish it or download it.
-- Start from Settings → Export English template on the Fieldwatch version being translated. Keep the keys. Edit the values. Delete any key that is not being translated. Do not invent keys, rename keys, or translate by searching the source for English sentences. A sentence that is not in the template cannot be translated.
+- Start from Settings → Language → Export English template on the Fieldwatch version being translated. Keep the keys. Edit the values. Delete any key that is not being translated. Do not invent keys, rename keys, or translate by searching the source for English sentences. A sentence that is not in the template cannot be translated.
 - A missing or blank key stays English. That is expected.
 - Keep every `{token}` exactly as exported, including the braces and the token name. Do not add tokens. Do not use `%s`. A line that breaks this rule is shown in English.
+- There are no plural forms. One sentence has to read right for every count. In Polish, Czech, Latvian, and other Slavic or Baltic languages, that gets awkward. Use a form such as `count: {n}` rather than forcing the noun to agree with the number.
 - The text is display text. HTML, scripts, links, and format strings are shown as characters or dropped. They do not run.
-- Stay inside the slot for each key. A tab is at most 18 characters. A chip, button, row, or spoken phrase is at most twice the English length and never more than 48 characters. A dialog or other long sentence is at most three times the English length and never more than 700 characters. The language name is at most 40 characters. The file is at most 256 KiB. A line that is too long is left in English. A newline is kept only when the English line has one.
+- Stay inside the slot for each key. A tab or a class chip is at most 18 characters. A chip, button, row, or spoken phrase is at most twice the English length and never more than 48 characters. A dialog or other long sentence is at most three times the English length and never more than 700 characters. The language name is at most 40 characters. The file is at most 256 KiB. A line that is too long is left in English. A newline is kept only when the English line has one.
+- For a tab or a class chip, pick a shorter word when the full word would pass 18 characters. A German compound is the usual case. A line over the cap stays English, and the confirm dialog only counts it. It does not point at the word.
+- Leave these words as written: Wi-Fi, Bluetooth, GPS, GNSS, USB, PDF, CSV, ATAK, SSID, MAC, RSSI, and OUI. Translate ordinary words. Translate Fieldwatch terms such as sit, signature, and Extra attention into plain words.
+- After a Fieldwatch update, import the pack again and read "new since your pack" on the confirm dialog. That count is the keys added after `writtenFor` which this pack does not translate. Export a fresh English template and translate those keys. Leave `writtenFor` as the version of that template.
 - Set `language` to the name users should see, and `writtenFor` to the version of the template. One pack replaces another. It does not merge.
 - The sentence that packs are not reviewed or certified is official text. It is not in the template, and a pack cannot change it.
-- Tell users to import the file from Settings, or from the first-run door when their phone is not in English. The guide can describe those steps. The in-app wording for phone users still belongs in the user manual.
+- Tell users to import the file from Settings, or from the first-run door when their phone language is not English and not one of the bundled languages. The guide can describe those steps. The in-app wording for phone users still belongs in the user manual. A bundled language is already in the APK. Do not tell those users to import it.
 
 ## Manual later
 
-When this is actually shipped, add a short English section to the user manual for import, remove, partial packs staying in English, and the fact that packs are made by other people and are not reviewed or certified by Off Grid Pete LLC. Add a changelog line. The manual stays English. Do that in the ship, not as a drive-by while the feature is still unreleased. The author guide above is a separate document.
+When this is actually shipped, add a short English section to the user manual. It covers the phone language selecting a bundled language, missing lines staying English, the AI sentence and the request to open a GitHub issue, and import and remove for every other language. An imported pack is made by other people and is not reviewed or certified by Off Grid Pete LLC. Add a changelog line. The manual stays English. Do that in the ship, not as a drive-by while the feature is still unreleased. The author guide above is a separate document.

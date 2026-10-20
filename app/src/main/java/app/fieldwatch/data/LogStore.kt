@@ -2,6 +2,7 @@ package app.fieldwatch.data
 
 import android.content.Context
 import app.fieldwatch.domain.CsvCells
+import app.fieldwatch.domain.LanguageText
 import app.fieldwatch.domain.Fleet
 import app.fieldwatch.domain.LogExportRadios
 import app.fieldwatch.domain.LogFormat
@@ -159,7 +160,7 @@ class LogStore(context: Context) {
             withContext(Dispatchers.IO) {
                 flushWriter()
                 val stream = resolver.openOutputStream(uri)
-                    ?: error("Could not open the selected location")
+                    ?: error(LanguageText.text("ui.could.not.open.location"))
                 stream.buffered(64 * 1024).use { dest ->
                     writeExport(dest, asJsonl, radios, onProgress)
                 }

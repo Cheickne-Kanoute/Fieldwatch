@@ -4,8 +4,10 @@ import android.app.ActivityManager
 import android.content.Context
 import app.fieldwatch.domain.Fleet
 import app.fieldwatch.domain.FloodBurst
+import app.fieldwatch.domain.Geo
 import app.fieldwatch.domain.GnssMark
 import app.fieldwatch.domain.GpsSample
+import app.fieldwatch.domain.PlaceMemory
 import app.fieldwatch.domain.RadioBookmarks
 import app.fieldwatch.domain.Sit
 import app.fieldwatch.domain.SitDebrief
@@ -44,6 +46,8 @@ class SitStore(
     private val mutex = Mutex()
     private val lock = Any()
     private var open: SitSession? = null
+    private var spanCacheCount = -1
+    private var spanCacheM = 0.0
     private var closed: List<SitSummary> = emptyList()
     private var selectedId: String? = null
     private var compareId: String? = null
@@ -249,6 +253,22 @@ class SitStore(
 
     fun consumeNotice() {
         synchronized(lock) { publishLocked(notice = null) }
+    }
+
+    fun openSitId(): String? = synchronized(lock) { open?.summary?.id }
+
+    /** Sit name while that sit's path is still one place. A drive leaves the name off. */
+    fun clusterLabel(): String? {
+        synchronized(lock) {
+            val session = open ?: return null
+            val count = session.pathCount
+            if (count != spanCacheCount) {
+                spanCacheM = if (count >= 2) Geo.spanM(session.operatorPath) else 0.0
+                spanCacheCount = count
+            }
+            if (count >= 2 && spanCacheM >= PlaceMemory.SEPARATION_M) return null
+            return session.summary.name.trim().ifBlank { null }
+        }
     }
 
     fun debriefSource(now: Long = System.currentTimeMillis()): SitDebrief? {

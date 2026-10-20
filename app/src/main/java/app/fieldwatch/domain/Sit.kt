@@ -288,6 +288,7 @@ class SitSession(
     val radioCount: Int get() = radios.size
     val atCap: Boolean get() = radios.size >= Sit.RADIO_CAP
     val operatorPath: List<GpsSample> get() = path.toList()
+    val pathCount: Int get() = path.size
 
     fun markClean() {
         dirty = false

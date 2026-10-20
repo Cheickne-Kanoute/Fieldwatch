@@ -39,6 +39,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
+import androidx.compose.material.icons.automirrored.outlined.ShowChart
 import androidx.compose.material.icons.outlined.CellTower
 import androidx.compose.material.icons.outlined.FilterAlt
 import androidx.compose.material.icons.outlined.ExpandLess
@@ -87,12 +89,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -111,6 +114,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import app.fieldwatch.domain.HeaderTone
 import app.fieldwatch.domain.ListLine
+import app.fieldwatch.domain.LanguageText
 import app.fieldwatch.domain.bleHeader
 import app.fieldwatch.domain.gpsHeader
 import app.fieldwatch.domain.wifiHeader
@@ -120,6 +124,8 @@ import app.fieldwatch.domain.ViewMode
 import app.fieldwatch.domain.FieldwatchDisclaimer
 import app.fieldwatch.domain.disclaimerOk
 import app.fieldwatch.radio.RadioPermissions
+import app.fieldwatch.ui.screen.LanguageDoor
+import app.fieldwatch.ui.screen.LanguageOverlays
 import app.fieldwatch.ui.screen.DeviceDetailScreen
 import app.fieldwatch.ui.screen.HuntScreen
 import app.fieldwatch.ui.screen.FiltersScreen
@@ -138,16 +144,35 @@ import app.fieldwatch.ui.theme.nightIf
 @Composable
 fun FieldwatchRoot(vm: FieldwatchViewModel, onRequestPermissions: () -> Unit) {
     val state by vm.ui.collectAsStateWithLifecycle()
+    val language by vm.language.collectAsStateWithLifecycle()
+    val languageRev by LanguageText.revision.collectAsStateWithLifecycle()
+    val importLanguage = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri -> uri?.let(vm::importLanguageFromUri) }
     FieldwatchTheme(
         darkTheme = true,
         nightMode = state.settings.nightMode,
     ) {
-        if (!state.settings.disclaimerOk()) {
-            DisclaimerGate(onAccept = vm::acceptDisclaimer)
-        } else if (!state.permissionsOk) {
-            PermissionGate(onRequestPermissions)
-        } else {
-            FieldwatchShell(state, vm)
+        if (languageRev >= 0) {
+            if (language.snap.showDoor) {
+                LanguageDoor(
+                    onImport = { importLanguage.launch(arrayOf("application/json", "text/plain", "*/*")) },
+                    onEnglish = vm::dismissLanguageDoor,
+                )
+            } else if (!state.settings.disclaimerOk()) {
+                DisclaimerGate(onAccept = vm::acceptDisclaimer)
+            } else if (!state.permissionsOk) {
+                PermissionGate(onRequestPermissions)
+            } else {
+                FieldwatchShell(state, vm)
+            }
+            LanguageOverlays(
+                state = language,
+                onConfirmImport = vm::confirmLanguageImport,
+                onCancelImport = vm::cancelLanguageImport,
+                onDismissError = vm::dismissLanguageError,
+                onDismissAi = vm::dismissLanguageAi,
+            )
         }
     }
 }
@@ -164,13 +189,13 @@ private fun DisclaimerGate(onAccept: () -> Unit) {
             .padding(horizontal = 28.dp, vertical = 24.dp),
     ) {
         Text(
-            "Disclaimer and license",
+            LanguageText.text("ui.disclaimer.license"),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold,
             color = ink,
         )
         Text(
-            "Disclaimer",
+            LanguageText.text("ui.disclaimer.label"),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = ink,
@@ -214,7 +239,7 @@ private fun DisclaimerGate(onAccept: () -> Unit) {
         ) {
             Checkbox(checked = agreed, onCheckedChange = null)
             Text(
-                "I have read this and I agree",
+                LanguageText.text("ui.i.have.read.i"),
                 style = MaterialTheme.typography.bodyMedium,
                 color = ink,
                 modifier = Modifier.padding(start = 8.dp),
@@ -226,7 +251,7 @@ private fun DisclaimerGate(onAccept: () -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 16.dp),
-        ) { Text("Continue") }
+        ) { Text(LanguageText.text("ui.continue.label")) }
     }
 }
 
@@ -237,14 +262,14 @@ private fun PermissionGate(onRequest: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("Fieldwatch needs the radios", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+        Text(LanguageText.text("ui.fieldwatch.needs.radios"), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
         Text(
-            "Location, nearby Wi-Fi, Bluetooth scan, and notifications let Fieldwatch passively watch advertised networks and BLE devices. Nothing is transmitted.",
+            LanguageText.text("ui.location.nearby.wi.fi"),
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(top = 12.dp, bottom = 20.dp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Button(onClick = onRequest) { Text("Grant permissions") }
+        Button(onClick = onRequest) { Text(LanguageText.text("ui.grant.permissions")) }
     }
 }
 
@@ -255,6 +280,7 @@ private fun FieldwatchShell(state: FieldwatchUi, vm: FieldwatchViewModel) {
     val route = nav.currentBackStackEntryAsState().value?.destination?.route ?: "live"
     val context = LocalContext.current
     val export by vm.export.collectAsStateWithLifecycle()
+    val candidates by vm.candidates.collectAsStateWithLifecycle()
     val gnssStatus by vm.gnssStatus.collectAsStateWithLifecycle()
     val gnssNotice by vm.gnssNotice.collectAsStateWithLifecycle()
     val gnssProfile by vm.gnssProfile.collectAsStateWithLifecycle()
@@ -282,25 +308,25 @@ private fun FieldwatchShell(state: FieldwatchUi, vm: FieldwatchViewModel) {
                 val m = export.message.lowercase()
                 Text(
                     when {
-                        "sit compare" in m && "pdf" in m -> "Sit compare PDF"
-                        "sit compare" in m && "ai" in m -> "Sit compare AI Export"
-                        "sit compare" in m -> "Sit compare"
-                        "ai export" in m || "ai export" in m -> "AI Export"
-                        "pdf" in m -> "Debrief PDF"
-                        "debrief" in m -> "Debrief"
-                        else -> "Export"
+                        LanguageText.text("ui.sit.compare") in m && "pdf" in m -> LanguageText.text("ui.sit.compare.pdf")
+                        LanguageText.text("ui.sit.compare") in m && "ai" in m -> LanguageText.text("ui.sit.compare.ai.export")
+                        LanguageText.text("ui.sit.compare") in m -> LanguageText.text("ui.sit.compare.2")
+                        LanguageText.text("ui.ai.export.2") in m || LanguageText.text("ui.ai.export.2") in m -> LanguageText.text("ui.ai.export")
+                        "pdf" in m -> LanguageText.text("ui.debrief.pdf")
+                        "debrief" in m -> LanguageText.text("reports.debrief")
+                        else -> LanguageText.text("ui.export.label")
                     },
                 )
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(export.message.ifBlank { "Please wait…" })
+                    Text(export.message.ifBlank { LanguageText.text("ui.please.wait") })
                     if ("debrief" !in export.message.lowercase() &&
-                        "ai export" !in export.message.lowercase() &&
-                        "sit compare" !in export.message.lowercase()
+                        LanguageText.text("ui.ai.export.2") !in export.message.lowercase() &&
+                        LanguageText.text("ui.sit.compare") !in export.message.lowercase()
                     ) {
                         Text(
-                            "Live logging is paused until this finishes. Scanning continues.",
+                            LanguageText.text("ui.live.logging.paused.until"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -319,35 +345,56 @@ private fun FieldwatchShell(state: FieldwatchUi, vm: FieldwatchViewModel) {
             confirmButton = { },
         )
     }
+    if (candidates.loading) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text(LanguageText.text("reports.candidates")) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(candidates.message.ifBlank { LanguageText.text("ui.reading.log") })
+                    LinearProgressIndicator(
+                        progress = { candidates.progress },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        "${(candidates.progress * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                }
+            },
+            confirmButton = { },
+        )
+    }
     if (export.error != null) {
         AlertDialog(
             onDismissRequest = vm::consumeExportNotice,
-            title = { Text(export.errorTitle ?: "Could not export") },
+            title = { Text(export.errorTitle ?: LanguageText.text("ui.could.not.export")) },
             text = { Text(export.error ?: "") },
             confirmButton = {
-                TextButton(onClick = vm::consumeExportNotice) { Text("OK") }
+                TextButton(onClick = vm::consumeExportNotice) { Text(LanguageText.text("ui.ok.label")) }
             },
         )
     }
     if (export.saved) {
         AlertDialog(
             onDismissRequest = vm::consumeExportNotice,
-            title = { Text("Log saved") },
+            title = { Text(LanguageText.text("ui.log.saved")) },
             text = {
-                Text("The file was written to the folder you picked. In the system picker, use the menu to choose the SD card if you want it off internal storage.")
+                Text(LanguageText.text("ui.file.was.written.folder"))
             },
             confirmButton = {
-                TextButton(onClick = vm::consumeExportNotice) { Text("OK") }
+                TextButton(onClick = vm::consumeExportNotice) { Text(LanguageText.text("ui.ok.label")) }
             },
         )
     }
     if (export.cleared) {
         AlertDialog(
             onDismissRequest = vm::consumeExportNotice,
-            title = { Text("Log cleared") },
-            text = { Text("Rotated files were deleted. New detections will start a fresh log.") },
+            title = { Text(LanguageText.text("ui.log.cleared")) },
+            text = { Text(LanguageText.text("ui.rotated.files.were.deleted")) },
             confirmButton = {
-                TextButton(onClick = vm::consumeExportNotice) { Text("OK") }
+                TextButton(onClick = vm::consumeExportNotice) { Text(LanguageText.text("ui.ok.label")) }
             },
         )
     }
@@ -357,7 +404,7 @@ private fun FieldwatchShell(state: FieldwatchUi, vm: FieldwatchViewModel) {
             title = { Text(export.noticeTitle ?: "") },
             text = { Text(export.noticeMessage.orEmpty()) },
             confirmButton = {
-                TextButton(onClick = vm::consumeExportNotice) { Text("OK") }
+                TextButton(onClick = vm::consumeExportNotice) { Text(LanguageText.text("ui.ok.label")) }
             },
         )
     }
@@ -409,9 +456,9 @@ private fun FieldwatchShell(state: FieldwatchUi, vm: FieldwatchViewModel) {
                             Text(
                                 when {
                                     state.sit.open != null && state.displayPaused ->
-                                        "FIELDWATCH  ·  SIT  ·  PAUSED"
-                                    state.sit.open != null -> "FIELDWATCH  ·  SIT"
-                                    state.displayPaused -> "FIELDWATCH  ·  PAUSED"
+                                        LanguageText.text("ui.fieldwatch.sit.paused")
+                                    state.sit.open != null -> LanguageText.text("ui.fieldwatch.sit")
+                                    state.displayPaused -> LanguageText.text("ui.fieldwatch.paused")
                                     else -> "FIELDWATCH"
                                 },
                                 style = MaterialTheme.typography.titleMedium,
@@ -444,7 +491,7 @@ private fun FieldwatchShell(state: FieldwatchUi, vm: FieldwatchViewModel) {
                                 HeaderCount(
                                     state.namedNow,
                                     Icons.Outlined.Hub,
-                                    if (state.scanning) "signatures" else "signatures idle",
+                                    if (state.scanning) "signatures" else LanguageText.text("ui.signatures.idle"),
                                     headerTint(
                                         if (state.scanning) HeaderTone.HEALTHY else HeaderTone.IDLE,
                                         muted,
@@ -490,6 +537,9 @@ private fun FieldwatchShell(state: FieldwatchUi, vm: FieldwatchViewModel) {
                                 onClick = {
                                     vm.setScanControlsExpanded(!state.settings.scanControlsExpanded)
                                 },
+                                modifier = Modifier.onGloballyPositioned {
+                                    tourTargets = tourTargets.copy(tune = it.boundsInRoot())
+                                },
                             ) {
                                 Icon(
                                     if (state.settings.scanControlsExpanded) {
@@ -498,13 +548,11 @@ private fun FieldwatchShell(state: FieldwatchUi, vm: FieldwatchViewModel) {
                                         Icons.Outlined.Tune
                                     },
                                     if (state.settings.scanControlsExpanded) {
-                                        "Hide scan options"
+                                        LanguageText.text("ui.hide.scan.options")
                                     } else {
-                                        "Show scan options"
+                                        LanguageText.text("ui.show.scan.options")
                                     },
-                                    modifier = Modifier.onGloballyPositioned {
-                                        tourTargets = tourTargets.copy(tune = it.boundsInRoot())
-                                    },
+                                    tint = MaterialTheme.colorScheme.onSurface,
                                 )
                             }
                         }
@@ -541,7 +589,6 @@ private fun FieldwatchShell(state: FieldwatchUi, vm: FieldwatchViewModel) {
                         FieldwatchNavTab(
                             weight = 1f,
                             selected = route == "live",
-                            onBounds = { tourTargets = tourTargets.copy(pause = it) },
                             onClick = {
                                 if (route == "live") {
                                     vm.toggleLiveDisplay()
@@ -556,42 +603,46 @@ private fun FieldwatchShell(state: FieldwatchUi, vm: FieldwatchViewModel) {
                                         route == "live" && state.displayPaused -> Icons.Outlined.PlayArrow
                                         else -> Icons.Outlined.CellTower
                                     },
-                                    if (route == "live" && !state.displayPaused) "Pause display" else "Live",
+                                    if (route == "live" && !state.displayPaused) {
+                                        LanguageText.text("chrome.pause.display")
+                                    } else {
+                                        LanguageText.text("tab.live")
+                                    },
                                 )
                             },
-                            label = if (route == "live" && !state.displayPaused) "Pause" else "Live",
+                            label = if (route == "live" && !state.displayPaused) {
+                                LanguageText.text("tab.pause")
+                            } else {
+                                LanguageText.text("tab.live")
+                            },
                         )
                         FieldwatchNavTab(
                             weight = 1f,
                             selected = route == "filters",
-                            onBounds = { tourTargets = tourTargets.copy(filters = it) },
                             onClick = { nav.navigate("filters") { launchSingleTop = true } },
                             icon = { Icon(Icons.Outlined.FilterAlt, null) },
-                            label = "Filters",
+                            label = LanguageText.text("tab.filters"),
                         )
                         FieldwatchNavTab(
                             weight = 1.45f,
                             selected = route == "fleets",
-                            onBounds = { tourTargets = tourTargets.copy(signatures = it) },
                             onClick = { nav.navigate("fleets") { launchSingleTop = true } },
                             icon = { Icon(Icons.Outlined.Hub, null) },
-                            label = "Signatures",
+                            label = LanguageText.text("tab.signatures"),
                         )
                         FieldwatchNavTab(
                             weight = 1f,
                             selected = route == "reports" || route == "candidates",
-                            onBounds = { tourTargets = tourTargets.copy(reports = it) },
                             onClick = { nav.navigate("reports") { launchSingleTop = true } },
                             icon = { Icon(Icons.Outlined.Description, null) },
-                            label = "Reports",
+                            label = LanguageText.text("tab.reports"),
                         )
                         FieldwatchNavTab(
                             weight = 1.05f,
                             selected = route == "settings" || route == "radio-bookmarks" || route == "scan-status",
-                            onBounds = { tourTargets = tourTargets.copy(settings = it) },
                             onClick = { nav.navigate("settings") { launchSingleTop = true } },
                             icon = { Icon(Icons.Outlined.Settings, null) },
-                            label = "Settings",
+                            label = LanguageText.text("tab.settings"),
                         )
                         }
                     }
@@ -740,17 +791,17 @@ private fun FieldwatchShell(state: FieldwatchUi, vm: FieldwatchViewModel) {
                     Scaffold(
                         topBar = {
                             TopAppBar(
-                                title = { Text("Detail") },
+                                title = { Text(LanguageText.text("ui.detail.label")) },
                                 navigationIcon = {
                                     IconButton(onClick = onBack) {
-                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, LanguageText.text("chrome.back"))
                                     }
                                 },
                             )
                         },
                     ) { pad ->
                         Text(
-                            "No radio selected.",
+                            LanguageText.text("ui.no.radio.selected"),
                             Modifier.padding(pad).padding(24.dp),
                         )
                     }
@@ -784,7 +835,11 @@ private fun FieldwatchShell(state: FieldwatchUi, vm: FieldwatchViewModel) {
         }
     }
     if (showTour) {
-        LiveChromeTour(targets = tourTargets, onDismiss = vm::dismissLiveTour)
+        LiveChromeTour(
+            tune = tourTargets.tune,
+            onOpen = vm::openTuneFromTour,
+            onSkip = vm::dismissLiveTour,
+        )
     }
     }
 }
@@ -830,7 +885,6 @@ private fun RowScope.FieldwatchNavTab(
     onClick: () -> Unit,
     icon: @Composable () -> Unit,
     label: String,
-    onBounds: (Rect) -> Unit = {},
 ) {
     val color = if (selected) {
         MaterialTheme.colorScheme.primary
@@ -850,9 +904,7 @@ private fun RowScope.FieldwatchNavTab(
                 Modifier.height(22.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Box(Modifier.onGloballyPositioned { onBounds(it.boundsInRoot()) }) {
-                    icon()
-                }
+                icon()
             }
             Text(
                 label,
@@ -863,6 +915,106 @@ private fun RowScope.FieldwatchNavTab(
             )
         }
     }
+}
+
+private val radarSweepGlyph: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "RadarSweep",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).apply {
+        path(
+            fill = null,
+            stroke = SolidColor(Color.Black),
+            strokeLineWidth = 2f,
+        ) {
+            moveTo(12f, 3f)
+            arcTo(9f, 9f, 0f, false, true, 21f, 12f)
+            arcTo(9f, 9f, 0f, false, true, 12f, 21f)
+            arcTo(9f, 9f, 0f, false, true, 3f, 12f)
+            arcTo(9f, 9f, 0f, false, true, 12f, 3f)
+        }
+        // Upper-right sector, from 12 o'clock clockwise, inside the ring.
+        path(fill = SolidColor(Color.Black)) {
+            moveTo(12f, 12f)
+            lineTo(12f, 4.8f)
+            arcTo(7.2f, 7.2f, 0f, false, true, 18.53f, 8.96f)
+            close()
+        }
+    }.build()
+}
+
+private val dashedLineGlyph: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "DashedLine",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).apply {
+        path(
+            fill = null,
+            stroke = SolidColor(Color.Black),
+            strokeLineWidth = 2f,
+        ) {
+            moveTo(3f, 12f)
+            lineTo(6.2f, 12f)
+            moveTo(8.2f, 12f)
+            lineTo(11.4f, 12f)
+            moveTo(13.4f, 12f)
+            lineTo(16.6f, 12f)
+            moveTo(18.6f, 12f)
+            lineTo(21.8f, 12f)
+        }
+    }.build()
+}
+
+private val classBarsGlyph: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "ClassBars",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).apply {
+        path(fill = SolidColor(Color.Black)) {
+            moveTo(3f, 5f)
+            lineTo(16f, 5f)
+            lineTo(16f, 8f)
+            lineTo(3f, 8f)
+            close()
+            moveTo(8f, 10.5f)
+            lineTo(21f, 10.5f)
+            lineTo(21f, 13.5f)
+            lineTo(8f, 13.5f)
+            close()
+            moveTo(3f, 16f)
+            lineTo(16f, 16f)
+            lineTo(16f, 19f)
+            lineTo(3f, 19f)
+            close()
+        }
+    }.build()
+}
+
+private fun ViewMode.glyph(): ImageVector = when (this) {
+    ViewMode.RADAR -> radarSweepGlyph
+    ViewMode.LIST -> Icons.AutoMirrored.Outlined.FormatListBulleted
+    ViewMode.TIMELINE -> dashedLineGlyph
+    ViewMode.HYBRID -> Icons.AutoMirrored.Outlined.ShowChart
+    ViewMode.BY_CLASS -> classBarsGlyph
+}
+
+@Composable
+private fun ViewModeGlyph(mode: ViewMode, compact: Boolean = false) {
+    Icon(
+        mode.glyph(),
+        contentDescription = null,
+        modifier = if (compact) Modifier.size(18.dp) else Modifier,
+        tint = MaterialTheme.colorScheme.onSurface,
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -898,15 +1050,15 @@ private fun ViewPicker(
     var openTitle by remember { mutableStateOf(false) }
     var openSubtitle by remember { mutableStateOf(false) }
     val sortLabel = when (listSort) {
-        ListSort.STRENGTH -> if (sort == StrengthSort.AVERAGE) "Strongest · avg ${windowSec}s" else "Strongest"
-        ListSort.NEWEST -> "Newest heard"
-        ListSort.NEWEST_ALERT -> "Newest alert"
-        ListSort.FIRST_SEEN -> "Newest arrival"
-        ListSort.ARRIVAL -> "New at bottom"
-        ListSort.NAME -> "Name A–Z"
-        ListSort.SIGNATURES -> "Signatures first"
+        ListSort.STRENGTH -> if (sort == StrengthSort.AVERAGE) "Strongest · avg ${windowSec}s" else LanguageText.text("ui.strongest.label")
+        ListSort.NEWEST -> LanguageText.text("ui.newest.heard")
+        ListSort.NEWEST_ALERT -> LanguageText.text("ui.newest.alert")
+        ListSort.FIRST_SEEN -> LanguageText.text("ui.newest.arrival")
+        ListSort.ARRIVAL -> LanguageText.text("ui.new.bottom")
+        ListSort.NAME -> LanguageText.text("sort.name")
+        ListSort.SIGNATURES -> LanguageText.text("ui.signatures.first")
     }
-    val decayLabel = if (decaySec <= 0) "Off" else "Hold ${decaySec}s"
+    val decayLabel = if (decaySec <= 0) LanguageText.text("ui.off.label") else "Hold ${decaySec}s"
     val scroll = rememberScrollState()
     val panelMax = (maxHeight - 8.dp).coerceAtLeast(140.dp)
     val surfaceColor = MaterialTheme.colorScheme.surface
@@ -929,64 +1081,70 @@ private fun ViewPicker(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                "Display",
+                LanguageText.text("ui.display.label"),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             val dropdownPad = Modifier.fillMaxWidth().padding(vertical = 6.dp)
             ExposedDropdownMenuBox(openView, { openView = it }, dropdownPad) {
-                FieldwatchDropdownField("View", viewLabel, openView)
+                FieldwatchDropdownField(
+                    LanguageText.text("ui.view.label"),
+                    viewLabel,
+                    openView,
+                    leadingIcon = { ViewModeGlyph(mode, compact = true) },
+                )
                 ExposedDropdownMenu(openView, { openView = false }) {
                     ViewMode.entries.forEach { item ->
                         DropdownMenuItem(
                             text = { Text(item.label()) },
+                            leadingIcon = { ViewModeGlyph(item) },
                             onClick = { onChangeView(item); openView = false },
                         )
                     }
                 }
             }
             ExposedDropdownMenuBox(openSort, { openSort = it }, dropdownPad) {
-                FieldwatchDropdownField("Sort", sortLabel, openSort)
+                FieldwatchDropdownField(LanguageText.text("ui.sort.label"), sortLabel, openSort)
                 ExposedDropdownMenu(openSort, { openSort = false }) {
                     DropdownMenuItem(
-                        text = { Text("Strongest signal") },
+                        text = { Text(LanguageText.text("ui.strongest.signal")) },
                         onClick = { onChangeSort(StrengthSort.INSTANT, null); openSort = false },
                     )
                     DropdownMenuItem(
-                        text = { Text("Strongest (avg 30s)") },
+                        text = { Text(LanguageText.text("ui.strongest.avg.30s")) },
                         onClick = { onChangeSort(StrengthSort.AVERAGE, 30); openSort = false },
                     )
                     DropdownMenuItem(
-                        text = { Text("Newest heard") },
+                        text = { Text(LanguageText.text("ui.newest.heard")) },
                         onClick = { onChangeListSort(ListSort.NEWEST); openSort = false },
                     )
                     DropdownMenuItem(
-                        text = { Text("Newest alert") },
+                        text = { Text(LanguageText.text("ui.newest.alert")) },
                         onClick = { onChangeListSort(ListSort.NEWEST_ALERT); openSort = false },
                     )
                     DropdownMenuItem(
-                        text = { Text("Newest arrival") },
+                        text = { Text(LanguageText.text("ui.newest.arrival")) },
                         onClick = { onChangeListSort(ListSort.FIRST_SEEN); openSort = false },
                     )
                     DropdownMenuItem(
-                        text = { Text("New at bottom") },
+                        text = { Text(LanguageText.text("ui.new.bottom")) },
                         onClick = { onChangeListSort(ListSort.ARRIVAL); openSort = false },
                     )
                     DropdownMenuItem(
-                        text = { Text("Name A–Z") },
+                        text = { Text(LanguageText.text("sort.name")) },
                         onClick = { onChangeListSort(ListSort.NAME); openSort = false },
                     )
                     DropdownMenuItem(
-                        text = { Text("Signatures first") },
+                        text = { Text(LanguageText.text("ui.signatures.first")) },
                         onClick = { onChangeListSort(ListSort.SIGNATURES); openSort = false },
                     )
                 }
             }
             ExposedDropdownMenuBox(openDecay, { openDecay = it }, dropdownPad) {
-                FieldwatchDropdownField("Brief hold", decayLabel, openDecay)
+                FieldwatchDropdownField(LanguageText.text("ui.brief.hold"), decayLabel, openDecay)
                 ExposedDropdownMenu(openDecay, { openDecay = false }) {
                     DropdownMenuItem(
-                        text = { Text("Off — Stale after only") },
+                        text = { Text(LanguageText.text("ui.off.stale.after.only")) },
                         onClick = { onChangeDecay(0); openDecay = false },
                     )
                     listOf(10, 30, 60).forEach { sec ->
@@ -998,7 +1156,7 @@ private fun ViewPicker(
                 }
             }
             ExposedDropdownMenuBox(openTitle, { openTitle = it }, dropdownPad) {
-                FieldwatchDropdownField("Title line", listLineLabel(titleLine), openTitle)
+                FieldwatchDropdownField(LanguageText.text("ui.title.line"), listLineLabel(titleLine), openTitle)
                 ExposedDropdownMenu(openTitle, { openTitle = false }) {
                     listOf(ListLine.ADVERTISED_NAME, ListLine.NAME_AND_TYPE, ListLine.MAC).forEach { item ->
                         DropdownMenuItem(
@@ -1009,7 +1167,7 @@ private fun ViewPicker(
                 }
             }
             ExposedDropdownMenuBox(openSubtitle, { openSubtitle = it }, dropdownPad) {
-                FieldwatchDropdownField("Subtitle line", listLineLabel(subtitleLine), openSubtitle)
+                FieldwatchDropdownField(LanguageText.text("ui.subtitle.line"), listLineLabel(subtitleLine), openSubtitle)
                 ExposedDropdownMenu(openSubtitle, { openSubtitle = false }) {
                     listOf(
                         ListLine.ADVERTISED_NAME,
@@ -1024,10 +1182,10 @@ private fun ViewPicker(
                     }
                 }
             }
-            OptionSwitch("RSSI bars", showBar, onToggleBar)
-            OptionSwitch("Signature names", showFleet, onToggleFleet)
-            OptionSwitch("Frequency", showFrequency, onToggleFrequency)
-            OptionSwitch("First / last seen", showSeenTimes, onToggleSeenTimes)
+            OptionSwitch(LanguageText.text("display.rssi"), showBar, onToggleBar)
+            OptionSwitch(LanguageText.text("ui.signature.names"), showFleet, onToggleFleet)
+            OptionSwitch(LanguageText.text("ui.frequency.label"), showFrequency, onToggleFrequency)
+            OptionSwitch(LanguageText.text("ui.first.last.seen"), showSeenTimes, onToggleSeenTimes)
         }
         if (scroll.canScrollForward) {
             Box(
@@ -1044,7 +1202,7 @@ private fun ViewPicker(
             ) {
                 Icon(
                     Icons.Outlined.ExpandMore,
-                    contentDescription = "More display options below",
+                    contentDescription = LanguageText.text("ui.more.display.options.below"),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp),
                 )
@@ -1055,10 +1213,10 @@ private fun ViewPicker(
 }
 
 private fun listLineLabel(line: ListLine): String = when (line) {
-    ListLine.ADVERTISED_NAME -> "Advertised name"
-    ListLine.NAME_AND_TYPE -> "Name + type"
-    ListLine.MAC -> "MAC address"
-    ListLine.NONE -> "None"
+    ListLine.ADVERTISED_NAME -> LanguageText.text("display.advertised")
+    ListLine.NAME_AND_TYPE -> LanguageText.text("display.name.type")
+    ListLine.MAC -> LanguageText.text("display.mac")
+    ListLine.NONE -> LanguageText.text("display.none")
 }
 
 @Composable
@@ -1089,12 +1247,12 @@ private fun LiveSessionBar(
                         onClick = onMarkSeen,
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                    ) { Text("Mark seen") }
+                    ) { Text(LanguageText.text("ui.mark.seen")) }
                     FieldwatchActionButton(
                         onClick = onResetSeen,
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                    ) { Text("Reset seen") }
+                    ) { Text(LanguageText.text("ui.reset.seen")) }
                 }
             }
             if (movingWithYou) {
@@ -1102,7 +1260,7 @@ private fun LiveSessionBar(
                     onClick = onStartOverFollow,
                     modifier = Modifier.fillMaxWidth(),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                ) { Text("Start over") }
+                ) { Text(LanguageText.text("ui.start.over")) }
             }
         }
     }

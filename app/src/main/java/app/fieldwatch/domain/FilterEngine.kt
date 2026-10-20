@@ -11,6 +11,7 @@ class FilterEngine {
         watchedFleetIds: Set<String> = emptySet(),
         alertDeviceKeys: Set<String> = emptySet(),
         mineKeys: Set<String> = emptySet(),
+        placeKeys: Set<String> = emptySet(),
     ): Boolean {
         val named = device.fleetIds.isNotEmpty()
         val namedOk = if (filter.namedOnly) named else true
@@ -22,13 +23,14 @@ class FilterEngine {
             RadioKind.WIFI -> filter.showWifi
             RadioKind.BLE -> filter.showBle
         }
-        val hideOk = if (filter.excludeSignatures && filter.fleetIds.isNotEmpty()) {
+        // Show only and Hide these share one list. Show wins if an old save had both on.
+        val hideOk = if (filter.signatureHideOn() && filter.fleetIds.isNotEmpty()) {
             device.fleetIds.none { it in filter.fleetIds }
         } else true
-        val includeOk = if (!filter.includeSignatures || filter.includeFleetIds.isEmpty()) true
+        val includeOk = if (!filter.signatureShowOn() || filter.includeFleetIds.isEmpty()) true
         else device.fleetIds.any { it in filter.includeFleetIds }
         val deviceClasses = device.fleetIds.mapNotNull { classByFleetId[it] }.toSet()
-        val hideClassOk = if (filter.excludeClasses && filter.classes.isNotEmpty()) {
+        val hideClassOk = if (filter.useClassFilter && filter.excludeClasses && filter.classes.isNotEmpty()) {
             deviceClasses.none { it in filter.classes }
         } else true
         val includeClassOk = if (!filter.useClassFilter || filter.excludeClasses || filter.classes.isEmpty()) true
@@ -46,7 +48,7 @@ class FilterEngine {
                 rssiOk && nameOk && ouiOk
         } else {
             val optional = mutableListOf<Boolean>()
-            if (filter.includeSignatures) optional += includeOk
+            if (filter.signatureShowOn()) optional += includeOk
             if (filter.useClassFilter && !filter.excludeClasses) optional += includeClassOk
             if (filter.nameQuery.isNotBlank()) optional += nameOk
             if (filter.ouiQuery.isNotBlank()) optional += ouiOk
@@ -57,6 +59,7 @@ class FilterEngine {
         if (!gates) return false
         if (filter.hideFastPairAccountKey && FastPair.isAccountKeyOnly(device)) return false
         if (filter.hideMine && device.key in mineKeys) return false
+        if (filter.seenAtPlaces && device.key !in placeKeys) return false
         if (!filter.movingWithYou) return true
         return CoTravel.withYou(device, travel, now)
     }

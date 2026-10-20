@@ -44,6 +44,16 @@ import app.fieldwatch.domain.GnssNotice
 import app.fieldwatch.domain.GnssSide
 import app.fieldwatch.domain.GnssPhoneProfile
 import app.fieldwatch.domain.GnssPositionWitness
+import app.fieldwatch.domain.GnssRawAgc
+import app.fieldwatch.domain.GnssRawClock
+import app.fieldwatch.domain.GnssRawCommand
+import app.fieldwatch.domain.GnssRawFix
+import app.fieldwatch.domain.GnssRawFormat
+import app.fieldwatch.domain.GnssRawMode
+import app.fieldwatch.domain.GnssRawSample
+import app.fieldwatch.domain.GnssRawSat
+import app.fieldwatch.domain.GnssRawSession
+import app.fieldwatch.domain.GnssRawTime
 import app.fieldwatch.domain.GnssSnapshot
 import app.fieldwatch.domain.GpsSample
 import app.fieldwatch.domain.AppSettings
@@ -128,6 +138,8 @@ class GnssMonitor(private val app: FieldwatchApp) {
     private var mockOn = false
     private var lastGps: Fix? = null
     private var lastNet: Fix? = null
+    private val rawSession = GnssRawSession()
+    private var lastFixAttached = Long.MIN_VALUE
 
     private val main = Handler(Looper.getMainLooper())
 
@@ -158,6 +170,7 @@ class GnssMonitor(private val app: FieldwatchApp) {
                 return
             }
             val snap = detector.onEpoch(toEpoch(event), side())
+            recordRaw(event, snap)
             deliver(snap)
             handler?.postDelayed(stalled, 3_000L)
         }
@@ -210,6 +223,7 @@ class GnssMonitor(private val app: FieldwatchApp) {
             if (!shadeOn) main.post { app.alerter.clearGnssNote() }
             fullLabel = if (settings.gnssFullTracking && Build.VERSION.SDK_INT >= 31) "on" else "off"
             wantOwn = !settings.tagLocation
+            if (!settings.gnssRawLog || settings.demoMode) finishRaw(drop = settings.demoMode)
             if (!running) startLocked(settings) else {
                 val wantFull = settings.gnssFullTracking && Build.VERSION.SDK_INT >= 31
                 if (wantFull != fullTracking && callbackOn) {
@@ -301,6 +315,7 @@ class GnssMonitor(private val app: FieldwatchApp) {
         releaseOwnLocation()
         detector.reset()
         alerts.reset()
+        finishRaw(drop = app.config.settings.demoMode)
         lastSnap = null
         lastCue = ""
         timeDisagree = false
@@ -476,6 +491,7 @@ class GnssMonitor(private val app: FieldwatchApp) {
         releaseOwnLocation()
         detector.reset()
         alerts.reset()
+        finishRaw(drop = app.config.settings.demoMode)
         lastSnap = null
         running = false
         _reading.value = _reading.value.copy(notice = null, lives = emptyList(), statusLine = "")
@@ -723,7 +739,181 @@ class GnssMonitor(private val app: FieldwatchApp) {
         wall = System.currentTimeMillis(),
         elapsedNanos = loc.elapsedRealtimeNanos,
         mock = isMock(loc),
+        alt = if (loc.hasAltitude()) loc.altitude else null,
+        speed = if (loc.hasSpeed()) loc.speed else null,
+        bearing = if (loc.hasBearing()) loc.bearing else null,
+        speedAcc = if (Build.VERSION.SDK_INT >= 26 && loc.hasSpeedAccuracy()) loc.speedAccuracyMetersPerSecond else null,
+        bearingAcc = if (Build.VERSION.SDK_INT >= 26 && loc.hasBearingAccuracy()) loc.bearingAccuracyDegrees else null,
+        vertAcc = if (Build.VERSION.SDK_INT >= 26 && loc.hasVerticalAccuracy()) loc.verticalAccuracyMeters else null,
     )
+
+    private fun finishRaw(drop: Boolean) {
+        when (rawSession.stop(drop)) {
+            GnssRawCommand.Close -> app.gnssRaw.close()
+            GnssRawCommand.Drop -> app.gnssRaw.abort()
+            else -> Unit
+        }
+        if (drop) lastFixAttached = Long.MIN_VALUE
+    }
+
+    private fun recordRaw(event: GnssMeasurementsEvent, snap: GnssSnapshot) {
+        val settings = app.config.settings
+        val mode = when {
+            settings.demoMode -> GnssRawMode.PRIVACY
+            settings.gnssRawLog -> GnssRawMode.RECORD
+            else -> GnssRawMode.OFF
+        }
+        val episode = snap.lives.any { it.kind == GnssKind.INTERFERENCE || it.kind == GnssKind.SPOOFING }
+        val sample = toRawSample(event)
+        when (val cmd = rawSession.onSample(sample, episode, mode)) {
+            GnssRawCommand.None -> Unit
+            is GnssRawCommand.Open -> {
+                if (!app.gnssRaw.open(sample.wallMs, GnssRawFormat.header())) {
+                    rawSession.failOpen()
+                    return
+                }
+                if (!app.gnssRaw.write(cmd.samples.joinToString("") { GnssRawFormat.body(it) })) {
+                    rawSession.failOpen()
+                    app.gnssRaw.abort()
+                }
+            }
+            is GnssRawCommand.Append -> {
+                if (!app.gnssRaw.write(GnssRawFormat.body(cmd.sample))) {
+                    rawSession.failOpen()
+                    app.gnssRaw.abort()
+                }
+            }
+            GnssRawCommand.Close -> {
+                app.gnssRaw.close()
+                lastFixAttached = Long.MIN_VALUE
+            }
+            GnssRawCommand.Drop -> {
+                app.gnssRaw.abort()
+                lastFixAttached = Long.MIN_VALUE
+            }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun toRawSample(event: GnssMeasurementsEvent): GnssRawSample {
+        val clock = event.clock
+        val leap = if (clock.hasLeapSecond()) clock.leapSecond else null
+        val bias = if (clock.hasBiasNanos()) clock.biasNanos else 0.0
+        val utc = GnssRawTime.utcMillis(
+            clock.timeNanos,
+            clock.fullBiasNanos,
+            bias,
+            leap ?: GnssRawTime.LEAP_SECOND,
+        )
+        val wall = System.currentTimeMillis()
+        val rawClock = GnssRawClock(
+            utcTimeMillis = utc,
+            timeNanos = clock.timeNanos,
+            leapSecond = leap,
+            timeUncertaintyNanos = if (clock.hasTimeUncertaintyNanos()) clock.timeUncertaintyNanos else null,
+            fullBiasNanos = clock.fullBiasNanos,
+            biasNanos = if (clock.hasBiasNanos()) clock.biasNanos else null,
+            biasUncertaintyNanos = if (clock.hasBiasUncertaintyNanos()) clock.biasUncertaintyNanos else null,
+            driftNanosPerSecond = if (clock.hasDriftNanosPerSecond()) clock.driftNanosPerSecond else null,
+            driftUncertaintyNanosPerSecond = if (clock.hasDriftUncertaintyNanosPerSecond()) {
+                clock.driftUncertaintyNanosPerSecond
+            } else {
+                null
+            },
+            hardwareClockDiscontinuityCount = clock.hardwareClockDiscontinuityCount,
+            elapsedRealtimeNanos = if (clock.hasElapsedRealtimeNanos()) clock.elapsedRealtimeNanos else null,
+        )
+        val agcs = ArrayList<GnssRawAgc>()
+        if (Build.VERSION.SDK_INT >= 33) {
+            for (agc in event.gnssAutomaticGainControls) {
+                val db = agc.levelDb
+                if (!db.isFinite()) continue
+                agcs += GnssRawAgc(db, agc.carrierFrequencyHz, agc.constellationType)
+            }
+        }
+        val useAgcRows = agcs.isNotEmpty()
+        val sats = ArrayList<GnssRawSat>(event.measurements.size)
+        for (m in event.measurements) {
+            sats += satOf(m, useAgcRows)
+        }
+        return GnssRawSample(
+            wallMs = wall,
+            clock = rawClock,
+            sats = sats,
+            agcs = agcs,
+            fix = takeFix(wall),
+        )
+    }
+
+    @Suppress("DEPRECATION")
+    private fun satOf(m: GnssMeasurement, useAgcRows: Boolean): GnssRawSat {
+        val agc = if (!useAgcRows && m.hasAutomaticGainControlLevelDb()) {
+            m.automaticGainControlLevelDb.takeIf { it.isFinite() }
+        } else {
+            null
+        }
+        val newer = Build.VERSION.SDK_INT >= 30
+        return GnssRawSat(
+            svid = m.svid,
+            timeOffsetNanos = m.timeOffsetNanos,
+            state = m.state,
+            receivedSvTimeNanos = m.receivedSvTimeNanos,
+            receivedSvTimeUncertaintyNanos = m.receivedSvTimeUncertaintyNanos,
+            cn0DbHz = m.cn0DbHz,
+            pseudorangeRateMps = m.pseudorangeRateMetersPerSecond,
+            pseudorangeRateUncMps = m.pseudorangeRateUncertaintyMetersPerSecond,
+            adrState = m.accumulatedDeltaRangeState,
+            adrMeters = m.accumulatedDeltaRangeMeters,
+            adrUncMeters = m.accumulatedDeltaRangeUncertaintyMeters,
+            carrierFrequencyHz = if (m.hasCarrierFrequencyHz()) m.carrierFrequencyHz.toDouble() else null,
+            carrierCycles = if (m.hasCarrierCycles()) m.carrierCycles else null,
+            carrierPhase = if (m.hasCarrierPhase()) m.carrierPhase else null,
+            carrierPhaseUnc = if (m.hasCarrierPhaseUncertainty()) m.carrierPhaseUncertainty else null,
+            multipathIndicator = m.multipathIndicator,
+            snrInDb = if (m.hasSnrInDb()) m.snrInDb else null,
+            constellationType = m.constellationType,
+            agcDb = agc,
+            basebandCn0DbHz = if (newer && m.hasBasebandCn0DbHz()) m.basebandCn0DbHz else null,
+            fullInterSignalBiasNanos = if (newer && m.hasFullInterSignalBiasNanos()) m.fullInterSignalBiasNanos else null,
+            fullInterSignalBiasUncNanos = if (newer && m.hasFullInterSignalBiasUncertaintyNanos()) {
+                m.fullInterSignalBiasUncertaintyNanos
+            } else {
+                null
+            },
+            satelliteInterSignalBiasNanos = if (newer && m.hasSatelliteInterSignalBiasNanos()) {
+                m.satelliteInterSignalBiasNanos
+            } else {
+                null
+            },
+            satelliteInterSignalBiasUncNanos = if (newer && m.hasSatelliteInterSignalBiasUncertaintyNanos()) {
+                m.satelliteInterSignalBiasUncertaintyNanos
+            } else {
+                null
+            },
+            codeType = m.codeType,
+        )
+    }
+
+    private fun takeFix(wall: Long): GnssRawFix? {
+        val fix = lastGps ?: return null
+        if (!fix.gps || fix.wall == lastFixAttached || wall - fix.wall > 2_000L) return null
+        lastFixAttached = fix.wall
+        return GnssRawFix(
+            provider = "GPS",
+            latitude = fix.lat,
+            longitude = fix.lon,
+            altitudeMeters = fix.alt,
+            speedMps = fix.speed,
+            accuracyMeters = fix.acc,
+            bearingDegrees = fix.bearing,
+            unixTimeMillis = fix.time,
+            speedAccuracyMps = fix.speedAcc,
+            bearingAccuracyDegrees = fix.bearingAcc,
+            elapsedRealtimeNanos = fix.elapsedNanos,
+            verticalAccuracyMeters = fix.vertAcc,
+            mock = fix.mock,
+        )
+    }
 
     private fun isMock(loc: Location): Boolean =
         if (Build.VERSION.SDK_INT >= 31) loc.isMock else @Suppress("DEPRECATION") loc.isFromMockProvider
@@ -761,6 +951,12 @@ class GnssMonitor(private val app: FieldwatchApp) {
         val wall: Long,
         val elapsedNanos: Long,
         val mock: Boolean,
+        val alt: Double?,
+        val speed: Float?,
+        val bearing: Float?,
+        val speedAcc: Float?,
+        val bearingAcc: Float?,
+        val vertAcc: Float?,
     )
 
     private class Acc {

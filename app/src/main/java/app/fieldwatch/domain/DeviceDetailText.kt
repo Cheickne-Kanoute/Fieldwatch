@@ -18,6 +18,7 @@ object DeviceDetailText {
         signatureNotes: List<Pair<String, String>> = emptyList(),
         fleets: List<Fleet> = emptyList(),
         mine: Boolean = false,
+        placeLines: List<String> = emptyList(),
     ): String {
         val fmt = SimpleDateFormat("HH:mm:ss", Locale.US)
         val iso = SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", Locale.US)
@@ -254,6 +255,7 @@ object DeviceDetailText {
         line("First seen", fmt.format(Date(device.firstSeen)))
         line("Last seen", fmt.format(Date(device.lastSeen)))
         line("Hits", device.hitCount.toString())
+        placeLines.forEach { out.append(it).append('\n') }
         Geo.screenCoord(device.latitude, device.longitude, false)?.let {
             line("Last fix", it)
             out.append("Last fix is the phone’s GPS at hear-time, not a fix on this radio.\n")

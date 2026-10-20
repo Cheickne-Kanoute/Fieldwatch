@@ -26,6 +26,7 @@ class TakPublishTest {
     )
     private val fleets = listOf(remote, axon, ruuvi)
     private val on = AppSettings(takEnabled = true, tagLocation = true)
+    private val tag = "AB23"
 
     @Test
     fun payloadLocationRejectsZeroZeroAndOutOfRange() {
@@ -190,7 +191,7 @@ class TakPublishTest {
     @Test
     fun extraAttentionMarkerIsHeardHereNotAdvertised() {
         val cam = radio(fleetIds = setOf("fleet-axon"), lat = 37.5, lon = -122.2)
-        val marks = TakPublish.markers(cam, on, fleets, emptyList())
+        val marks = TakPublish.markers(cam, on, fleets, emptyList(), tag)
         assertEquals(1, marks.size)
         assertFalse(marks[0].advertised)
         assertFalse(marks[0].pilot)
@@ -201,7 +202,7 @@ class TakPublishTest {
         val unmatched = radio(fleetIds = emptySet(), lat = 1.0, lon = 2.0)
         val loud = WatchTarget(id = "n1", deviceKey = unmatched.key, label = "van", alert = true)
         val settings = on.copy(takWatchlist = true, takAttention = false, takPayloadFix = false)
-        val marks = TakPublish.markers(unmatched, settings, fleets, listOf(loud))
+        val marks = TakPublish.markers(unmatched, settings, fleets, listOf(loud), tag)
         assertEquals(1, marks.size)
         assertFalse(marks[0].advertised)
         assertFalse(marks[0].pilot)
@@ -224,8 +225,10 @@ class TakPublishTest {
             lon = -74.0,
             advertised = true,
             now = 0L,
+        
+            tag = tag,
         )
-        assertTrue(xml.contains("uid=\"FIELDWATCH-BLE-AABBCCDDEE01\""))
+        assertTrue(xml.contains("uid=\"FIELDWATCH-AB23-BLE-AABBCCDDEE01\""))
         assertTrue(xml.contains("type=\"a-u-A-M-H-Q\""))
         assertTrue(xml.contains("lat=\"40\""))
         assertTrue(xml.contains("lon=\"-74\""))
@@ -255,6 +258,8 @@ class TakPublishTest {
             lon = -74.0,
             advertised = true,
             now = 0L,
+        
+            tag = tag,
         )
         assertTrue(xml.contains("<track course=\"270\" speed=\"12.5\"/>"))
         val here = CotEvent.xml(
@@ -265,6 +270,8 @@ class TakPublishTest {
             lon = 2.0,
             advertised = false,
             now = 0L,
+        
+            tag = tag,
         )
         assertFalse(here.contains("<track"))
     }
@@ -294,6 +301,8 @@ class TakPublishTest {
             lon = -122.2,
             advertised = false,
             now = 0L,
+        
+            tag = tag,
         )
         assertTrue(xml.contains("&#10;"))
         assertTrue(xml.contains("Axon (here)&#10;BLE  AA:BB:CC:DD:EE:01  -60 dBm"))
@@ -333,6 +342,8 @@ class TakPublishTest {
             lon = -122.2,
             advertised = false,
             now = 0L,
+        
+            tag = tag,
         )
         assertTrue(xml.contains("type=\"a-u-G\""))
         assertTrue(xml.contains("heard here (operator GPS)"))
@@ -349,8 +360,8 @@ class TakPublishTest {
             payloadLon = -74.0,
             payloadUasId = "TESTSERIAL1234567890",
         )
-        assertEquals("FIELDWATCH-RID-TESTSERIAL1234567890", CotEvent.uid(drone))
-        assertEquals("FIELDWATCH-PILOT-TESTSERIAL1234567890", CotEvent.pilotUid(drone))
+        assertEquals("FIELDWATCH-RID-TESTSERIAL1234567890", CotEvent.uid(drone, tag))
+        assertEquals("FIELDWATCH-PILOT-TESTSERIAL1234567890", CotEvent.pilotUid(drone, tag))
         val xml = CotEvent.xml(
             device = drone,
             fleets = fleets,
@@ -359,6 +370,8 @@ class TakPublishTest {
             lon = -74.0,
             advertised = true,
             now = 0L,
+        
+            tag = tag,
         )
         assertTrue(xml.contains("uid=\"FIELDWATCH-RID-TESTSERIAL1234567890\""))
         assertTrue(xml.contains("callsign=\"TESTSERIAL1234567890\""))
@@ -368,7 +381,7 @@ class TakPublishTest {
     @Test
     fun uidFallsBackToMacWithoutUasId() {
         val drone = radio(fleetIds = setOf("fleet-remote-id"), payloadLat = 40.0, payloadLon = -74.0)
-        assertEquals("FIELDWATCH-BLE-AABBCCDDEE01", CotEvent.uid(drone))
+        assertEquals("FIELDWATCH-AB23-BLE-AABBCCDDEE01", CotEvent.uid(drone, tag))
     }
 
     @Test
@@ -393,7 +406,7 @@ class TakPublishTest {
             payloadOpLon = -74.1,
             payloadUasId = "TESTSERIAL1234567890",
         )
-        val marks = TakPublish.markers(drone, on, fleets, emptyList())
+        val marks = TakPublish.markers(drone, on, fleets, emptyList(), tag)
         assertEquals(2, marks.size)
         assertEquals("FIELDWATCH-RID-TESTSERIAL1234567890", marks[0].uid)
         assertEquals("FIELDWATCH-PILOT-TESTSERIAL1234567890", marks[1].uid)
@@ -406,6 +419,8 @@ class TakPublishTest {
             lon = -74.0,
             advertised = true,
             now = 0L,
+        
+            tag = tag,
         )
         assertTrue(air.contains("link uid=\"FIELDWATCH-PILOT-TESTSERIAL1234567890\""))
         val pilot = CotEvent.xml(
@@ -417,6 +432,8 @@ class TakPublishTest {
             advertised = true,
             now = 0L,
             pilot = true,
+        
+            tag = tag,
         )
         assertTrue(pilot.contains("uid=\"FIELDWATCH-PILOT-TESTSERIAL1234567890\""))
         assertTrue(pilot.contains("callsign=\"Operator · TESTSERIAL1234567890\""))
@@ -462,24 +479,24 @@ class TakPublishTest {
     @Test
     fun keepUidsHoldsGpsBlipAndDropsGone() {
         val cam = radio(fleetIds = setOf("fleet-axon"), lat = 37.5, lon = -122.2)
-        val uid = CotEvent.uid(cam)
+        val uid = CotEvent.uid(cam, tag)
         val prev = listOf(TakSent(uid, cam.key, 1L, 37.5, -122.2))
         val blip = cam.copy(latitude = null, longitude = null)
-        val keepBlip = TakPublish.keepUids(listOf(blip), on, fleets, emptyList(), prev)
+        val keepBlip = TakPublish.keepUids(listOf(blip), on, fleets, emptyList(), prev, tag)
         assertTrue(uid in keepBlip)
         val taggingOff = on.copy(tagLocation = false)
-        val keepOff = TakPublish.keepUids(listOf(blip), taggingOff, fleets, emptyList(), prev)
+        val keepOff = TakPublish.keepUids(listOf(blip), taggingOff, fleets, emptyList(), prev, tag)
         assertFalse(uid in keepOff)
         val gone = cam.copy(gone = true)
-        val keepGone = TakPublish.keepUids(listOf(gone), on, fleets, emptyList(), prev)
+        val keepGone = TakPublish.keepUids(listOf(gone), on, fleets, emptyList(), prev, tag)
         assertFalse(uid in keepGone)
     }
 
     @Test
     fun keepUidsDoesNotDropUnsentEligibleWhenCapped() {
         val cam = radio(fleetIds = setOf("fleet-axon"), lat = 37.5, lon = -122.2)
-        val uid = CotEvent.uid(cam)
-        val keep = TakPublish.keepUids(listOf(cam), on, fleets, emptyList(), emptyList())
+        val uid = CotEvent.uid(cam, tag)
+        val keep = TakPublish.keepUids(listOf(cam), on, fleets, emptyList(), emptyList(), tag)
         assertTrue(uid in keep)
     }
 
@@ -491,12 +508,12 @@ class TakPublishTest {
             payloadLon = -74.0,
         )
         val stable = macKeyed.copy(payloadUasId = "TESTSERIAL1234567890")
-        val oldUid = CotEvent.uid(macKeyed)
-        val newUid = CotEvent.uid(stable)
-        assertEquals("FIELDWATCH-BLE-AABBCCDDEE01", oldUid)
+        val oldUid = CotEvent.uid(macKeyed, tag)
+        val newUid = CotEvent.uid(stable, tag)
+        assertEquals("FIELDWATCH-AB23-BLE-AABBCCDDEE01", oldUid)
         assertEquals("FIELDWATCH-RID-TESTSERIAL1234567890", newUid)
         val prev = listOf(TakSent(oldUid, macKeyed.key, 1L, 40.0, -74.0))
-        val keep = TakPublish.keepUids(listOf(stable), on, fleets, emptyList(), prev)
+        val keep = TakPublish.keepUids(listOf(stable), on, fleets, emptyList(), prev, tag)
         assertTrue(newUid in keep)
         assertFalse(oldUid in keep)
     }
@@ -568,10 +585,11 @@ class TakPublishTest {
             lon = -74.0,
             now = 1_000L,
             hold = TakGnssHold.HOUR,
+            tag = tag,
         )
         assertTrue(opened.send)
         assertTrue(opened.plot!!.pin)
-        assertEquals("FIELDWATCH-GNSS-50", opened.track!!.uid)
+        assertEquals("FIELDWATCH-GNSS-AB23-50", opened.track!!.uid)
         assertTrue(opened.remarks.contains("Where this phone was"))
         assertFalse(opened.remarks.contains("40.0"))
 
@@ -584,6 +602,7 @@ class TakPublishTest {
             lon = -74.0,
             now = 2_000L,
             hold = TakGnssHold.HOUR,
+            tag = tag,
         )
         assertFalse(quiet.send)
 
@@ -596,6 +615,7 @@ class TakPublishTest {
             lon = -73.998,
             now = 2_000L,
             hold = TakGnssHold.HOURS_6,
+            tag = tag,
         )
         assertTrue(stretched.send)
         assertFalse(stretched.plot!!.pin)
@@ -611,6 +631,7 @@ class TakPublishTest {
             lon = -73.99,
             now = 30_000L,
             hold = TakGnssHold.HOUR,
+            tag = tag,
         )
         assertTrue(frozen.send)
         assertFalse(frozen.track!!.open)
@@ -627,6 +648,7 @@ class TakPublishTest {
             lon = -74.0,
             now = 40_000L,
             hold = TakGnssHold.UNTIL_DELETED,
+            tag = tag,
             hasMarks = true,
         )
         assertTrue(off.clearAll)
@@ -660,7 +682,7 @@ class TakPublishTest {
             "\"RED_LINE\"",
         )
         assertEquals(TakFloodSend.ON, saved)
-        val xml = CotEvent.selfXml(40.0, -74.0, 0L, remarksExtra = TakFlood.line(TakFloodSend.ON, asking))
+        val xml = CotEvent.selfXml(40.0, -74.0, 0L, tag, "Fieldwatch-AB23", remarksExtra = TakFlood.line(TakFloodSend.ON, asking))
         assertTrue(xml.contains("Pairing flood"))
         assertFalse(xml.contains("Flipper"))
         assertFalse(xml.contains("latitude"))
@@ -668,10 +690,12 @@ class TakPublishTest {
 
     @Test
     fun selfMarkerCarriesTheGnssLineAndNoCoordinatesInRemarks() {
-        val plain = CotEvent.selfXml(40.0, -74.0, 0L)
+        val plain = CotEvent.selfXml(40.0, -74.0, 0L, tag, "Fieldwatch-AB23")
+        assertTrue(plain.contains("uid=\"FIELDWATCH-SELF-AB23\""))
+        assertTrue(plain.contains("callsign=\"Fieldwatch-AB23\""))
         assertTrue(plain.contains("Fieldwatch TAK heartbeat (this phone)"))
         assertFalse(plain.contains("GNSS"))
-        val xml = CotEvent.selfXml(40.0, -74.0, 0L, remarksExtra = "Possible GNSS interference · Medium")
+        val xml = CotEvent.selfXml(40.0, -74.0, 0L, tag, "Fieldwatch-AB23", remarksExtra = "Possible GNSS interference · Medium")
         assertTrue(xml.contains("Possible GNSS interference · Medium"))
         assertTrue(xml.contains("&#10;"))
         assertFalse(xml.contains("latitude"))
@@ -681,12 +705,12 @@ class TakPublishTest {
 
     @Test
     fun tombstoneStaleEqualsNow() {
-        val xml = CotEvent.tombstoneXml("FIELDWATCH-BLE-AABBCCDDEE01", 37.5, -122.2, 0L)
-        assertTrue(xml.contains("uid=\"FIELDWATCH-BLE-AABBCCDDEE01\""))
+        val xml = CotEvent.tombstoneXml("FIELDWATCH-AB23-BLE-AABBCCDDEE01", 37.5, -122.2, 0L)
+        assertTrue(xml.contains("uid=\"FIELDWATCH-AB23-BLE-AABBCCDDEE01\""))
         assertTrue(xml.contains("stale=\"1970-01-01T00:00:00.000Z\""))
         assertTrue(xml.contains("gone"))
         val named = CotEvent.tombstoneXml(
-            "FIELDWATCH-BLE-AABBCCDDEE01",
+            "FIELDWATCH-AB23-BLE-AABBCCDDEE01",
             37.5,
             -122.2,
             0L,
@@ -709,13 +733,15 @@ class TakPublishTest {
             advertised = false,
             now = 0L,
             staleMs = TakGnssHold.HOUR.staleMs(),
+        
+            tag = tag,
         )
         assertTrue(xml.contains("callsign=\"Axon (here)\""))
         assertTrue(xml.contains("stale=\"1970-01-01T01:00:00.000Z\""))
         assertFalse(xml.contains("Fieldwatch"))
-        val face = CotEvent.face(cam, fleets, emptyList(), advertised = false)
+        val face = CotEvent.face(cam, fleets, emptyList(), advertised = false, tag = tag)
         val again = CotEvent.render(
-            uid = CotEvent.uid(cam),
+            uid = CotEvent.uid(cam, tag),
             face = face,
             lat = 37.5,
             lon = -122.2,
@@ -734,6 +760,122 @@ class TakPublishTest {
         assertEquals(TakUdpPreset.CUSTOM, TakPublish.udpPreset("192.168.0.9", 10011))
         assertEquals("127.0.0.1" to 10011, TakPublish.applyPreset(TakUdpPreset.THIS_PHONE))
         assertEquals("239.2.3.1" to 6969, TakPublish.applyPreset(TakUdpPreset.LAN_MULTICAST))
+    }
+
+    @Test
+    fun twoInstallsAreDistinctAndShareARemoteId() {
+        val cam = radio(fleetIds = setOf("fleet-axon"), lat = 37.5, lon = -122.2)
+        val other = "CD34"
+        assertEquals("FIELDWATCH-SELF-AB23", CotEvent.selfUid(tag))
+        assertEquals("FIELDWATCH-SELF-CD34", CotEvent.selfUid(other))
+        assertEquals("FIELDWATCH-AB23-BLE-AABBCCDDEE01", CotEvent.uid(cam, tag))
+        assertEquals("FIELDWATCH-CD34-BLE-AABBCCDDEE01", CotEvent.uid(cam, other))
+        assertEquals("FIELDWATCH-AB23-HERE-BLE-AABBCCDDEE01", CotEvent.hereUid(cam, tag))
+        assertEquals("FIELDWATCH-CD34-HERE-BLE-AABBCCDDEE01", CotEvent.hereUid(cam, other))
+        val live = GnssLive(
+            kind = GnssKind.INTERFERENCE,
+            confidence = GnssConfidence.MEDIUM,
+            startedWall = 50L,
+            detail = "GPS L1",
+            adapted = false,
+            rose = false,
+        )
+        val notice = GnssNotice(false, "Possible GNSS interference (Medium)", "", "Possible GNSS interference · Medium")
+        val opened = TakGnss.plan(null, TakGnssSend.ALERT, notice, listOf(live), 40.0, -74.0, 1_000L, TakGnssHold.HOUR, tag)
+        val otherOpen = TakGnss.plan(null, TakGnssSend.ALERT, notice, listOf(live), 40.0, -74.0, 1_000L, TakGnssHold.HOUR, other)
+        assertEquals("FIELDWATCH-GNSS-AB23-50", opened.track!!.uid)
+        assertEquals("FIELDWATCH-GNSS-CD34-50", otherOpen.track!!.uid)
+        val drone = radio(
+            fleetIds = setOf("fleet-remote-id"),
+            payloadLat = 40.0,
+            payloadLon = -74.0,
+            payloadOpLat = 40.1,
+            payloadOpLon = -74.1,
+            payloadUasId = "TESTUAS1",
+        )
+        assertEquals("FIELDWATCH-RID-TESTUAS1", CotEvent.uid(drone, tag))
+        assertEquals(CotEvent.uid(drone, tag), CotEvent.uid(drone, other))
+        assertEquals("FIELDWATCH-PILOT-TESTUAS1", CotEvent.pilotUid(drone, tag))
+        assertEquals(CotEvent.pilotUid(drone, tag), CotEvent.pilotUid(drone, other))
+        val macPilot = drone.copy(payloadUasId = null)
+        assertEquals("FIELDWATCH-AB23-PILOT-BLE-AABBCCDDEE01", CotEvent.pilotUid(macPilot, tag))
+        assertEquals("FIELDWATCH-CD34-PILOT-BLE-AABBCCDDEE01", CotEvent.pilotUid(macPilot, other))
+        val macXml = CotEvent.xml(
+            device = cam,
+            fleets = fleets,
+            watchlist = emptyList(),
+            lat = 37.5,
+            lon = -122.2,
+            advertised = false,
+            now = 0L,
+            tag = tag,
+            viaCallsign = TakInstall.viaLine(CotEvent.uid(cam, tag), tag, "Fieldwatch-AB23"),
+        )
+        assertTrue(macXml.contains("via Fieldwatch-AB23"))
+        val shared = CotEvent.xml(
+            device = drone,
+            fleets = fleets,
+            watchlist = emptyList(),
+            lat = 40.0,
+            lon = -74.0,
+            advertised = true,
+            now = 0L,
+            tag = tag,
+            viaCallsign = TakInstall.viaLine(CotEvent.uid(drone, tag), tag, "Fieldwatch-AB23"),
+        )
+        assertFalse(shared.contains("via "))
+        assertEquals("Scout 1", TakInstall.callsign("Scout 1", other))
+        assertEquals("Fieldwatch-CD34", TakInstall.callsign("", other))
+        assertEquals("Scout 1", TakInstall.callsign("Scout 1", tag))
+    }
+
+    @Test
+    fun legacyDeleteNamesOnlyTheOldSelfMarker() {
+        assertEquals("FIELDWATCH-SELF", TakInstall.legacySelfDelete(false, true, false))
+        assertNull(TakInstall.legacySelfDelete(true, true, false))
+        assertNull(TakInstall.legacySelfDelete(false, false, false))
+        assertNull(TakInstall.legacySelfDelete(false, true, true))
+        val xml = CotEvent.tombstoneXml("FIELDWATCH-SELF", 40.0, -74.0, 0L, callsign = "Fieldwatch")
+        assertTrue(xml.contains("uid=\"FIELDWATCH-SELF\""))
+        assertFalse(xml.contains("FIELDWATCH-SELF-"))
+        assertTrue(xml.contains("stale=\"1970-01-01T00:00:00.000Z\""))
+        assertEquals(1, Regex("""uid="FIELDWATCH-SELF"""").findAll(xml).count())
+    }
+
+    @Test
+    fun phoneCallsignIsXmlEscaped() {
+        val xml = CotEvent.selfXml(40.0, -74.0, 0L, tag, "A & <B> \"c\"")
+        assertTrue(xml.contains("uid=\"FIELDWATCH-SELF-AB23\""))
+        assertTrue(xml.contains("callsign=\"A &amp; &lt;B&gt; &quot;c&quot;\""))
+        assertFalse(xml.contains("callsign=\"A & <B>"))
+        val via = CotEvent.xml(
+            device = radio(fleetIds = setOf("fleet-axon"), lat = 37.5, lon = -122.2),
+            fleets = fleets,
+            watchlist = emptyList(),
+            lat = 37.5,
+            lon = -122.2,
+            advertised = false,
+            now = 0L,
+            tag = tag,
+            viaCallsign = "A & B",
+        )
+        assertTrue(via.contains("via A &amp; B"))
+    }
+
+    @Test
+    fun missingTagIsFilledWithoutRetiringTheLegacyDelete() {
+        val raw = PersistedConfig()
+        assertEquals("", raw.takInstallTag)
+        assertFalse(raw.takLegacySelfRetired)
+        val next = TakInstall.ensure(raw, java.util.Random(3))
+        assertEquals(4, next.takInstallTag.length)
+        assertTrue(next.takInstallTag.all { it in "23456789ABCDEFGHJKLMNPQRSTUVWXYZ" })
+        assertFalse(next.takLegacySelfRetired)
+        assertEquals(next.takInstallTag, TakInstall.ensure(next).takInstallTag)
+        assertEquals("AB23", TakInstall.clean(" ab23 "))
+        assertEquals("", TakInstall.clean("AB1I"))
+        assertEquals("", TakInstall.storedCallsign("   "))
+        assertEquals("Scout 1", TakInstall.storedCallsign("  Scout 1  "))
     }
 
     @Test
@@ -768,6 +910,7 @@ class TakPublishTest {
         advertised = true,
         now = 0L,
         pilot = true,
+        tag = tag,
     )
 
     private fun radio(

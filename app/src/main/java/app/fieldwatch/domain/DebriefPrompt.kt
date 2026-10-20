@@ -29,6 +29,7 @@ object DebriefPrompt {
         mineKeys: Set<String> = emptySet(),
         floods: List<FloodBurst> = emptyList(),
         gnss: List<GnssMark> = emptyList(),
+        placeRecords: List<PlaceMemory.Record> = emptyList(),
     ): String {
         val names = fleets.associate { it.id to it.name }
         val win = window ?: DebriefWindow(now - WINDOW_MS, now)
@@ -66,6 +67,7 @@ object DebriefPrompt {
             customNames, observerNotes, bookmarkedKeys, mineKeys = mineKeys,
             floods = floods,
             gnss = gnss,
+            placeRecords = placeRecords,
         )
         val iso = utc(windowEnd)
         val start = utc(windowStart)
@@ -85,6 +87,7 @@ object DebriefPrompt {
             appendLine("- RSSI is loudness at the phone, not meters.")
             appendLine("- Live RAM cap is about 400 radios; unnamed BLE evicts after ~3 min. A named sit keeps more. This is not a complete capture.")
             appendLine("- Do not claim a tracker is following unless the onboard GPS co-travel section supports it. A radio with you the whole sit is not automatically yours — it may be planted. Do not dismiss it. Do not invent a tail the onboard test did not flag. Do not treat a retail beacon as a Find My tail.")
+            appendLine("- Seen at more than one place, when that section is present, means this phone heard that stable address at those stops in the last 7 days. The coordinates are where this phone was. A street is the system geocoder when Online place names is on. It is not the co-travel test. A radio heard the whole way is left out of that section.")
             appendLine("- A radio marked mine was claimed by the operator. Do not treat it as an unexplained follower.")
             appendLine("- A flood note is a burst of new addresses, not a follower.")
             appendLine("- A decoded live value on a tracking row is catalog text for that advertisement. Quote the catalog sentence when the onboard report includes one. Do not stitch that value onto a different MAC.")

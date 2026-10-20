@@ -126,6 +126,16 @@ class SitExportTest {
     fun suggestedNameSlugsSitTitle() {
         val name = SitExport.suggestedName(LogExportKind.GPX, "Drive through Target!", "20260925-120000")
         assertEquals("fieldwatch-sit-drive-through-target-20260925-120000.gpx", name)
+        assertEquals(
+            "fieldwatch-sit-drive-through-target-20260925-120000.geojson",
+            SitExport.suggestedName(LogExportKind.GEOJSON, "Drive through Target!", "20260925-120000"),
+        )
+        assertEquals(
+            "fieldwatch-sit-drive-through-target-20260925-120000.zip",
+            SitExport.suggestedName(LogExportKind.ATAK, "Drive through Target!", "20260925-120000"),
+        )
+        assertEquals("application/geo+json", SitExport.mime(LogExportKind.GEOJSON))
+        assertEquals("application/zip", SitExport.mime(LogExportKind.ATAK))
     }
 
     private fun radio(

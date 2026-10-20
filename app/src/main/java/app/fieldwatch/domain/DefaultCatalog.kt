@@ -1480,11 +1480,12 @@ object DefaultCatalog {
         colorIndex = Hue.FIND_MY,
         kind = SignatureClass.FINDER,
         matchAny = true,
-        notes = "Chipolo item finder (Find Hub / Find My). A tag you clip to keys or a bag.",
+        notes = "Chipolo item finder. A tag you clip to keys or a bag. A renamed tag still matches the Chipolo Bluetooth service. Find Hub tags stay on the Find Hub row.",
         builtIn = true,
         rules = listOf(
             name("Chipolo"),
             glob("Chipolo*"),
+            uuid("FE33"),
         ),
     )
 

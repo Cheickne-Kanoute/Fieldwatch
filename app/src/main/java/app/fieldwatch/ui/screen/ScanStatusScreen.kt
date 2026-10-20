@@ -1,5 +1,7 @@
 package app.fieldwatch.ui.screen
 
+import app.fieldwatch.domain.LanguageText
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -73,10 +75,10 @@ fun ScanStatusScreen(
         contentWindowInsets = NestedTabInsets,
         topBar = {
             NestedTopBar(
-                title = "Diagnostics",
+                title = LanguageText.text("ui.diagnostics.label"),
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, LanguageText.text("chrome.back"))
                     }
                 },
             )
@@ -91,15 +93,10 @@ fun ScanStatusScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(report.verdict, style = MaterialTheme.typography.bodyLarge)
-            Text("What to check", style = MaterialTheme.typography.titleSmall)
+            Text(LanguageText.text("ui.what.check"), style = MaterialTheme.typography.titleSmall)
             report.checks.forEach { line ->
                 Text(line, style = MaterialTheme.typography.bodyMedium)
             }
-            Text(
-                "If that does not explain it, tap Copy and send the paste.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             report.rows.forEach { (label, value) ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
@@ -118,23 +115,18 @@ fun ScanStatusScreen(
             FieldwatchActionButton(
                 onClick = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText("Fieldwatch diagnostics", report.text))
+                    clipboard.setPrimaryClip(ClipData.newPlainText(LanguageText.text("ui.fieldwatch.diagnostics"), report.text))
                     copied = true
                 },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Copy") }
+            ) { Text(LanguageText.text("ui.copy.label")) }
             if (copied) {
                 Text(
-                    "Copied.",
+                    LanguageText.text("ui.copied.label"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Text(
-                "Paste this into an issue. It has no network names, no addresses, and no GPS coordinates.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }
@@ -159,6 +151,7 @@ internal fun scanPhoneFacts(context: Context, state: FieldwatchUi, now: Long): S
         customNamesOnly = filter.customNamesOnly,
         showOnly = filter.namedOnly || filter.namedOnlyImplied(),
         movingWithYou = filter.movingWithYou,
+        seenAtPlaces = filter.seenAtPlaces,
         showWifi = filter.showWifi,
         showBle = filter.showBle,
         nameFilter = filter.nameQuery.isNotBlank(),

@@ -9,10 +9,15 @@ import android.os.Looper
 import androidx.core.content.ContextCompat
 import app.fieldwatch.alert.Alerter
 import app.fieldwatch.radio.GnssMonitor
+import app.fieldwatch.data.AssetLanguageFiles
 import app.fieldwatch.data.ConfigStore
+import app.fieldwatch.data.LanguageStore
+import app.fieldwatch.domain.LanguageText
 import app.fieldwatch.data.DeviceStore
 import app.fieldwatch.data.GnssProfileStore
+import app.fieldwatch.data.GnssRawFiles
 import app.fieldwatch.data.LogStore
+import app.fieldwatch.data.PlaceStore
 import app.fieldwatch.data.SitStore
 import app.fieldwatch.domain.CoTravel
 import app.fieldwatch.domain.FilterEngine
@@ -35,6 +40,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import java.io.File
+import java.util.Locale
 
 class FieldwatchApp : Application() {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -46,6 +53,8 @@ class FieldwatchApp : Application() {
         private set
     lateinit var sits: SitStore
         private set
+    lateinit var places: PlaceStore
+        private set
     lateinit var alerter: Alerter
         private set
     lateinit var tak: TakPublisher
@@ -54,8 +63,15 @@ class FieldwatchApp : Application() {
     val wifiFlood = WifiBeaconFlood()
     lateinit var gnss: GnssMonitor
         private set
+    lateinit var gnssRaw: GnssRawFiles
+        private set
     lateinit var gnssProfile: GnssProfileStore
         private set
+    lateinit var language: LanguageStore
+        private set
+
+    /** Null until onCreate has loaded the language file. */
+    fun loadedLanguage(): LanguageStore? = if (::language.isInitialized) language else null
 
     /** Bluetooth bursts, Wi-Fi bursts, or both in time order. */
     fun floodBursts(): List<FloodBurst> {
@@ -96,12 +112,19 @@ class FieldwatchApp : Application() {
         devices = DeviceStore()
         logs = LogStore(this)
         sits = SitStore(this, scope)
+        places = PlaceStore(File(filesDir, "place-memory.json"))
         alerter = Alerter(this)
         tak = TakPublisher()
         gnssProfile = GnssProfileStore(this)
+        gnssRaw = GnssRawFiles(File(filesDir, "gnss-raw"))
         gnss = GnssMonitor(this)
+        language = LanguageStore(
+            File(filesDir, "language.json"),
+            AssetLanguageFiles(assets),
+        )
         runBlocking {
             config.load()
+            LanguageText.apply(language.load(Locale.getDefault()).overlay)
             if (gnssProfile.profile.value == null && config.settings.gnssMonitor) {
                 config.update { it.copy(settings = it.settings.copy(gnssMonitor = false)) }
             }
@@ -111,11 +134,13 @@ class FieldwatchApp : Application() {
                 config.settings.loggingEnabled,
             )
             sits.load()
+            places.load()
             val sitOpen = sits.ui.value.open != null
             pairingFlood.setSitOpen(sitOpen)
             wifiFlood.setSitOpen(sitOpen)
         }
         sits.startFlusher()
+        places.startFlusher(scope)
         syncLocationUpdates()
         if (config.settings.alertVoice || config.settings.gnssVoice) alerter.prepareVoice()
         if (config.filter.arrivalsOnly) {
@@ -219,6 +244,12 @@ class FieldwatchApp : Application() {
             CoTravel.Ctx.None
         }
         val classById = config.fleets.associate { it.id to it.kind }
+        val mineKeys = RadioBookmarks.mineKeys(config.watchlist)
+        val placeKeys = if (config.filter.seenAtPlaces && config.settings.placeWatch) {
+            places.multiPlaceKeys(System.currentTimeMillis(), mineKeys)
+        } else {
+            emptySet()
+        }
         if (!filters.pass(
                 device,
                 config.filter,
@@ -227,7 +258,8 @@ class FieldwatchApp : Application() {
                 namedRadioKeys = RadioBookmarks.namedKeys(config.watchlist),
                 watchedFleetIds = RadioBookmarks.watchedFleetIds(config.watchlist),
                 alertDeviceKeys = RadioBookmarks.alertDeviceKeys(config.watchlist),
-                mineKeys = RadioBookmarks.mineKeys(config.watchlist),
+                mineKeys = mineKeys,
+                placeKeys = placeKeys,
             )
         ) return false
         if (isHiddenByArrivals(device)) return false

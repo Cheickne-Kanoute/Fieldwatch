@@ -147,6 +147,8 @@ object SitExport {
             LogExportKind.LOG_JSONL -> "jsonl"
             LogExportKind.GPX -> "gpx"
             LogExportKind.KML -> "kml"
+            LogExportKind.GEOJSON -> "geojson"
+            LogExportKind.ATAK -> "zip"
         }
         return "$prefix-$slug-$stamp.$ext"
     }
@@ -154,7 +156,8 @@ object SitExport {
     fun mime(kind: LogExportKind): String = when (kind) {
         LogExportKind.LOG_CSV, LogExportKind.WIGLE -> "text/csv"
         LogExportKind.LOG_JSONL -> "application/x-ndjson"
-        LogExportKind.GPX, LogExportKind.KML -> GeoExport.formatOf(kind)!!.mime
+        LogExportKind.GPX, LogExportKind.KML, LogExportKind.GEOJSON -> GeoExport.formatOf(kind)!!.mime
+        LogExportKind.ATAK -> "application/zip"
     }
 
     fun subject(kind: LogExportKind, sitName: String): String = when (kind) {
@@ -162,7 +165,9 @@ object SitExport {
         LogExportKind.LOG_JSONL -> "Fieldwatch sit $sitName (JSON lines)"
         LogExportKind.GPX -> "Fieldwatch sit $sitName (GPX)"
         LogExportKind.KML -> "Fieldwatch sit $sitName (KML)"
+        LogExportKind.GEOJSON -> "Fieldwatch sit $sitName (GeoJSON)"
         LogExportKind.WIGLE -> "Fieldwatch sit $sitName (WiGLE CSV)"
+        LogExportKind.ATAK -> "Fieldwatch sit $sitName (ATAK)"
     }
 
     fun emptyHint(kind: LogExportKind, radios: LogExportRadios): String {
@@ -171,10 +176,11 @@ object SitExport {
             LogExportRadios.WIFI -> "Wi-Fi radios"
             LogExportRadios.BLE -> "BLE radios"
         }
-        return if (kind == LogExportKind.LOG_CSV || kind == LogExportKind.LOG_JSONL) {
-            "No $which in this sit."
-        } else {
-            "No GPS-tagged $which in this sit. Settings → Tag detections with GPS."
+        return when (kind) {
+            LogExportKind.LOG_CSV, LogExportKind.LOG_JSONL -> "No $which in this sit."
+            LogExportKind.ATAK ->
+                "Nothing to map in this sit. Tag detections with GPS, or keep a radio that advertised a position."
+            else -> "No GPS-tagged $which in this sit. Settings → Tag detections with GPS."
         }
     }
 

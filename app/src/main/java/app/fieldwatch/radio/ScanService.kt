@@ -1,5 +1,7 @@
 package app.fieldwatch.radio
 
+import app.fieldwatch.domain.LanguageText
+
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -194,6 +196,15 @@ class ScanService : LifecycleService() {
                 }
                 app.sits.noteFloods(app.pairingFlood.bursts())
                 app.sits.ingest(seen, fleets, app.config.watchlist)
+                if (settings.placeWatch && settings.tagLocation) {
+                    app.places.hear(
+                        seen,
+                        fleets,
+                        app.config.watchlist,
+                        app.sits.openSitId(),
+                        app.sits.clusterLabel(),
+                    )
+                }
                 if (settings.loggingEnabled) {
                     val toLog = seen.filter { it.hitCount <= 1 || it.hitCount % 25 == 0 }.take(16)
                     for (row in toLog) {
@@ -235,7 +246,7 @@ class ScanService : LifecycleService() {
         }
     }
 
-    private fun publishNow() {
+    private suspend fun publishNow() {
         try {
             val app = application as FieldwatchApp
             val fleets = app.config.fleets
@@ -275,7 +286,8 @@ class ScanService : LifecycleService() {
                 TakGnss.line(settings.takGnss, gnss.notice, gnss.lives),
                 TakFlood.line(settings.takFlood, floodNotice),
             ).joinToString("\n").ifBlank { null }
-            app.tak.publish(
+            val cfg = app.config.config.value
+            val legacyRetired = app.tak.publish(
                 live,
                 fleets,
                 settings,
@@ -284,7 +296,14 @@ class ScanService : LifecycleService() {
                 gnssRemark = phoneNote,
                 gnssNotice = gnss.notice,
                 gnssLives = gnss.lives,
+                installTag = cfg.takInstallTag,
+                legacySelfRetired = cfg.takLegacySelfRetired,
             )
+            if (legacyRetired) {
+                app.config.update { cur ->
+                    if (cur.takLegacySelfRetired) cur else cur.copy(takLegacySelfRetired = true)
+                }
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -293,7 +312,7 @@ class ScanService : LifecycleService() {
     }
 
     private fun startAsForeground() {
-        val notification = buildNotification("Starting radios…")
+        val notification = buildNotification(LanguageText.text("ui.starting.radios"))
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(
                 NOTIF_ID,
@@ -337,7 +356,7 @@ class ScanService : LifecycleService() {
         )
         return NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_fieldwatch)
-            .setContentTitle("Fieldwatch scanning")
+            .setContentTitle(LanguageText.text("ui.fieldwatch.scanning"))
             .setContentText(text)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -401,7 +420,7 @@ class ScanService : LifecycleService() {
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL, "Scanning", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "Passive Wi-Fi and Bluetooth scan status"
+                description = LanguageText.text("ui.passive.wi.fi.bluetooth")
                 setShowBadge(false)
             },
         )

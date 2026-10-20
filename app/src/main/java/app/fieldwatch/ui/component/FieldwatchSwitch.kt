@@ -2,6 +2,7 @@ package app.fieldwatch.ui.component
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.Composable
@@ -22,9 +23,12 @@ fun FieldwatchSwitch(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
+    val scheme = MaterialTheme.colorScheme
     val fill = spectreTileFill()
     val edge = spectreTileEdge()
     val active = PhosphorActive.nightIf(LocalNightMode.current)
+    val knob = scheme.onSurface
+    val onActive = scheme.onPrimary
     Box(
         modifier = modifier
             .requiredSize(width = 40.dp, height = 24.dp)
@@ -37,12 +41,16 @@ fun FieldwatchSwitch(
         modifier = Modifier.scale(0.72f),
         enabled = enabled,
         colors = SwitchDefaults.colors(
+            checkedThumbColor = onActive,
             checkedTrackColor = active,
             checkedBorderColor = edge,
+            uncheckedThumbColor = knob,
             uncheckedTrackColor = fill,
             uncheckedBorderColor = edge,
+            disabledCheckedThumbColor = onActive.copy(alpha = 0.38f),
             disabledCheckedTrackColor = active.copy(alpha = 0.38f),
             disabledCheckedBorderColor = edge.copy(alpha = 0.4f),
+            disabledUncheckedThumbColor = knob.copy(alpha = 0.38f),
             disabledUncheckedTrackColor = fill.copy(alpha = 0.4f),
             disabledUncheckedBorderColor = edge.copy(alpha = 0.4f),
         ),

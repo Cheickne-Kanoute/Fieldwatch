@@ -18,11 +18,13 @@ import app.fieldwatch.domain.WatchTarget
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import app.fieldwatch.domain.TakInstall
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.MulticastSocket
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Sends Cursor-on-Target UDP to ATAK SA multicast or a unicast host:port.
@@ -34,6 +36,9 @@ class TakPublisher {
     /** Radios that left the feed and were resent once with the spot hold. */
     private val parked = ConcurrentHashMap<String, TakSent>()
     private val gnssMarks = LinkedHashMap<String, TakGnssTrack>()
+    /** Tags replaced this session. A late tick must not put those spots back. */
+    private val retiredTags = ConcurrentHashMap.newKeySet<String>()
+    private val legacySelfSent = AtomicBoolean(false)
     private val gate = Any()
     @Volatile private var multicast: MulticastSocket? = null
     @Volatile private var unicast: DatagramSocket? = null
@@ -45,12 +50,14 @@ class TakPublisher {
         fleets: List<Fleet>,
         settings: AppSettings,
         watchlist: List<WatchTarget>,
+        installTag: String,
+        legacySelfRetired: Boolean,
         now: Long = System.currentTimeMillis(),
         selfFix: Pair<Double, Double>? = null,
         gnssRemark: String? = null,
         gnssNotice: GnssNotice? = null,
         gnssLives: List<GnssLive> = emptyList(),
-    ) {
+    ): Boolean {
         if (!settings.takEnabled || settings.demoMode) {
             retractRadios(settings, now)
             if (last.isEmpty() && parked.isEmpty()) gnssMarks.clear()
@@ -59,8 +66,16 @@ class TakPublisher {
             } else {
                 TakFeedStatus(paused = true, detail = "Privacy mode — feed paused")
             }
-            return
+            return false
         }
+        val tag = TakInstall.clean(installTag)
+        if (tag.isEmpty()) {
+            Log.w(TAG, "TAK install tag is missing")
+            _status.value = TakFeedStatus(at = now, error = "Install tag is missing")
+            return false
+        }
+        val phoneCallsign = TakInstall.callsign(settings.takCallsign, tag)
+        val selfUid = CotEvent.selfUid(tag)
         val host = settings.takHost.trim().ifBlank { TakDefaults.HOST }
         val port = settings.takPort.coerceIn(1, 65_535)
         val dests = destinations(host, port)
@@ -71,35 +86,65 @@ class TakPublisher {
                 dest = "$host:$port",
                 error = "Host $host did not resolve",
             )
-            return
+            return false
         }
         val destLabel = dests.joinToString { "${it.first.hostAddress}:${it.second}" }
+        fun current(): Boolean = tag !in retiredTags
         val selfOk = selfFix != null && PayloadOk(selfFix)
         var sent = 0
         var gone = 0
         var lastErr: String? = null
+        var legacyJustSent = false
 
-        if (selfOk) {
-            val prev = last[SELF_UID]
+        if (selfOk && current()) {
+            val legacyUid = TakInstall.legacySelfDelete(
+                retired = legacySelfRetired || legacySelfSent.get(),
+                takEnabled = true,
+                privacy = false,
+            )
+            if (legacyUid != null) {
+                val xml = CotEvent.tombstoneXml(
+                    uid = legacyUid,
+                    lat = selfFix!!.first,
+                    lon = selfFix.second,
+                    now = now,
+                    callsign = "Fieldwatch",
+                    remarks = "Fieldwatch · gone",
+                )
+                if (sendAll(dests, xml.toByteArray(Charsets.UTF_8))) {
+                    if (legacySelfSent.compareAndSet(false, true)) legacyJustSent = true
+                    gone++
+                } else {
+                    lastErr = "send failed"
+                }
+            }
+        }
+
+        if (selfOk && current()) {
+            val prev = last[selfUid]
             val gnssLine = gnssRemark?.trim().orEmpty()
             val noteChanged = (prev?.note ?: "") != gnssLine
             if (noteChanged || TakPublish.shouldEmit(prev?.at, prev?.lat, prev?.lon, now, selfFix!!.first, selfFix.second)) {
                 val xml = CotEvent.selfXml(
-                    selfFix.first,
-                    selfFix.second,
-                    now,
+                    lat = selfFix.first,
+                    lon = selfFix.second,
+                    now = now,
+                    tag = tag,
+                    callsign = phoneCallsign,
                     remarksExtra = gnssLine.ifBlank { null },
                 )
-                if (sendAll(dests, xml.toByteArray(Charsets.UTF_8))) {
-                    last[SELF_UID] = TakSent(
-                        SELF_UID,
-                        SELF_UID,
+                if (sendAll(dests, xml.toByteArray(Charsets.UTF_8)) && current()) {
+                    last[selfUid] = TakSent(
+                        selfUid,
+                        selfUid,
                         now,
                         selfFix.first,
                         selfFix.second,
                         note = gnssLine,
                     )
                     sent++
+                } else if (!current()) {
+                    last.remove(selfUid)
                 } else {
                     lastErr = "send failed"
                 }
@@ -107,6 +152,7 @@ class TakPublisher {
         }
 
         val gnssFix = if (selfOk) selfFix else null
+        if (current()) {
         val gnssPlan = TakGnss.plan(
             open = gnssMarks.values.firstOrNull { it.open },
             mode = settings.takGnss,
@@ -116,6 +162,7 @@ class TakPublisher {
             lon = gnssFix?.second,
             now = now,
             hold = settings.takGnssHold,
+            tag = tag,
             hasMarks = gnssMarks.isNotEmpty(),
         )
         if (gnssPlan.clearAll) {
@@ -139,7 +186,7 @@ class TakPublisher {
             var gnssOk = true
             val drawn = gnssPlan.plot
             val gnssUid = gnssPlan.track?.uid
-            if (gnssOk && gnssPlan.send && drawn != null && gnssUid != null) {
+            if (gnssOk && current() && gnssPlan.send && drawn != null && gnssUid != null) {
                 val xml = if (drawn.pin) {
                     CotEvent.gnssPinXml(
                         uid = gnssUid,
@@ -169,10 +216,11 @@ class TakPublisher {
                     lastErr = "send failed"
                 }
             }
-            if (gnssOk) {
+            if (gnssOk && current()) {
                 val track = gnssPlan.track
                 if (track != null) gnssMarks[track.uid] = track
             }
+        }
         }
 
         val chosen = devices.asSequence()
@@ -185,7 +233,7 @@ class TakPublisher {
         var emitted = sent
         for (device in chosen) {
             if (emitted >= TakDefaults.MAX_PER_TICK) break
-            val marks = TakPublish.markers(device, settings, fleets, watchlist)
+            val marks = TakPublish.markers(device, settings, fleets, watchlist, tag)
             for (mark in marks) {
                 if (emitted >= TakDefaults.MAX_PER_TICK) break
                 val prev = last[mark.uid]
@@ -215,12 +263,15 @@ class TakPublisher {
                         }
                     }
                 }
+                if (!current() && TakInstall.phoneScoped(mark.uid, tag)) continue
                 val face = CotEvent.face(
                     device = mark.device,
                     fleets = fleets,
                     watchlist = watchlist,
                     advertised = mark.advertised,
+                    tag = tag,
                     pilot = mark.pilot,
+                    viaCallsign = TakInstall.viaLine(mark.uid, tag, phoneCallsign),
                 )
                 val xml = CotEvent.render(
                     uid = mark.uid,
@@ -234,6 +285,7 @@ class TakPublisher {
                     lastErr = "send failed"
                     continue
                 }
+                if (!current() && TakInstall.phoneScoped(mark.uid, tag)) continue
                 last[mark.uid] = TakSent(
                     mark.uid,
                     mark.deviceKey,
@@ -256,15 +308,16 @@ class TakPublisher {
             fleets = fleets,
             watchlist = watchlist,
             previous = last.values,
-            selfUid = SELF_UID,
-            selfOk = selfOk,
+            tag = tag,
+            selfUid = selfUid,
+            selfOk = selfOk && current(),
         )
         val holdMs = settings.takRadioHold.staleMs()
         var holdBudget = TakDefaults.MAX_PER_TICK
         for (uid in last.keys.filter { it !in keep }) {
             val prev = last[uid] ?: continue
             val face = prev.face
-            if (uid == SELF_UID || face == null) {
+            if (uid == selfUid || face == null || (!current() && TakInstall.phoneScoped(uid, tag))) {
                 last.remove(uid)
                 continue
             }
@@ -281,6 +334,10 @@ class TakPublisher {
             }
         }
         for (spot in parked.values.toList()) {
+            if (!current() && TakInstall.phoneScoped(spot.uid, tag)) {
+                parked.remove(spot.uid)
+                continue
+            }
             if (spot.uid in keep || spot.staleMs == holdMs) continue
             val face = spot.face
             if (face == null) {
@@ -311,6 +368,10 @@ class TakPublisher {
                 "0 eligible radios (need Extra attention / payload latlon / GPS stamp)"
             else -> ""
         }
+        if (!current()) {
+            last.keys.filter { TakInstall.phoneScoped(it, tag) }.forEach { last.remove(it) }
+            parked.keys.filter { TakInstall.phoneScoped(it, tag) }.forEach { parked.remove(it) }
+        }
         _status.value = TakFeedStatus(
             at = now,
             sent = sent,
@@ -320,6 +381,51 @@ class TakPublisher {
             error = lastErr,
             detail = detail,
         )
+        return legacyJustSent
+    }
+
+    /**
+     * Drop spots this session still has for [tag], then the caller saves a new tag.
+     * Shared Remote ID markers are left alone. Privacy and a feed that is off do not call this.
+     */
+    fun retireTag(tag: String, callsign: String, settings: AppSettings, now: Long = System.currentTimeMillis()) {
+        val mark = TakInstall.clean(tag)
+        if (mark.isEmpty()) return
+        retiredTags.add(mark)
+        if (!settings.takEnabled || settings.demoMode) return
+        val host = settings.takHost.trim().ifBlank { TakDefaults.HOST }
+        val port = settings.takPort.coerceIn(1, 65_535)
+        val dests = destinations(host, port)
+        if (dests.isEmpty()) return
+        val spots = LinkedHashMap<String, TakSent>()
+        last.forEach { (uid, spot) -> if (TakInstall.phoneScoped(uid, mark)) spots[uid] = spot }
+        parked.forEach { (uid, spot) -> if (TakInstall.phoneScoped(uid, mark)) spots.putIfAbsent(uid, spot) }
+        for ((uid, spot) in spots) {
+            val face = spot.face
+            val xml = if (face != null) {
+                CotEvent.tombstoneXml(uid, spot.lat, spot.lon, now, face.callsign, face.remarks)
+            } else {
+                CotEvent.tombstoneXml(uid, spot.lat, spot.lon, now, callsign, "Fieldwatch · gone")
+            }
+            if (!sendAll(dests, xml.toByteArray(Charsets.UTF_8))) return
+            last.remove(uid)
+            parked.remove(uid)
+        }
+        val gnss = synchronized(gate) {
+            gnssMarks.values.filter { TakInstall.phoneScoped(it.uid, mark) }.toList()
+        }
+        for (held in gnss) {
+            val xml = CotEvent.tombstoneXml(
+                uid = held.uid,
+                lat = held.startLat,
+                lon = held.startLon,
+                now = now,
+                callsign = TakGnss.CALLOUT,
+                remarks = "Where this phone was. Not the source.",
+            )
+            if (!sendAll(dests, xml.toByteArray(Charsets.UTF_8))) return
+            synchronized(gate) { gnssMarks.remove(held.uid) }
+        }
     }
 
     fun close() {
@@ -419,7 +525,6 @@ class TakPublisher {
 
     companion object {
         private const val TAG = "FieldwatchTak"
-        private const val SELF_UID = "FIELDWATCH-SELF"
         private fun PayloadOk(fix: Pair<Double, Double>): Boolean =
             app.fieldwatch.domain.PayloadLocation.validCoord(fix.first, fix.second)
     }

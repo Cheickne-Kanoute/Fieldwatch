@@ -1,5 +1,7 @@
 package app.fieldwatch.alert
 
+import app.fieldwatch.domain.LanguageText
+
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -237,7 +239,7 @@ class Alerter(private val context: Context) {
         )
         val note = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_fieldwatch)
-            .setContentTitle("Fieldwatch watchlist")
+            .setContentTitle(LanguageText.text("ui.fieldwatch.watchlist"))
             .setContentText("$label  ${device.rssi} dBm  ${MacUtil.screenMac(device.mac, demoMode)}")
             .setStyle(
                 NotificationCompat.BigTextStyle().bigText(
@@ -535,7 +537,7 @@ class Alerter(private val context: Context) {
         if (manager.getNotificationChannel(CHANNEL) == null) {
             manager.createNotificationChannel(
                 NotificationChannel(CHANNEL, "Watchlist", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "Appearing signatures and devices on your watchlist. Beep is played separately."
+                    description = LanguageText.text("ui.appearing.signatures.devices.watchlist")
                     enableVibration(true)
                     enableLights(true)
                     setSound(null, null)
@@ -548,8 +550,8 @@ class Alerter(private val context: Context) {
         if (Build.VERSION.SDK_INT < 26) return
         if (manager.getNotificationChannel(GNSS_CHANNEL) != null) return
         manager.createNotificationChannel(
-            NotificationChannel(GNSS_CHANNEL, "GNSS interference", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "Possible GNSS interference or spoofing on this phone. Beep and voice are separate."
+            NotificationChannel(GNSS_CHANNEL, LanguageText.text("settings.topic.gnss"), NotificationManager.IMPORTANCE_HIGH).apply {
+                description = LanguageText.text("ui.possible.gnss.interference.spoofing")
                 setSound(null, null)
             },
         )

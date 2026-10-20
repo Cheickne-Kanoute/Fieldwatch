@@ -85,6 +85,26 @@ object Geo {
     fun cellKey(lat: Double, lon: Double): String =
         "%.4f,%.4f".format(java.util.Locale.US, lat, lon)
 
+    /** Exact GPS cell, then the nearest named cell within [maxM]. */
+    fun nameNear(lat: Double, lon: Double, namesByCell: Map<String, String>, maxM: Double = 90.0): String? {
+        if (namesByCell.isEmpty()) return null
+        namesByCell[cellKey(lat, lon)]?.let { return it }
+        var best: String? = null
+        var bestD = maxM
+        for ((key, name) in namesByCell) {
+            val parts = key.split(',')
+            if (parts.size != 2) continue
+            val klat = parts[0].toDoubleOrNull() ?: continue
+            val klon = parts[1].toDoubleOrNull() ?: continue
+            val d = meters(lat, lon, klat, klon)
+            if (d < bestD) {
+                bestD = d
+                best = name
+            }
+        }
+        return best
+    }
+
     fun screenCoord(lat: Double?, lon: Double?, demo: Boolean): String? {
         if (lat == null || lon == null) return null
         if (demo) return "masked"

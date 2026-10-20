@@ -1,5 +1,7 @@
 package app.fieldwatch.ui.screen
 
+import app.fieldwatch.domain.LanguageText
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -161,7 +163,7 @@ fun LivePane(
             (gnssNotice.showDialog || !gnssNotice.ended)
         if (gnssStatus == GnssCopy.PAUSED && !gnssAlert) {
             Text(
-                gnssStatus,
+                LanguageText.text("live.gnss.paused"),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
@@ -184,7 +186,7 @@ fun LivePane(
                         Text(gnssNotice.body)
                         if (gnssNotice.details.isNotBlank()) {
                             Text(
-                                "Details",
+                                LanguageText.text("ui.details.label"),
                                 style = MaterialTheme.typography.labelMedium,
                                 modifier = Modifier.padding(top = 14.dp),
                             )
@@ -198,7 +200,7 @@ fun LivePane(
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = { vm.dismissGnss() }) { Text("OK") }
+                    TextButton(onClick = { vm.dismissGnss() }) { Text(LanguageText.text("ui.ok.label")) }
                 },
             )
         }
@@ -214,7 +216,7 @@ fun LivePane(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
             ) {
                 Text(
-                    "Hide this burst",
+                    LanguageText.text("ui.hide.burst"),
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.weight(1f),
                 )
@@ -227,7 +229,7 @@ fun LivePane(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
             ) {
                 Text(
-                    if (floodHide.keys.size == 1) "Hiding 1 flood radio" else "Hiding ${floodHide.keys.size} flood radios",
+                    LanguageText.text("live.flood.hiding", mapOf("n" to floodHide.keys.size.toString())),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
@@ -241,16 +243,16 @@ fun LivePane(
                 title = { Text(floodNotice.title()) },
                 text = { Text(floodNotice.body()) },
                 confirmButton = {
-                    TextButton(onClick = { vm.dismissPairingFlood() }) { Text("Continue") }
+                    TextButton(onClick = { vm.dismissPairingFlood() }) { Text(LanguageText.text("ui.continue.label")) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { vm.hidePairingFlood() }) { Text("Hide these") }
+                    TextButton(onClick = { vm.hidePairingFlood() }) { Text(LanguageText.text("ui.hide.these")) }
                 },
             )
         }
         if (state.displayPaused) {
             Text(
-                "Display paused · radios still scanning and logging. Filters still apply when you run again. Tap Live to run the list again.",
+                LanguageText.text("ui.display.paused.radios.still"),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
@@ -259,9 +261,12 @@ fun LivePane(
         if (state.filter.arrivalsOnly) {
             Text(
                 when {
-                    state.arrivalsLearning -> "New only · learning sitting Wi-Fi"
-                    state.hiddenKnown > 0 -> "New only · ${state.hiddenKnown} hidden"
-                    else -> "New only"
+                    state.arrivalsLearning -> LanguageText.text("ui.new.only.learning.sitting")
+                    state.hiddenKnown > 0 -> LanguageText.text(
+                        "live.new.hidden",
+                        mapOf("n" to state.hiddenKnown.toString()),
+                    )
+                    else -> LanguageText.text("ui.new.only")
                 },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -270,7 +275,10 @@ fun LivePane(
         }
         if (state.filter.movingWithYou) {
             Text(
-                "Follow · path ${state.operatorSpanM.toInt()} m · Start over clears the path",
+                LanguageText.text(
+                    "live.follow.path",
+                    mapOf("n" to state.operatorSpanM.toInt().toString()),
+                ),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
@@ -278,7 +286,7 @@ fun LivePane(
         }
         if (state.filter.watchedOnly) {
             Text(
-                "Watched only",
+                LanguageText.text("ui.keep.watched.only"),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
@@ -286,7 +294,7 @@ fun LivePane(
         }
         if (state.filter.customNamesOnly) {
             Text(
-                "Named radios only",
+                LanguageText.text("ui.keep.named.only"),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
@@ -297,7 +305,7 @@ fun LivePane(
             val now = System.currentTimeMillis()
             val dur = Sit.fmtDuration(openSit.durationMs(now))
             val cap = when {
-                state.sit.memoryTight -> " · memory cap"
+                state.sit.memoryTight -> (" " + LanguageText.text("ui.memory.cap"))
                 state.sit.atCap -> " · ${Sit.RADIO_CAP} cap"
                 else -> ""
             }
@@ -325,12 +333,12 @@ fun LivePane(
         if (renameSit && openSit != null) {
             AlertDialog(
                 onDismissRequest = { renameSit = false },
-                title = { Text("Rename sit") },
+                title = { Text(LanguageText.text("ui.rename.sit")) },
                 text = {
                     FieldwatchOutlinedField(
                         value = renameDraft,
                         onValueChange = { renameDraft = it.take(Sit.NAME_MAX) },
-                        label = "Name",
+                        label = LanguageText.text("ui.name.label"),
                     )
                 },
                 confirmButton = {
@@ -339,10 +347,10 @@ fun LivePane(
                             renameSit = false
                             vm.renameSit(openSit.id, renameDraft)
                         },
-                    ) { Text("Save") }
+                    ) { Text(LanguageText.text("ui.save.label")) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { renameSit = false }) { Text("Cancel") }
+                    TextButton(onClick = { renameSit = false }) { Text(LanguageText.text("language.cancel")) }
                 },
             )
         }
@@ -377,63 +385,79 @@ private fun LocationOffBanner() {
     }
     Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
         Text(
-            "Location is off. Android will not return Wi-Fi or Bluetooth results.",
+            LanguageText.text("ui.location.off.android.will"),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.error,
         )
         if (canOpen) {
             TextButton(onClick = { runCatching { context.startActivity(settings) } }) {
-                Text("Turn on")
+                Text(LanguageText.text("ui.turn.label"))
             }
         }
     }
 }
 
 private fun arrivalsEmpty(state: FieldwatchUi): String? {
-    if (state.filter.movingWithYou) {
+    val filter = state.filter
+    if (filter.seenAtPlaces) {
+        return when {
+            !state.settings.placeWatch ->
+                LanguageText.text("ui.turn.settings.location.places")
+            !state.settings.tagLocation ->
+                LanguageText.text("ui.turn.settings.tag.detections")
+            filter.arrivalsOnly ->
+                LanguageText.text("ui.new.detections.only.hides")
+            else ->
+                LanguageText.text("ui.nothing.can.hear.right")
+        }
+    }
+    if (filter.movingWithYou) {
         return when {
             !state.settings.tagLocation ->
-                "Moving with you needs Settings → Tag detections with GPS, then a walk or drive."
+                LanguageText.text("ui.moving.needs.settings.tag")
             state.operatorSpanM < 45.0 ->
-                "GPS path ${state.operatorSpanM.toInt()} m — too short. Keep moving. " +
-                    "If this stays 0, Location is not updating (use high accuracy)."
-            state.filter.customNamesOnly || state.filter.watchedOnly ||
-                state.filter.namedOnly || state.filter.namedOnlyImplied() ->
-                "No loud BLE has stayed with you among the radios still allowed. " +
-                    "Tap the Moving with you preset to test BLE, or turn off Signatures only / Show only / Named radios only / Watched only."
+                LanguageText.text(
+                    "live.path.short",
+                    mapOf("n" to state.operatorSpanM.toInt().toString()),
+                )
+            filter.customNamesOnly || filter.watchedOnly ||
+                filter.namedOnly || filter.namedOnlyImplied() ->
+                (LanguageText.text("ui.no.loud.ble.has") + " ") +
+                    LanguageText.text("ui.tap.moving.preset.test")
             else ->
-                if (state.filter.hideMine) {
-                    "No loud BLE has stayed with you along this path. Wi-Fi access points stay hidden. Radios marked Mine stay off this list."
+                if (filter.hideMine) {
+                    LanguageText.text("ui.no.loud.ble.has.2")
                 } else {
-                    "No loud BLE has stayed with you along this path. Wi-Fi access points stay hidden. A tag in your bag or car should show. Find My MAC rotation will not stitch."
+                    LanguageText.text("ui.no.loud.ble.has.3")
                 }
         }
     }
-    if (state.filter.arrivalsOnly) {
+    if (filter.arrivalsOnly) {
         return when {
-            state.arrivalsLearning -> "Hiding sitting access points until the next Wi-Fi scan. New Bluetooth still shows right away."
+            state.arrivalsLearning -> LanguageText.text("ui.hiding.sitting.access.points")
             state.hiddenKnown > 0 ->
-                "${state.hiddenKnown} already seen are hidden. A new radio stays while we hear it, then at least as long as Brief hold after the last packet."
+                LanguageText.text(
+                    "live.already.hidden",
+                    mapOf("n" to state.hiddenKnown.toString()),
+                )
             else ->
-                "Waiting for a new Wi-Fi or BLE radio. It stays while we hear it, then at least as long as Brief hold after the last packet."
+                LanguageText.text("ui.waiting.new.wi.fi")
         }
     }
-    if (state.filter.watchedOnly) {
-        return "No watched radios on the air. Bookmark a signature, turn Alert on a Named radio, or turn off Filters → Watched only."
+    if (filter.watchedOnly) {
+        return LanguageText.text("ui.no.watched.radios.air")
     }
-    if (state.filter.customNamesOnly) {
-        return "No named radios on the air. Set a custom name on detail, or turn off Filters → Named radios only."
+    if (filter.customNamesOnly) {
+        return LanguageText.text("ui.no.named.radios.air")
     }
     return null
 }
 
-private const val LIST_EMPTY =
-    "No live emitters match the current filter. If this just emptied, the OS may be between scan windows — the last set is held and should return without a burst. Use Timeline for recent disappearances."
+private val LIST_EMPTY get() = LanguageText.text("ui.no.live.emitters.match")
 
-private const val CLASS_EMPTY =
-    "No live emitters match the current filter. If this just emptied, the OS may be between scan windows — the last set is held and should return without a burst."
+private val CLASS_EMPTY get() = LanguageText.text("ui.no.live.emitters.match.2")
 
-private const val RADAR_EMPTY = "No devices match the current filter"
+private val RADAR_EMPTY get() = LanguageText.text("ui.no.devices.match.current")
 
 /** Keeps the filter sentence. Adds the Diagnostics pointer only while a scan is blocked. */
 private fun liveEmpty(state: FieldwatchUi, fallback: String): String {
@@ -515,13 +539,13 @@ private fun ClassOutlineView(
                 FieldwatchFilterChip(
                     selected = !hideEmpty,
                     onClick = { vm.updateSettings { it.copy(outlineHideEmpty = false) } },
-                    label = { Text("Show all") },
+                    label = { Text(LanguageText.text("live.show.all")) },
                     modifier = Modifier.weight(1f),
                 )
                 FieldwatchFilterChip(
                     selected = hideEmpty,
                     onClick = { vm.updateSettings { it.copy(outlineHideEmpty = true) } },
-                    label = { Text("Collapse empty") },
+                    label = { Text(LanguageText.text("live.collapse.empty")) },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -540,10 +564,19 @@ private fun ClassOutlineView(
         item(key = "outline-summary") {
             val hidden = slices.count { it.radios.isEmpty() }
             val summary = buildString {
-                append("${devices.size} radios")
-                if (unmatched > 0) append(" · $unmatched unmatched")
-                if (multi > 0) append(" · $multi in more than one class")
-                if (hideEmpty && hidden > 0) append(" · $hidden empty hidden")
+                append(LanguageText.text("live.summary.radios", mapOf("n" to devices.size.toString())))
+                if (unmatched > 0) {
+                    append(" · ")
+                    append(LanguageText.text("live.summary.unmatched", mapOf("n" to unmatched.toString())))
+                }
+                if (multi > 0) {
+                    append(" · ")
+                    append(LanguageText.text("live.summary.multi", mapOf("n" to multi.toString())))
+                }
+                if (hideEmpty && hidden > 0) {
+                    append(" · ")
+                    append(LanguageText.text("live.summary.hidden", mapOf("n" to hidden.toString())))
+                }
             }
             Text(
                 summary,
@@ -558,9 +591,12 @@ private fun ClassOutlineView(
                     count = slice.radios.size,
                     subtitle = when {
                         slice.radios.isEmpty() -> null
-                        slice.kind == null -> "no signature"
+                        slice.kind == null -> LanguageText.text("live.no.signature")
                         slice.signatures.size == 1 -> vm.fleetName(slice.signatures.first().fleetId)
-                        else -> "${slice.signatures.size} signatures"
+                        else -> LanguageText.text(
+                            "live.signatures",
+                            mapOf("n" to slice.signatures.size.toString()),
+                        )
                     },
                     accent = slice.accent(vm).nightIf(LocalNightMode.current),
                     expanded = slice.id in openClasses,
@@ -1065,7 +1101,7 @@ private fun RadarView(
                     val zoomBit = if (zoom > 1.04f) {
                         " · ×${"%.1f".format(Locale.US, zoom)} · double-tap reset"
                     } else {
-                        " · pinch to zoom"
+                        (" " + LanguageText.text("ui.pinch.zoom"))
                     }
                     "$onAir on-air · ${devices.size} in filter · dim = gone · tap a blip$zoomBit"
                 },
@@ -1442,7 +1478,7 @@ private fun FleetNameChips(
                 color = ink.copy(alpha = 0.12f),
             ) {
                 Text(
-                    "Mine",
+                    LanguageText.text("ui.mine.label"),
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 0.dp),
                     maxLines = 1,
                     style = TextStyle(
@@ -1467,7 +1503,7 @@ private fun FleetNameChips(
             ) {
                 Icon(
                     Icons.AutoMirrored.Outlined.Notes,
-                    contentDescription = "Observer notes",
+                    contentDescription = LanguageText.text("ui.observer.notes"),
                     modifier = Modifier
                         .padding(horizontal = 5.dp, vertical = 1.dp)
                         .size(11.dp),
@@ -1483,7 +1519,7 @@ private fun FleetNameChips(
             ) {
                 Icon(
                     Icons.Outlined.Notifications,
-                    contentDescription = "Alerted this session",
+                    contentDescription = LanguageText.text("ui.alerted.session"),
                     modifier = Modifier
                         .padding(horizontal = 5.dp, vertical = 1.dp)
                         .size(11.dp),
@@ -1627,7 +1663,7 @@ private fun TimelineView(
     ) {
         item {
             Text(
-                "Last 15 minutes · solid bars are on-air windows",
+                LanguageText.text("ui.last.15.minutes.solid"),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

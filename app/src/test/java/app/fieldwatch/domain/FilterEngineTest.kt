@@ -29,6 +29,14 @@ class FilterEngineTest {
     }
 
     @Test
+    fun seenAtPlacesKeepsOnlyListedKeys() {
+        val filter = FilterState(seenAtPlaces = true)
+        assertTrue(engine.pass(labeled, filter, placeKeys = setOf(labeled.key)))
+        assertFalse(engine.pass(other, filter, placeKeys = setOf(labeled.key)))
+        assertTrue(engine.pass(other, FilterState()))
+    }
+
+    @Test
     fun customNamesOnlyKeepsLabeledKeys() {
         val filter = FilterState(customNamesOnly = true)
         val keys = setOf(labeled.key)
@@ -122,6 +130,106 @@ class FilterEngineTest {
         val named = labeled.copy(name = "anything")
         assertFalse(engine.pass(named, filter, mineKeys = setOf(labeled.key)))
         assertTrue(engine.pass(other.copy(name = "anything"), filter, mineKeys = setOf(labeled.key)))
+    }
+
+    @Test
+    fun sectionSwitchFollowsItsOptions() {
+        val fresh = FilterState()
+        assertFalse(fresh.whoStaysOn())
+        assertFalse(fresh.signaturesOn())
+        assertFalse(fresh.fineOn())
+        assertFalse(fresh.useClassFilter)
+        val picked = FilterState(hideMine = true, includeSignatures = true, rssiMin = -70)
+        assertTrue(picked.whoStaysOn())
+        assertTrue(picked.signaturesOn())
+        assertTrue(picked.fineOn())
+        assertFalse(picked.clearWhoStays().hideMine)
+        assertFalse(picked.clearSelectedSignatures().includeSignatures)
+        assertTrue(picked.clearSelectedSignatures().includeFleetIds.isEmpty())
+        assertEquals(-100, picked.clearFine().rssiMin)
+        assertFalse(picked.clearClasses().useClassFilter)
+    }
+
+    @Test
+    fun classHideNeedsTheSectionOn() {
+        val filter = FilterState(
+            useClassFilter = false,
+            excludeClasses = true,
+            classes = setOf(SignatureClass.SURVEILLANCE),
+        )
+        val flock = signed.copy(fleetIds = setOf("fleet-flock"))
+        val byClass = mapOf("fleet-flock" to SignatureClass.SURVEILLANCE)
+        assertTrue(engine.pass(flock, filter, classByFleetId = byClass))
+    }
+
+    @Test
+    fun selectedSignaturesAreOneList() {
+        val show = FilterState(
+            includeSignatures = true,
+            includeFleetIds = setOf("fleet-airtag"),
+        )
+        assertTrue(engine.pass(signed, show))
+        assertFalse(engine.pass(other, show))
+
+        val hide = FilterState(
+            excludeSignatures = true,
+            fleetIds = setOf("fleet-airtag"),
+        )
+        assertFalse(engine.pass(signed, hide))
+        assertTrue(engine.pass(other, hide))
+
+        val both = FilterState(
+            includeSignatures = true,
+            excludeSignatures = true,
+            includeFleetIds = setOf("fleet-airtag"),
+            fleetIds = setOf("fleet-airtag"),
+        )
+        assertTrue(both.signatureShowOn())
+        assertFalse(both.signatureHideOn())
+        assertTrue(engine.pass(signed, both))
+        assertFalse(engine.pass(other, both))
+
+        val orBoth = both.copy(logic = FilterLogic.OR, nameQuery = "nope")
+        assertTrue(engine.pass(signed, orBoth))
+        assertFalse(engine.pass(other, orBoth))
+    }
+
+    @Test
+    fun signatureChipsShareOnePickList() {
+        val off = FilterState()
+        val shown = off.toggleSignaturePick("fleet-airtag", checked = true)
+        assertTrue(shown.signatureShowOn())
+        assertFalse(shown.signatureHideOn())
+        assertEquals(setOf("fleet-airtag"), shown.includeFleetIds)
+        assertEquals(setOf("fleet-airtag"), shown.fleetIds)
+
+        val hidden = shown.toggleSignatureHide()
+        assertFalse(hidden.signatureShowOn())
+        assertTrue(hidden.signatureHideOn())
+        assertEquals(setOf("fleet-airtag"), hidden.selectedSignatureIds())
+        assertFalse(engine.pass(signed, hidden))
+
+        val kept = hidden.toggleSignatureHide()
+        assertFalse(kept.signaturesOn())
+        assertEquals(setOf("fleet-airtag"), kept.selectedSignatureIds())
+        assertTrue(engine.pass(signed, kept))
+
+        val again = kept.toggleSignatureShow()
+        assertTrue(again.signatureShowOn())
+        assertTrue(engine.pass(signed, again))
+        assertFalse(engine.pass(other, again))
+
+        val old = FilterState(
+            includeSignatures = true,
+            excludeSignatures = true,
+            includeFleetIds = setOf("fleet-airtag"),
+            fleetIds = setOf("fleet-tile"),
+        )
+        assertEquals(setOf("fleet-airtag"), old.selectedSignatureIds())
+        val unified = old.toggleSignatureHide()
+        assertTrue(unified.signatureHideOn())
+        assertEquals(setOf("fleet-airtag"), unified.includeFleetIds)
+        assertEquals(setOf("fleet-airtag"), unified.fleetIds)
     }
 
     @Test

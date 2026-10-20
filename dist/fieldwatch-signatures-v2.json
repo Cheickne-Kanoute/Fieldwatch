@@ -3,7 +3,7 @@
     "formatVersion": 1,
     "exportedAt": "",
     "appVersion": "stock",
-    "catalogVersion": 95,
+    "catalogVersion": 96,
     "fleets": [
         {
             "id": "fleet-actiontec",
@@ -9942,13 +9942,21 @@
                     "dataPrefixHex": "",
                     "radio": null,
                     "enabled": true
+                },
+                {
+                    "kind": "SERVICE_UUID",
+                    "text": "FE33",
+                    "companyId": 0,
+                    "dataPrefixHex": "",
+                    "radio": null,
+                    "enabled": true
                 }
             ],
             "minPeers": 0,
             "peerWindowSec": 60,
             "clusterByOui": false,
             "sequentialMac": false,
-            "notes": "Chipolo item finder (Find Hub / Find My). A tag you clip to keys or a bag.",
+            "notes": "Chipolo item finder. A tag you clip to keys or a bag. A renamed tag still matches the Chipolo Bluetooth service. Find Hub tags stay on the Find Hub row.",
             "attentionNote": "",
             "builtIn": true,
             "kind": "FINDER"

@@ -4,6 +4,39 @@ Newest first. This is Fieldwatch (`app.fieldwatch`). Each build below is what Se
 
 Fieldwatch continues the Spectre 1.2.14 field build under a new name, application id, and the MIT License. It does not replace Spectre on a phone.
 
+## 1.1.27 — 16 October 2026
+
+- Places remembers a stable tracker this phone hears at two or more places in the last 7 days, and a return after a quiet stretch. The lines are on that radio’s page and in the sit report, with where this phone was. A stop from another day includes the date. Online place names adds the street. Filters can limit Live to the ones you can hear now. A radio that changes its address is skipped. Ordinary Wi-Fi and Bluetooth stay off. There is no beep and no TAK marker. Each radio keeps the latest 8 stops. A ninth confirmed stop drops the oldest.
+- The user manual explains Places: what a stop is, which radios qualify, and the limits.
+- Signature candidates shows a progress dialog while it reads the log and matches the catalog. The bar follows the file.
+- Sit export can write GeoJSON. It is the same map as the sit GPX and KML: this phone's path, and a point where this phone heard each radio.
+- Settings opens as a list of topics. Tap a row for that page. The row shows the current choice. Back returns to the list. Named radios is its own row, after Watchlist. The row shows how many are saved.
+
+- A Filters row names what is selected in the same muted text as Settings. That line is not green.
+- The sit list is spaced a little tighter.
+- The Signatures page says Bookmark to alert. The line about hiding a family on Filters is gone.
+- The Sits line says Radios heard during a named stretch of time. Under Start sit it says Select Sit for actions below.
+- Moving with you says Loud Bluetooth radios that stay with you.
+- Presets says tap a preset to load it, long-press one to delete it, or save the current filters settings to a new preset.
+- Selected signature classes says to pick Show only or Hide these, then the classes, and that a preset includes those selections.
+- Selected signatures says to pick Show only or Hide these, then the signatures, and that a preset includes those selections.
+- Edit signature drops the last sentence under Notes and the last sentence under Extra attention.
+- Edit signature says the class is what Filters uses for Show only or Hide these.
+- Edit signature and Decode fields use shorter, accurate lines for Min peers, color, rules, restore defaults, removing a decode map, and an empty preview.
+- Settings → Diagnostics says it shows whether scanning is running, and the state of Wi-Fi, Bluetooth, Location, and GPS. The Diagnostics page no longer tells you to paste the copy into an issue.
+- The Settings footer no longer says Wi-Fi and Bluetooth only.
+- The Live tour points at the sliders in the top right. Open it shows how Live looks. Skip closes the tour. An upgrade to this version shows that card once, on the first Live screen. Settings → Show Live tour still brings it back.
+- The language list uses the English name of each language, in alphabetical order. Use the phone's locale if available stays first.
+- The user manual explains Language: the bundled drafts were translated with AI, a wrong line belongs in a GitHub issue, and a new language is a file in the author’s own repository. The author guide is linked from that section.
+- An off switch keeps a light knob, so it still looks like it can be turned on. A switch that cannot be used stays faded.
+- Reports keeps Sits open. Path, Debrief, Sit export, Compare, Log Export, and Signature candidates each open their own page. The line under each row is a short description. Signature candidates explains the search, and Find candidates starts it. Path, Debrief, Sit export, and Compare sit under a line that names the sit they use, with a bar on the left in the same green as those rows. Log and Signature candidates stay full width under that group.
+- Keep or hide calls the three keep switches Keep signature matches only, Keep watched only, and Keep named only. Hide my radios is Hide Mine.
+- Filters keeps Presets and Radios open at the top. Moving with you, Seen at more than one place, and New detections are switches on that list. Keep or hide, Selected signature classes, Selected signatures, and Signal, name, MAC, vendor open their own page. The row names what is selected in that section.
+- Selected signatures is one list. Show only and Hide these sit above it, the same way Selected signature classes works. Turning a chip off keeps the picks.
+- Sit export can write an ATAK data package. ATAK imports the zip. It has this phone's path, a point for each radio, an aircraft pin and its short track when a position was advertised, an operator pin when that position was advertised, and a GNSS hit as a pin on the path. The ellipse and floods stay on the live feed.
+- Each phone gets its own TAK marker. The name is Fieldwatch plus a 4-character tag, unless you type one. Two phones on one network no longer share that marker. A Remote ID aircraft with a UAS ID is still one shared marker. This is not direction finding.
+- Settings → GNSS interference can record the phone’s raw GPS measurements around a hit. The switch is off until you turn it on. Share last recording is on that page. Privacy mode does not record.
+
 ## 1.1.26 — 12 October 2026
 
 - A Remote ID operator location says what that point is. Takeoff is the launch spot. Pilot is a live GPS operator. Fixed is a point the aircraft declared. An older sit says Operator. The pin stays Orange. A known operator altitude is shown. Unknown stays blank. The card can say the aircraft height is above takeoff or above the ground. EU category and class show only when the plate says the classification is EU.

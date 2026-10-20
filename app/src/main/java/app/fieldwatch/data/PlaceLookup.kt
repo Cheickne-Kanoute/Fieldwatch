@@ -22,7 +22,12 @@ import kotlin.coroutines.resume
  * becomes a note in the report.
  */
 object PlaceLookup {
-    data class Fix(val label: String, val lat: Double, val lon: Double)
+    data class Fix(
+        val label: String,
+        val lat: Double,
+        val lon: Double,
+        val namedOnly: Boolean = false,
+    )
 
     fun online(context: Context): Boolean {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
@@ -37,17 +42,39 @@ object PlaceLookup {
         path: List<GpsSample>,
         devices: List<Sighting>,
         now: Long = System.currentTimeMillis(),
+        extra: List<Fix> = emptyList(),
         onProgress: ((String) -> Unit)? = null,
     ): DebriefPlaces = withContext(Dispatchers.IO) {
-        runCatching { lookupInner(context, path, devices, now, onProgress) }
+        runCatching { lookupInner(context, path, devices, now, extra, onProgress) }
             .getOrElse { DebriefPlaces(attempted = true, available = false, note = "Online lookup failed silently. Coordinates only.") }
     }
+
+    /**
+     * Street names for a few phone fixes. Empty when offline or the geocoder
+     * has nothing. Callers keep the map and skip cells they already named.
+     */
+    suspend fun namesAt(context: Context, points: List<Pair<Double, Double>>): Map<String, String> =
+        withContext(Dispatchers.IO) {
+            if (points.isEmpty() || !online(context) || !Geocoder.isPresent()) return@withContext emptyMap()
+            val geocoder = Geocoder(context, Locale.getDefault())
+            val out = LinkedHashMap<String, String>()
+            for ((lat, lon) in points) {
+                if (out.size >= 8) break
+                if (lat == 0.0 && lon == 0.0) continue
+                val key = app.fieldwatch.domain.Geo.cellKey(lat, lon)
+                if (key in out) continue
+                val name = reverse(geocoder, lat, lon)?.trim()?.takeIf { it.isNotEmpty() } ?: continue
+                out[key] = name
+            }
+            out
+        }
 
     private suspend fun lookupInner(
         context: Context,
         path: List<GpsSample>,
         devices: List<Sighting>,
         now: Long,
+        extra: List<Fix>,
         onProgress: ((String) -> Unit)?,
     ): DebriefPlaces {
         if (!online(context)) {
@@ -64,7 +91,7 @@ object PlaceLookup {
                 note = "Online lookup skipped: this phone has no system geocoder (needs Google Play / network location). Coordinates only.",
             )
         }
-        val fixes = collect(path, devices, now)
+        val fixes = withExtra(collect(path, devices, now), extra)
         if (fixes.isEmpty()) {
             return DebriefPlaces(
                 attempted = true,
@@ -79,11 +106,13 @@ object PlaceLookup {
             onProgress?.invoke("Looking up place names (${i + 1} of ${fixes.size})…")
             val key = app.fieldwatch.domain.Geo.cellKey(fix.lat, fix.lon)
             val name = cache[key] ?: reverse(geocoder, fix.lat, fix.lon)?.also { cache[key] = it }
-            val coord = "%.5f, %.5f".format(Locale.US, fix.lat, fix.lon)
-            lines += if (name.isNullOrBlank()) {
-                "  · ${fix.label}  $coord  (no name returned)"
-            } else {
-                "  · ${fix.label}  $name  ($coord)"
+            if (!fix.namedOnly) {
+                val coord = "%.5f, %.5f".format(Locale.US, fix.lat, fix.lon)
+                lines += if (name.isNullOrBlank()) {
+                    "  · ${fix.label}  $coord  (no name returned)"
+                } else {
+                    "  · ${fix.label}  $name  ($coord)"
+                }
             }
         }
         val named = cache.size
@@ -134,6 +163,27 @@ object PlaceLookup {
                 }
         }
         return out.take(8)
+    }
+
+    /** Path cells first, then up to eight more from [extra] (place stops). */
+    private fun withExtra(base: List<Fix>, extra: List<Fix>): List<Fix> {
+        if (extra.isEmpty()) return base
+        val out = ArrayList<Fix>(base.size + 8)
+        val seen = HashSet<String>()
+        for (fix in base) {
+            out += fix
+            seen += app.fieldwatch.domain.Geo.cellKey(fix.lat, fix.lon)
+        }
+        var added = 0
+        for (fix in extra) {
+            if (added >= 8) break
+            if (fix.lat == 0.0 && fix.lon == 0.0) continue
+            val key = app.fieldwatch.domain.Geo.cellKey(fix.lat, fix.lon)
+            if (!seen.add(key)) continue
+            out += fix
+            added++
+        }
+        return out
     }
 
     private suspend fun reverse(geocoder: Geocoder, lat: Double, lon: Double): String? {

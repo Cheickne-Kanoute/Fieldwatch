@@ -26,6 +26,77 @@ object TakDefaults {
     const val REMARKS_MAX = 800
 }
 
+/**
+ * One phone on a TAK net. The tag is not a setting, so a settings file cannot
+ * copy it onto another phone. A blank callsign means Fieldwatch- plus the tag.
+ */
+object TakInstall {
+    const val LEGACY_SELF_UID = "FIELDWATCH-SELF"
+    const val LENGTH = 4
+
+    /** 32 symbols. 0, O, 1, and I are left out so a tag is easy to read aloud. */
+    private const val ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+
+    fun newTag(random: java.util.Random = java.util.Random()): String = buildString(LENGTH) {
+        repeat(LENGTH) { append(ALPHABET[random.nextInt(ALPHABET.length)]) }
+    }
+
+    fun clean(raw: String?): String {
+        val text = raw?.trim()?.uppercase(Locale.US).orEmpty()
+        if (text.length != LENGTH || text.any { it !in ALPHABET }) return ""
+        return text
+    }
+
+    /** What is saved. Blank means the default name, so a new tag can follow it. */
+    fun storedCallsign(raw: String?): String =
+        raw.orEmpty().replace('\n', ' ').replace('\r', ' ').trim().take(32)
+
+    fun callsign(stored: String?, tag: String): String {
+        val typed = storedCallsign(stored)
+        if (typed.isNotEmpty()) return typed
+        val mark = clean(tag)
+        return if (mark.isEmpty()) "Fieldwatch" else "Fieldwatch-$mark"
+    }
+
+    /**
+     * The one delete an upgraded install can name. Last and parked spots are
+     * not on disk. Null when the feed must not send.
+     */
+    fun legacySelfDelete(retired: Boolean, takEnabled: Boolean, privacy: Boolean): String? {
+        if (retired || !takEnabled || privacy) return null
+        return LEGACY_SELF_UID
+    }
+
+    fun gnssUid(tag: String, key: String): String {
+        val mark = clean(tag)
+        return if (mark.isEmpty()) "FIELDWATCH-GNSS-$key" else "FIELDWATCH-GNSS-$mark-$key"
+    }
+
+    /** This phone's marker, a MAC pin, or a GNSS mark. Shared Remote ID uids are not. */
+    fun phoneScoped(uid: String, tag: String): Boolean {
+        val mark = clean(tag)
+        if (mark.isEmpty()) return false
+        return uid == "$LEGACY_SELF_UID-$mark" ||
+            uid.startsWith("FIELDWATCH-$mark-") ||
+            uid.startsWith("FIELDWATCH-GNSS-$mark-")
+    }
+
+    /** Phone name for a MAC pin's card. Shared aircraft and the phone marker itself get none. */
+    fun viaLine(uid: String, tag: String, phoneCallsign: String): String? {
+        if (!phoneScoped(uid, tag)) return null
+        if (uid.startsWith("FIELDWATCH-GNSS-") || uid.startsWith("$LEGACY_SELF_UID-")) return null
+        return phoneCallsign.trim().take(32).takeIf { it.isNotEmpty() }
+    }
+
+    /** A loaded config with no tag is an upgrade. Leave [PersistedConfig.takLegacySelfRetired] alone. */
+    fun ensure(config: PersistedConfig, random: java.util.Random = java.util.Random()): PersistedConfig {
+        val tag = clean(config.takInstallTag)
+        if (tag.isEmpty()) return config.copy(takInstallTag = newTag(random))
+        if (tag == config.takInstallTag) return config
+        return config.copy(takInstallTag = tag)
+    }
+}
+
 enum class TakUdpPreset {
     THIS_PHONE,
     LAN_MULTICAST,
@@ -226,6 +297,7 @@ object TakGnss {
         lon: Double?,
         now: Long,
         hold: TakGnssHold,
+        tag: String,
         hasMarks: Boolean = open != null,
     ): TakGnssAction {
         if (mode == TakGnssSend.OFF) {
@@ -264,7 +336,7 @@ object TakGnss {
         }
         val track = if (open == null || !open.open) {
             TakGnssTrack(
-                uid = "FIELDWATCH-GNSS-$key",
+                uid = TakInstall.gnssUid(tag, key.toString()),
                 episodeKey = key,
                 startLat = lat,
                 startLon = lon,
@@ -485,6 +557,7 @@ object TakPublish {
         settings: AppSettings,
         fleets: List<Fleet>,
         watchlist: List<WatchTarget>,
+        tag: String,
     ): List<TakMarker> {
         if (device.gone) return emptyList()
         if (!selected(device, settings, fleets, watchlist)) return emptyList()
@@ -492,7 +565,7 @@ object TakPublish {
         val advertised = advertisedPin(device)
         val out = ArrayList<TakMarker>(2)
         out += TakMarker(
-            uid = CotEvent.uid(device),
+            uid = CotEvent.uid(device, tag),
             deviceKey = device.key,
             lat = aircraft.first,
             lon = aircraft.second,
@@ -504,7 +577,7 @@ object TakPublish {
             val pilot = pilotPin(device)
             if (pilot != null) {
                 out += TakMarker(
-                    uid = CotEvent.pilotUid(device),
+                    uid = CotEvent.pilotUid(device, tag),
                     deviceKey = device.key,
                     lat = pilot.first,
                     lon = pilot.second,
@@ -528,6 +601,7 @@ object TakPublish {
         fleets: List<Fleet>,
         watchlist: List<WatchTarget>,
         previous: Collection<TakSent>,
+        tag: String,
         selfUid: String? = null,
         selfOk: Boolean = false,
     ): Set<String> {
@@ -537,7 +611,7 @@ object TakPublish {
         for (device in devices) {
             if (device.gone) continue
             if (!selected(device, settings, fleets, watchlist)) continue
-            val next = markers(device, settings, fleets, watchlist)
+            val next = markers(device, settings, fleets, watchlist, tag)
             if (next.isNotEmpty()) {
                 next.forEach { keep += it.uid }
             } else if (settings.tagLocation) {
@@ -592,21 +666,35 @@ object TakPublish {
 object CotEvent {
     private val TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
         .withZone(ZoneOffset.UTC)
-    private const val SELF_UID = "FIELDWATCH-SELF"
 
-    fun uid(device: Sighting): String {
+    fun uid(device: Sighting, tag: String): String {
         stableId(device.payloadUasId)?.let { return "FIELDWATCH-RID-$it" }
-        val mac = MacUtil.normalize(device.mac).replace(":", "")
-        return "FIELDWATCH-${device.kind.name}-$mac"
+        return scopedUid(tag, device.kind.name, macKey(device))
     }
 
-    fun pilotUid(device: Sighting): String {
+    /** Heard-here pin. Separate from [uid] so an advertised aircraft does not replace it. */
+    fun hereUid(device: Sighting, tag: String): String =
+        scopedUid(tag, "HERE", device.kind.name, macKey(device))
+
+    fun pilotUid(device: Sighting, tag: String): String {
         stableId(device.payloadUasId)?.let { return "FIELDWATCH-PILOT-$it" }
-        val mac = MacUtil.normalize(device.mac).replace(":", "")
-        return "FIELDWATCH-PILOT-${device.kind.name}-$mac"
+        return scopedUid(tag, "PILOT", device.kind.name, macKey(device))
     }
 
-    fun selfUid(): String = SELF_UID
+    fun selfUid(tag: String): String {
+        val mark = TakInstall.clean(tag)
+        return if (mark.isEmpty()) TakInstall.LEGACY_SELF_UID else "${TakInstall.LEGACY_SELF_UID}-$mark"
+    }
+
+    private fun macKey(device: Sighting): String =
+        MacUtil.normalize(device.mac).replace(":", "")
+
+    /** FIELDWATCH-<tag>-<parts>. A blank tag keeps the old shape so a bug is visible in tests. */
+    private fun scopedUid(tag: String, vararg parts: String): String {
+        val tail = parts.joinToString("-")
+        val mark = TakInstall.clean(tag)
+        return if (mark.isEmpty()) "FIELDWATCH-$tail" else "FIELDWATCH-$mark-$tail"
+    }
 
     fun stableId(raw: String?): String? {
         val trimmed = raw?.trim()?.trimEnd('\u0000') ?: return null
@@ -648,11 +736,13 @@ object CotEvent {
         fleets: List<Fleet>,
         watchlist: List<WatchTarget>,
         advertised: Boolean,
+        tag: String,
         pilot: Boolean = false,
+        viaCallsign: String? = null,
     ): TakFace {
         val linkUid = when {
-            pilot -> uid(device)
-            advertised && TakPublish.pilotPin(device) != null -> pilotUid(device)
+            pilot -> uid(device, tag)
+            advertised && TakPublish.pilotPin(device) != null -> pilotUid(device, tag)
             else -> null
         }
         val linkType = when {
@@ -663,7 +753,7 @@ object CotEvent {
         return TakFace(
             callsign = if (pilot) TakPublish.pilotCallsign(device)
             else TakPublish.callsign(device, fleets, watchlist),
-            remarks = remarks(device, fleets, advertised, pilot, watchlist),
+            remarks = remarks(device, fleets, advertised, pilot, watchlist, viaCallsign),
             cotType = type(device, fleets, advertised, pilot),
             group = group(device, fleets, advertised, pilot),
             hae = if (pilot) OperatorLoc.hae(device.payloadOpAlt) else device.payloadAlt?.takeIf { it.isFinite() } ?: 9999999.0,
@@ -682,11 +772,13 @@ object CotEvent {
         lon: Double,
         advertised: Boolean,
         now: Long,
+        tag: String,
         staleMs: Long = TakDefaults.STALE_MS,
         pilot: Boolean = false,
+        viaCallsign: String? = null,
     ): String = render(
-        uid = if (pilot) pilotUid(device) else uid(device),
-        face = face(device, fleets, watchlist, advertised, pilot),
+        uid = if (pilot) pilotUid(device, tag) else uid(device, tag),
+        face = face(device, fleets, watchlist, advertised, tag, pilot, viaCallsign),
         lat = lat,
         lon = lon,
         now = now,
@@ -702,6 +794,8 @@ object CotEvent {
         now: Long,
         staleMs: Long,
         staleNow: Boolean = false,
+        eventTimeMs: Long = now,
+        staleAtMs: Long = if (staleNow) now else now + staleMs,
     ): String = eventXml(
         uid = uid,
         cotType = face.cotType,
@@ -719,6 +813,8 @@ object CotEvent {
         linkUid = face.linkUid,
         linkType = face.linkType,
         role = face.role,
+        eventTimeMs = eventTimeMs,
+        staleAtMs = staleAtMs,
     )
 
     fun gnssPinXml(
@@ -728,6 +824,8 @@ object CotEvent {
         now: Long,
         staleMs: Long,
         remarks: String,
+        eventTimeMs: Long = now,
+        staleAtMs: Long = now + staleMs,
     ): String = eventXml(
         uid = uid,
         cotType = "b-m-p-s-m",
@@ -743,7 +841,52 @@ object CotEvent {
         linkUid = null,
         linkType = null,
         role = "Team Member",
+        eventTimeMs = eventTimeMs,
+        staleAtMs = staleAtMs,
     )
+
+    /**
+     * A line ATAK draws from the link points. [eventTimeMs] is when the track was recorded.
+     * [staleAtMs] is when the imported line goes stale, usually long after export.
+     */
+    fun routeXml(
+        uid: String,
+        callsign: String,
+        points: List<Pair<Double, Double>>,
+        group: String,
+        stroke: Int,
+        now: Long,
+        eventTimeMs: Long,
+        staleAtMs: Long,
+    ): String {
+        val links = buildString {
+            points.forEachIndexed { i, (lat, lon) ->
+                append("<link uid=\"${xmlEscape("$uid-pt-$i")}\" type=\"b-m-p-w\" relation=\"p-p\" ")
+                append("point=\"${fmt(lat)},${fmt(lon)}\"/>")
+            }
+            append("<strokeColor value=\"$stroke\"/>")
+            append("<strokeWeight value=\"3.0\"/>")
+            append("<labels_on value=\"false\"/>")
+        }
+        return eventXml(
+            uid = uid,
+            cotType = "b-m-r",
+            lat = points.first().first,
+            lon = points.first().second,
+            hae = 9999999.0,
+            callsign = xmlEscape(callsign),
+            remarks = xmlEscape(callsign),
+            group = group,
+            now = now,
+            staleMs = 0L,
+            staleNow = false,
+            linkUid = null,
+            linkType = null,
+            extraDetail = links,
+            eventTimeMs = eventTimeMs,
+            staleAtMs = staleAtMs,
+        )
+    }
 
     fun gnssOvalXml(
         uid: String,
@@ -807,6 +950,8 @@ object CotEvent {
         lat: Double,
         lon: Double,
         now: Long,
+        tag: String,
+        callsign: String,
         staleMs: Long = TakDefaults.STALE_MS,
         remarksExtra: String? = null,
     ): String {
@@ -819,12 +964,12 @@ object CotEvent {
             }
         }.take(TakDefaults.REMARKS_MAX)
         return eventXml(
-            uid = SELF_UID,
+            uid = selfUid(tag),
             cotType = "a-f-G-U-C",
             lat = lat,
             lon = lon,
             hae = 9999999.0,
-            callsign = "Fieldwatch",
+            callsign = xmlEscape(callsign),
             remarks = xmlEscape(remarks),
             group = "Cyan",
             now = now,
@@ -842,6 +987,7 @@ object CotEvent {
         advertised: Boolean,
         pilot: Boolean = false,
         watchlist: List<WatchTarget> = emptyList(),
+        viaCallsign: String? = null,
     ): String {
         val callsign = if (pilot) TakPublish.pilotCallsign(device)
             else TakPublish.callsign(device, fleets, watchlist)
@@ -908,6 +1054,12 @@ object CotEvent {
                 append(": ")
                 append(note.take(120))
             }
+            val via = viaCallsign?.trim()?.takeIf { it.isNotEmpty() }?.take(32)
+            if (via != null) {
+                append('\n')
+                append("via ")
+                append(via)
+            }
         }.trimEnd().take(TakDefaults.REMARKS_MAX)
     }
 
@@ -929,9 +1081,11 @@ object CotEvent {
         linkType: String?,
         role: String = "Team Member",
         extraDetail: String = "",
+        eventTimeMs: Long = now,
+        staleAtMs: Long = if (staleNow) now else now + staleMs,
     ): String {
-        val t = TIME.format(Instant.ofEpochMilli(now))
-        val stale = TIME.format(Instant.ofEpochMilli(if (staleNow) now else now + staleMs))
+        val t = TIME.format(Instant.ofEpochMilli(eventTimeMs))
+        val stale = TIME.format(Instant.ofEpochMilli(staleAtMs))
         return buildString {
             append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>")
             append("<event version=\"2.0\" uid=\"${xmlEscape(uid)}\" type=\"$cotType\" ")

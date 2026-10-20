@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 fun SectionCard(
     title: String,
     modifier: Modifier = Modifier,
+    showTitle: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(
@@ -31,12 +32,14 @@ fun SectionCard(
             Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(
-                title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            if (showTitle) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
             content()
         }
     }

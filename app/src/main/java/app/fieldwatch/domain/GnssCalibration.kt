@@ -17,9 +17,9 @@ enum class GnssCalGrade {
     GOOD, FAIR, POOR;
 
     fun label(): String = when (this) {
-        GOOD -> "Good"
-        FAIR -> "Fair"
-        POOR -> "Poor"
+        GOOD -> LanguageText.text("ui.good.label")
+        FAIR -> LanguageText.text("ui.fair.label")
+        POOR -> LanguageText.text("ui.poor.label")
     }
 }
 
@@ -44,16 +44,16 @@ data class GnssPhoneProfile(
 ) {
     fun summary(): String = when (grade) {
         GnssCalGrade.GOOD ->
-            "Calibration complete. This phone is Good. " +
-                "It should work with a steady view of the sky, away from other electronics."
+            (LanguageText.text("ui.calibration.complete.phone.good") + " ") +
+                LanguageText.text("ui.should.work.steady.view")
         GnssCalGrade.FAIR ->
-            "Calibration complete. This phone is Fair. Usable. " +
-                "Small drops will be hard to separate from this phone's own GPS. " +
-                "Medium or Low will be steadier than High."
+            (LanguageText.text("ui.calibration.complete.phone.fair") + " ") +
+                (LanguageText.text("ui.small.drops.will.hard") + " ") +
+                LanguageText.text("ui.medium.low.will.steadier")
         GnssCalGrade.POOR ->
-            "Calibration complete. This phone is Poor. " +
-                "This phone's GPS is too coarse for an interference alert. " +
-                "It can still tag a path. The popup stays off."
+            (LanguageText.text("ui.calibration.complete.phone.poor") + " ") +
+                (LanguageText.text("ui.phone.s.gps.too") + " ") +
+                LanguageText.text("ui.can.still.tag.path")
     }
 
     fun calibratedLabel(): String {
@@ -158,13 +158,13 @@ object GnssCalibration {
     }
 
     fun diagRows(profile: GnssPhoneProfile?): List<Pair<String, String>> {
-        if (profile == null) return listOf("GNSS calibration" to "not run")
-        val gain = if (profile.agcSeen) "${num(profile.agcWanderDb)} dB" else "not reported"
+        if (profile == null) return listOf(LanguageText.text("ui.gnss.calibration") to LanguageText.text("ui.not.run"))
+        val gain = if (profile.agcSeen) "${num(profile.agcWanderDb)} dB" else LanguageText.text("ui.not.reported")
         return listOf(
-            "GNSS calibration" to profile.grade.label(),
-            "Calibrated" to profile.calibratedLabel(),
-            "GPS signal at calibration" to "${num(profile.cn0Mean)} dB-Hz, wander ${num(profile.cn0WanderDb)} dB",
-            "Gain wander" to gain,
+            LanguageText.text("ui.gnss.calibration") to profile.grade.label(),
+            LanguageText.text("ui.calibrated.label") to profile.calibratedLabel(),
+            LanguageText.text("ui.gps.signal.calibration") to "${num(profile.cn0Mean)} dB-Hz, wander ${num(profile.cn0WanderDb)} dB",
+            LanguageText.text("ui.gain.wander") to gain,
         )
     }
 
@@ -242,9 +242,9 @@ object GnssCalibration {
     private const val FLOOR_SCALE = 2.5
     private const val FLOOR_CAP = 8.0
 
-    const val FEW_READINGS = "Not enough GPS readings. Stay outside, hold still, and try again."
-    const val NO_FIX = "No GPS fix. Stand outside, hold still, and try again."
-    const val MOVING = "The phone was moving. Stand still and try again."
-    const val FEW_SV = "Too few satellites. Stand in the open, away from a roof and a router, and try again."
-    const val WEAK = "The GPS signal was too weak for a calibration. Stand in the open and try again."
+    val FEW_READINGS get() = LanguageText.text("ui.not.enough.gps.readings")
+    val NO_FIX get() = LanguageText.text("ui.no.gps.fix.stand")
+    val MOVING get() = LanguageText.text("ui.phone.was.moving.stand")
+    val FEW_SV get() = LanguageText.text("ui.too.few.satellites.stand")
+    val WEAK get() = LanguageText.text("ui.gps.signal.was.too")
 }

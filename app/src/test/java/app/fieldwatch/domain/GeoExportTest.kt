@@ -1,5 +1,6 @@
 package app.fieldwatch.domain
 
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -66,6 +67,37 @@ class GeoExportTest {
         )
         assertTrue(xml.contains("<coordinates>-122.143000,37.441900</coordinates>"))
         assertTrue(xml.contains("Heard at this phone"))
+    }
+
+    @Test
+    fun geoJsonMatchesGpxHearPointsAndPath() {
+        val path = listOf(
+            GpsSample(1_700_000_000_000L, 37.4400, -122.1400, 0),
+            GpsSample(1_700_000_060_000L, 37.4410, -122.1410, 0),
+        )
+        val json = GeoExport.render(
+            GeoExport.Format.GEOJSON,
+            listOf(cafe, noGps),
+            emptyMap(),
+            "1.1.26",
+            "",
+            track = path,
+        )
+        val root = JSONObject(json)
+        assertEquals("FeatureCollection", root.getString("type"))
+        val features = root.getJSONArray("features")
+        assertEquals(2, features.length())
+        val point = features.getJSONObject(0)
+        val coords = point.getJSONObject("geometry").getJSONArray("coordinates")
+        assertEquals(-122.143, coords.getDouble(0), 0.000001)
+        assertEquals(37.4419, coords.getDouble(1), 0.000001)
+        assertEquals("CafeWiFi", point.getJSONObject("properties").getString("name"))
+        assertTrue(point.getJSONObject("properties").getString("description").contains("Heard at this phone"))
+        assertFalse(json.contains("00:00:00:00:00:99"))
+        val line = features.getJSONObject(1)
+        assertEquals("LineString", line.getJSONObject("geometry").getString("type"))
+        assertEquals("Operator path", line.getJSONObject("properties").getString("name"))
+        assertEquals(2, line.getJSONObject("geometry").getJSONArray("coordinates").length())
     }
 
     @Test

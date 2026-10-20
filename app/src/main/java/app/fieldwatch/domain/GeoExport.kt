@@ -1,24 +1,36 @@
 package app.fieldwatch.domain
 
+import org.json.JSONArray
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-/** Share/save format for Reports → Log. Disk is always CSV; JSON lines is an export. */
-enum class LogExportKind(val label: String) {
-    LOG_CSV("Log file — CSV"),
-    LOG_JSONL("Log file — JSON lines"),
-    GPX("GPX — GPS Exchange"),
-    KML("KML — Google Earth"),
-    WIGLE("WiGLE CSV — wigle.net"),
+/**
+ * Share/save format. [sitOnly] formats are Reports → Sit export.
+ * The rotating log does not have a path, an advertised track, or a GNSS hit.
+ */
+enum class LogExportKind(val titleKey: String, val sitOnly: Boolean = false) {
+    LOG_CSV("export.log.csv"),
+    LOG_JSONL("export.log.jsonl"),
+    GPX("export.gpx"),
+    KML("export.kml"),
+    GEOJSON("export.geojson", sitOnly = true),
+    WIGLE("export.wigle"),
+    ATAK("export.atak", sitOnly = true),
+    ;
+
+    fun label(): String = LanguageText.text(titleKey)
 }
 
-enum class LogExportRadios(val label: String) {
-    BOTH("Both radios"),
-    WIFI("Wi-Fi only"),
-    BLE("BLE only"),
+enum class LogExportRadios(val titleKey: String) {
+    BOTH("export.both"),
+    WIFI("export.wifi.only"),
+    BLE("export.ble.only"),
     ;
+
+    fun label(): String = LanguageText.text(titleKey)
 
     fun matches(kind: RadioKind): Boolean = when (this) {
         BOTH -> true
@@ -35,13 +47,15 @@ object GeoExport {
     enum class Format(val extension: String, val mime: String) {
         GPX("gpx", "application/gpx+xml"),
         KML("kml", "application/vnd.google-earth.kml+xml"),
+        GEOJSON("geojson", "application/geo+json"),
         WIGLE("csv", "text/csv"),
     }
 
     fun formatOf(kind: LogExportKind): Format? = when (kind) {
-        LogExportKind.LOG_CSV, LogExportKind.LOG_JSONL -> null
+        LogExportKind.LOG_CSV, LogExportKind.LOG_JSONL, LogExportKind.ATAK -> null
         LogExportKind.GPX -> Format.GPX
         LogExportKind.KML -> Format.KML
+        LogExportKind.GEOJSON -> Format.GEOJSON
         LogExportKind.WIGLE -> Format.WIGLE
     }
 
@@ -60,6 +74,7 @@ object GeoExport {
         return when (format) {
             Format.GPX -> gpx(pins, names, appVersion, onProgress, customNames, observerNotes, track)
             Format.KML -> kml(pins, names, appVersion, onProgress, customNames, observerNotes, track)
+            Format.GEOJSON -> geoJson(pins, names, appVersion, onProgress, customNames, observerNotes, track)
             Format.WIGLE -> wigleCsv(pins, appVersion, deviceInfo, onProgress)
         }
     }
@@ -133,6 +148,58 @@ object GeoExport {
         }
         append("</Document></kml>\n")
     }
+
+    /** Same hear-points and operator path as GPX and KML. Coordinates are lon, lat. */
+    private fun geoJson(
+        radios: List<LogRadio>,
+        names: Map<String, List<String>>,
+        appVersion: String,
+        onProgress: (Int, Int) -> Unit,
+        customNames: Map<String, String>,
+        observerNotes: Map<String, String>,
+        track: List<GpsSample>,
+    ): String {
+        val features = JSONArray()
+        val n = radios.size
+        radios.forEachIndexed { i, r ->
+            val props = JSONObject()
+            props.put("name", pinName(r, customNames))
+            props.put("kind", r.kind.name)
+            props.put("mac", r.mac)
+            props.put("rssi", r.rssi)
+            props.put("time", iso(r.lastSeen))
+            props.put("description", pinDesc(r, names, observerNotes))
+            features.put(feature("Point", JSONArray().put(round6(r.longitude!!)).put(round6(r.latitude!!)), props))
+            val done = i + 1
+            if (done == n || done % 250 == 0) onProgress(done, n)
+        }
+        if (n == 0) onProgress(0, 0)
+        if (track.size >= 2) {
+            val coords = JSONArray()
+            track.forEach { s -> coords.put(JSONArray().put(round6(s.lon)).put(round6(s.lat))) }
+            val props = JSONObject()
+            props.put("name", "Operator path")
+            features.put(feature("LineString", coords, props))
+        }
+        val root = JSONObject()
+        root.put("type", "FeatureCollection")
+        root.put("name", "Fieldwatch $appVersion export")
+        root.put("features", features)
+        return root.toString()
+    }
+
+    private fun feature(geometryType: String, coordinates: JSONArray, props: JSONObject): JSONObject {
+        val geom = JSONObject()
+        geom.put("type", geometryType)
+        geom.put("coordinates", coordinates)
+        val feature = JSONObject()
+        feature.put("type", "Feature")
+        feature.put("geometry", geom)
+        feature.put("properties", props)
+        return feature
+    }
+
+    private fun round6(v: Double): Double = String.format(Locale.US, "%.6f", v).toDouble()
 
     private fun wigleCsv(
         radios: List<LogRadio>,

@@ -26,7 +26,7 @@ data class ReportChart(
                 appendLine()
             } else {
                 append(row.label).append(": ")
-                append(row.value).append(" Wi-Fi, ")
+                append(row.value).append((" " + LanguageText.text("ui.wi.fi") + " "))
                 append(row.second).append(" BLE")
                 appendLine()
             }
@@ -51,23 +51,8 @@ data class DebriefPlaces(
     val namesByCell: Map<String, String> = emptyMap(),
 ) {
     /** Exact GPS cell, then nearest named cell within [maxM]. */
-    fun nameNear(lat: Double, lon: Double, maxM: Double = 90.0): String? {
-        namesByCell[Geo.cellKey(lat, lon)]?.let { return it }
-        var best: String? = null
-        var bestD = maxM
-        for ((key, name) in namesByCell) {
-            val parts = key.split(',')
-            if (parts.size != 2) continue
-            val klat = parts[0].toDoubleOrNull() ?: continue
-            val klon = parts[1].toDoubleOrNull() ?: continue
-            val d = Geo.meters(lat, lon, klat, klon)
-            if (d < bestD) {
-                bestD = d
-                best = name
-            }
-        }
-        return best
-    }
+    fun nameNear(lat: Double, lon: Double, maxM: Double = 90.0): String? =
+        Geo.nameNear(lat, lon, namesByCell, maxM)
 
     fun areaLine(): String {
         if (!attempted) return "off"
@@ -96,9 +81,9 @@ data class DebriefDoc(
     val takeaway: String,
     val sections: List<DebriefSection>,
     val extraAttention: List<ExtraAttentionHit> = emptyList(),
-    val heading: String = "FIELDWATCH FIELD DEBRIEF",
-    val pdfKicker: String = "FIELD DEBRIEF",
-    val pdfTitle: String = "Field debrief",
+    val heading: String = LanguageText.text("ui.fieldwatch.field.debrief"),
+    val pdfKicker: String = LanguageText.text("ui.field.debrief"),
+    val pdfTitle: String = LanguageText.text("ui.field.debrief.2"),
     val pathFigure: SitPathPlot.Figure? = null,
     val extraFigures: List<SitPathPlot.Figure> = emptyList(),
 ) {
@@ -130,9 +115,9 @@ data class DebriefDoc(
     ): DebriefDoc {
         if (!demo) return this
         fun t(s: String) = MacUtil.redactPrivateText(s, macs, uasIds, true)
-        val note = "MAC tails (**:**:**), UAS ids, and GPS coordinates masked. Logs on the phone are unchanged."
+        val note = LanguageText.text("ui.mac.tails.uas.ids")
         return copy(
-            meta = listOf("Privacy" to note) + meta.map { it.first to t(it.second) },
+            meta = listOf(LanguageText.text("ui.privacy.label") to note) + meta.map { it.first to t(it.second) },
             disclaimer = t(disclaimer),
             takeaway = t(takeaway),
             sections = sections.map {
@@ -210,10 +195,11 @@ object DebriefReport {
         mineKeys: Set<String> = emptySet(),
         floods: List<FloodBurst> = emptyList(),
         gnss: List<GnssMark> = emptyList(),
+        placeRecords: List<PlaceMemory.Record> = emptyList(),
     ): String = document(
         devices, fleets, settings, operatorPath, now, places, window,
         customNames, observerNotes, bookmarkedKeys, watchedFleetIds, mineKeys,
-        floods, gnss,
+        floods, gnss, placeRecords,
     ).toPlainText()
 
     fun document(
@@ -231,6 +217,7 @@ object DebriefReport {
         mineKeys: Set<String> = emptySet(),
         floods: List<FloodBurst> = emptyList(),
         gnss: List<GnssMark> = emptyList(),
+        placeRecords: List<PlaceMemory.Record> = emptyList(),
     ): DebriefDoc {
         val names = fleets.associate { it.id to it.name }
         val win = window ?: DebriefWindow(now - WINDOW_MS, now)
@@ -274,6 +261,15 @@ object DebriefReport {
         val beaconsWithYou = stayedWithYou(beaconFollow).open()
         val wearablesWithYou = stayedWithYou(wearableFollow).open()
         val mineHeard = inWin.count { it.key in mineKeys }
+        val placeBody = if (!settings.placeWatch || placeRecords.isEmpty()) {
+            null
+        } else {
+            PlaceMemory.section(
+                inWin, placeRecords, names, customNames, mineKeys, windowEnd,
+                demo = settings.demoMode,
+                streets = places.namesByCell,
+            )
+        }
 
         val showAll = settings.debriefShowAllRadios
         fun Sighting.listedWhenShort(): Boolean =
@@ -297,16 +293,16 @@ object DebriefReport {
             )
         } else {
             buildString {
-                appendLine("Loudest APs:")
+                appendLine(LanguageText.text("ui.loudest.aps"))
                 wifi.take(12).forEach { d ->
                     appendLine("  · ${wifiLine(d, names, windowStart, now, customNames)}")
-                    if (d.key in mineKeys) appendLine("    Marked mine")
+                    if (d.key in mineKeys) appendLine(("    " + LanguageText.text("ui.marked.mine")))
                     d.attentionNotes(fleets).forEach { (sig, note) ->
                         appendLine("    extra attention ($sig): $note")
                     }
                 }
                 if (hidden.isNotEmpty()) {
-                    appendLine("Hidden SSIDs:")
+                    appendLine(LanguageText.text("ui.hidden.ssids"))
                     hidden.forEach { appendLine("  · ${it.mac}  ${it.vendor ?: ""}  ${it.rssi} dBm  ch ${it.channel}") }
                 }
             }.trimEnd()
@@ -324,11 +320,11 @@ object DebriefReport {
         }.trimEnd()
         val bleAfter = if (showAll && notable.isNotEmpty()) {
             buildString {
-                appendLine("Notable BLE:")
+                appendLine(LanguageText.text("ui.notable.ble"))
                 notable.forEach { d ->
                     val guess = DeviceExplain.guess(d, d.fleetIds.map { names[it] ?: it })
                     appendLine("  · ${bleLine(d, names, windowStart, now, customNames)}  |  ${guess.headline}")
-                    if (d.key in mineKeys) appendLine("    Marked mine")
+                    if (d.key in mineKeys) appendLine(("    " + LanguageText.text("ui.marked.mine")))
                     d.attentionNotes(fleets).forEach { (sig, note) ->
                         appendLine("    extra attention ($sig): $note")
                     }
@@ -356,7 +352,7 @@ object DebriefReport {
             ""
         }
         val sigChart = signatureChart(named, names)
-        val sigBody = if (named.isEmpty()) "None in this window." else ""
+        val sigBody = if (named.isEmpty()) LanguageText.text("ui.none.window") else ""
         val sigAfter = if (named.isEmpty()) {
             ""
         } else if (showAll) {
@@ -367,7 +363,7 @@ object DebriefReport {
                         appendLine(sig)
                         list.sortedByDescending { it.rssi }.take(8).forEach { d ->
                             append("  · ${d.reportName(customNames)}  ${d.mac}  ${d.rssi} dBm")
-                            if (d.key in mineKeys) append("  Marked mine")
+                            if (d.key in mineKeys) append(("  " + LanguageText.text("ui.marked.mine.2")))
                             val labels = d.liveDecode.reportLabels()
                             if (labels.isNotEmpty()) append("  ").append(labels.joinToString(", "))
                             appendLine()
@@ -380,10 +376,10 @@ object DebriefReport {
         } else {
             buildString {
                 val marked = named.filter { it.listedWhenShort() }.sortedByDescending { it.rssi }
-                if (marked.isNotEmpty()) appendLine("Named or marked:")
+                if (marked.isNotEmpty()) appendLine(LanguageText.text("ui.named.marked"))
                 marked.forEach { d ->
                     append("  · ${d.reportName(customNames)}  ${d.mac}  ${d.rssi} dBm")
-                    if (d.key in mineKeys) append("  Marked mine")
+                    if (d.key in mineKeys) append(("  " + LanguageText.text("ui.marked.mine.2")))
                     val labels = d.liveDecode.reportLabels()
                     if (labels.isNotEmpty()) append("  ").append(labels.joinToString(", "))
                     appendLine()
@@ -401,8 +397,8 @@ object DebriefReport {
                 persistent.filter { inventoryKeep(it, settings, bookmarkedKeys) }.take(15).forEach {
                     appendLine("  · ${it.reportName(customNames)}  ${it.mac}  dwell ${fmtDur(dwellMs(it, windowStart, now))}")
                 }
-                if (persistent.isEmpty()) appendLine("  · None.")
-                appendLine("Loudest first seen:")
+                if (persistent.isEmpty()) appendLine(("  " + LanguageText.text("ui.none.label")))
+                appendLine(LanguageText.text("ui.loudest.first.seen"))
                 arrived.filter { inventoryKeep(it, settings, bookmarkedKeys) }.sortedByDescending { it.rssi }.take(8).forEach {
                     appendLine("  · ${it.reportName(customNames)}  ${it.mac}  ${it.rssi} dBm")
                 }
@@ -410,7 +406,7 @@ object DebriefReport {
         }
         val flags = anomalyLines(inWin, customNames, settings, bookmarkedKeys, showAll)
         val anomalyBody = if (flags.isEmpty()) {
-            "No extra flags. Signature hits, Extra attention, and tracking callouts already cover named pattern matches."
+            LanguageText.text("ui.no.extra.flags.signature")
         } else flags.joinToString("\n") { "  · $it" }
         val attentionHits = inWin.flatMap { d ->
             d.attentionNotes(fleets).map { (sig, note) -> Triple(d, sig, note) }
@@ -419,8 +415,8 @@ object DebriefReport {
             .joinToString("\n") { "  · $it" }
 
         val distanceLine = when {
-            !settings.tagLocation -> "GPS tagging off — no path"
-            path.size < 2 -> "GPS tagging on, fewer than 2 fixes in this window"
+            !settings.tagLocation -> LanguageText.text("ui.gps.tagging.off.no")
+            path.size < 2 -> LanguageText.text("ui.gps.tagging.fewer.than")
             else -> "traveled ${fmtDist(pathLen)} along path · span ${fmtDist(pathSpan)} · ${path.size} fixes"
         }
         val lookupLine = when {
@@ -440,24 +436,24 @@ object DebriefReport {
         val sections = buildList {
             add(DebriefSection(
                 next(),
-                "Executive summary",
+                LanguageText.text("ui.executive.summary"),
                 execSummary(wifi, ble, named, hidden, randomized, pathSpan, pathLen, following, withYou, ownLikely, beaconsWithYou, wearablesWithYou, settings, places, win, mineHeard) + craftSentence(pictures),
                 chart = classChart(inWin, fleets),
             ))
-            add(DebriefSection(next(), "Where you were", whereYouWere(settings, path, pathLen, pathSpan, inWin, names, places, windowEnd, customNames, bookmarkedKeys)))
+            add(DebriefSection(next(), LanguageText.text("ui.where.were"), whereYouWere(settings, path, pathLen, pathSpan, inWin, names, places, windowEnd, customNames, bookmarkedKeys)))
             if (aircraftBody.isNotEmpty()) {
-                add(DebriefSection(next(), "Aircraft", aircraftBody))
+                add(DebriefSection(next(), LanguageText.text("ui.aircraft.label"), aircraftBody))
             }
             observerNotesSection(inWin, customNames, observerNotes)?.let { body ->
-                add(DebriefSection(next(), "Observer notes", body))
+                add(DebriefSection(next(), LanguageText.text("ui.observer.notes"), body))
             }
             markedMineSection(inWin, customNames, mineKeys, assessed)?.let { body ->
-                add(DebriefSection(next(), "Marked mine", body))
+                add(DebriefSection(next(), LanguageText.text("ui.marked.mine.3"), body))
             }
             add(
                 DebriefSection(
                     next(),
-                    "Tracking assessment",
+                    LanguageText.text("ui.tracking.assessment"),
                     trackingSection(settings, path, pathSpan, pathLen, following, wholeSit, beaconsWithYou, wearablesWithYou),
                 ),
             )
@@ -465,12 +461,12 @@ object DebriefReport {
                 add(
                     DebriefSection(
                         next(),
-                        "Possible trackers with you",
+                        LanguageText.text("ui.possible.trackers"),
                         trackerCallout(
-                            "Finder tags (AirTag / Find My, SmartTag, Tile, Chipolo, Pebblebee) and loud pocket Apple BLE. " +
-                                "These radios stayed with your GPS path for this sit. " +
-                                "Fieldwatch cannot tell your own tag or phone from a tracker planted in the car, bag, or on you before you started. " +
-                                "Account for each MAC. Not a finding and not identity.",
+                            (LanguageText.text("ui.finder.tags.airtag.find") + " ") +
+                                (LanguageText.text("ui.these.radios.stayed.gps") + " ") +
+                                (LanguageText.text("ui.fieldwatch.cannot.tell.own") + " ") +
+                                LanguageText.text("ui.account.each.mac.not"),
                             wholeSit,
                             customNames,
                         ),
@@ -482,11 +478,11 @@ object DebriefReport {
                 add(
                     DebriefSection(
                         next(),
-                        "Possible tail",
+                        LanguageText.text("ui.possible.tail"),
                         trackerCallout(
-                            "Finder tags that were not heard when this sit started, then stayed with your path. " +
-                                "That can mean someone started following you (their phone or tag), or a device was added during the trip. " +
-                                "Not a finding and not identity.",
+                            (LanguageText.text("ui.finder.tags.were.not") + " ") +
+                                (LanguageText.text("ui.can.mean.someone.started") + " ") +
+                                LanguageText.text("ui.not.finding.not.identity"),
                             following,
                             customNames,
                         ),
@@ -498,12 +494,12 @@ object DebriefReport {
                 add(
                     DebriefSection(
                         next(),
-                        "Retail beacons with you",
+                        LanguageText.text("ui.retail.beacons"),
                         trackerCallout(
-                            "iBeacon / Minew / Estimote / Kontakt.io / Atrius cart tag radios that stayed with your GPS path. " +
-                                "Location beacons are usually fixtures in a store or venue — they do not typically move with you. " +
-                                "If one did, account for it (a cart you pushed, your own test tag, a badge, or a short path that still overlaps a fixture). " +
-                                "Not the same as a Find My tail. Not a finding and not identity.",
+                            (LanguageText.text("ui.ibeacon.minew.estimote.kontakt") + " ") +
+                                (LanguageText.text("ui.location.beacons.usually.fixtures") + " ") +
+                                (LanguageText.text("ui.if.one.did.account") + " ") +
+                                LanguageText.text("ui.not.same.find.my"),
                             beaconsWithYou,
                             customNames,
                         ),
@@ -515,11 +511,11 @@ object DebriefReport {
                 add(
                     DebriefSection(
                         next(),
-                        "Wearables with you",
+                        LanguageText.text("ui.wearables.label"),
                         trackerCallout(
-                            "Garmin / Fitbit / Oura / Polar radios that stayed with your GPS path. " +
-                                "Watches and rings usually move with the person wearing them — often your own kit or someone walking with you. " +
-                                "They are not typically planted trackers. Account for each MAC. Not a finding and not identity.",
+                            (LanguageText.text("ui.garmin.fitbit.oura.polar") + " ") +
+                                (LanguageText.text("ui.watches.rings.usually.move") + " ") +
+                                LanguageText.text("ui.they.not.typically.planted"),
                             wearablesWithYou,
                             customNames,
                         ),
@@ -527,27 +523,30 @@ object DebriefReport {
                     ),
                 )
             }
-            add(DebriefSection(next(), "Environment", environment(wifi, ble, randomized, persistent, pathSpan, pathLen)))
+            if (!placeBody.isNullOrBlank()) {
+                add(DebriefSection(next(), LanguageText.text("ui.seen.more.than.one"), placeBody))
+            }
+            add(DebriefSection(next(), LanguageText.text("ui.environment.label"), environment(wifi, ble, randomized, persistent, pathSpan, pathLen)))
             add(DebriefSection(
                 next(),
-                "Networks (Wi-Fi access points)",
+                LanguageText.text("ui.networks.wi.fi.access"),
                 networks.trimEnd(),
                 chart = channelChart,
                 after = networksAfter.trimEnd(),
             ))
-            add(DebriefSection(next(), "Bluetooth LE", bleBody.trimEnd(), after = bleAfter.trimEnd()))
-            add(DebriefSection(next(), "Signature hits", sigBody.trimEnd(), chart = sigChart, after = sigAfter.trimEnd()))
-            add(DebriefSection(next(), "Persistence", persistBody.trimEnd(), after = persistAfter.trimEnd()))
+            add(DebriefSection(next(), LanguageText.text("ui.bluetooth.le"), bleBody.trimEnd(), after = bleAfter.trimEnd()))
+            add(DebriefSection(next(), LanguageText.text("ui.signature.hits"), sigBody.trimEnd(), chart = sigChart, after = sigAfter.trimEnd()))
+            add(DebriefSection(next(), LanguageText.text("ui.persistence.label"), persistBody.trimEnd(), after = persistAfter.trimEnd()))
             if (attentionHits.isNotEmpty()) {
                 add(
                     DebriefSection(
                         next(),
-                        "Extra attention",
+                        LanguageText.text("chrome.extra.attention"),
                         buildString {
-                            appendLine("Pattern match, not identity, not a skimmer detector, not a safety finding.")
+                            appendLine(LanguageText.text("ui.pattern.match.not.identity.2"))
                             attentionHits.forEach { (d, sig, note) ->
                                 append("  · ${d.reportName(customNames)}  ${d.mac}  ${d.rssi} dBm  [$sig]")
-                                if (d.key in mineKeys) append("  Marked mine")
+                                if (d.key in mineKeys) append(("  " + LanguageText.text("ui.marked.mine.2")))
                                 appendLine()
                                 appendLine("    $note")
                             }
@@ -556,15 +555,15 @@ object DebriefReport {
                     ),
                 )
             }
-            add(DebriefSection(next(), "Anomalies", anomalyBody))
+            add(DebriefSection(next(), LanguageText.text("ui.anomalies.label"), anomalyBody))
             floodBody(floods, windowStart, windowEnd)?.let { body ->
-                add(DebriefSection(next(), "Flood", body))
+                add(DebriefSection(next(), LanguageText.text("ui.flood.label"), body))
             }
             gnssBody(gnss, windowStart, windowEnd, onPath = gnssOnPath)?.let { body ->
                 add(DebriefSection(next(), "GNSS", body, alert = true))
             }
-            add(DebriefSection(next(), "Privacy", privacy(wifi, ble, randomized, hidden, settings, places, pictures.isNotEmpty())))
-            add(DebriefSection(next(), "Recommended actions", actionBody))
+            add(DebriefSection(next(), LanguageText.text("ui.privacy.label"), privacy(wifi, ble, randomized, hidden, settings, places, pictures.isNotEmpty())))
+            add(DebriefSection(next(), LanguageText.text("ui.recommended.actions"), actionBody))
         }
 
         val windowLine = if (win.sitName != null) {
@@ -575,23 +574,23 @@ object DebriefReport {
         val heading = if (win.sitName != null) {
             "FIELDWATCH SIT — ${win.sitName}"
         } else {
-            "FIELDWATCH FIELD DEBRIEF"
+            LanguageText.text("ui.fieldwatch.field.debrief")
         }
         val meta = buildList {
-            add("Generated" to "${utc(now)} UTC")
-            if (win.sitName != null) add("Sit" to win.sitName)
-            add("Window" to windowLine)
-            add("Radios" to "${inWin.size}")
-            add("Tool" to "Fieldwatch (app.fieldwatch) · stock Android · receive-only Wi-Fi AP + BLE advertiser")
-            add("Scan" to "${settings.intensity.name.lowercase()} · stale ${settings.staleSec}s · brief hold ${settings.decaySec}s")
-            add("GPS tag" to if (settings.tagLocation) "on" else "off")
-            add("Distance" to distanceLine)
-            add("Places" to lookupLine)
+            add(LanguageText.text("ui.generated.label") to "${utc(now)} UTC")
+            if (win.sitName != null) add(LanguageText.text("ui.sit.label") to win.sitName)
+            add(LanguageText.text("ui.window.label") to windowLine)
+            add(LanguageText.text("ui.radios.label") to "${inWin.size}")
+            add(LanguageText.text("ui.tool.label") to LanguageText.text("ui.fieldwatch.app.fieldwatch.stock"))
+            add(LanguageText.text("ui.scan.label") to "${settings.intensity.name.lowercase()} · stale ${settings.staleSec}s · brief hold ${settings.decaySec}s")
+            add(LanguageText.text("ui.gps.tag") to if (settings.tagLocation) "on" else "off")
+            add(LanguageText.text("ui.distance.label") to distanceLine)
+            add(LanguageText.text("ui.places.label") to lookupLine)
             add(
-                "Classification" to if (pictures.isNotEmpty()) {
-                    "Operationally sensitive — neighbor SSIDs, MACs, operator GPS, advertised aircraft track"
+                LanguageText.text("ui.classification.label") to if (pictures.isNotEmpty()) {
+                    LanguageText.text("ui.operationally.sensitive.neighbor.ssids")
                 } else {
-                    "Operationally sensitive — neighbor SSIDs, MACs, operator GPS"
+                    LanguageText.text("ui.operationally.sensitive.neighbor.ssids.2")
                 },
             )
         }
@@ -608,17 +607,17 @@ object DebriefReport {
                     signature = sig,
                     radioLabel = buildString {
                         append("${d.reportName(customNames)}  ${d.mac}  ${d.rssi} dBm")
-                        if (d.key in mineKeys) append("  Marked mine")
+                        if (d.key in mineKeys) append(("  " + LanguageText.text("ui.marked.mine.2")))
                     },
                     note = note,
                 )
             },
             heading = heading,
-            pdfKicker = if (win.sitName != null) "SIT" else "FIELD DEBRIEF",
-            pdfTitle = if (win.sitName != null) "Sit — ${win.sitName}" else "Field debrief",
+            pdfKicker = if (win.sitName != null) "SIT" else LanguageText.text("ui.field.debrief"),
+            pdfTitle = if (win.sitName != null) "Sit — ${win.sitName}" else LanguageText.text("ui.field.debrief.2"),
             pathFigure = AircraftTrail.applyWalk(
                 pathFigure(
-                    win.sitName ?: "Last 15 minutes", path, inWin, fleets,
+                    win.sitName ?: LanguageText.text("ui.last.15.minutes"), path, inWin, fleets,
                     customNames, observerNotes, bookmarkedKeys, watchedFleetIds, mineKeys,
                     gnssPins,
                 ),
@@ -653,17 +652,17 @@ object DebriefReport {
         )
         val caption = buildString {
             append("North-up. Line is this phone (${path.lengthM()}). ")
-            append("A MAC alert or a signature alert is drawn once. ")
-            append("A decoded latitude and longitude is the last advertised position. ")
-            append("Anything else is the strongest hear. A number is that place (Path key).")
+            append((LanguageText.text("ui.mac.alert.signature.alert") + " "))
+            append((LanguageText.text("ui.decoded.latitude.longitude.last") + " "))
+            append(LanguageText.text("ui.anything.else.strongest.hear"))
             if (gnss.isNotEmpty()) {
-                append(" A red diamond is where this phone was during a GNSS detection. ")
-                append("The Path key has the time and what changed. ")
-                append("It does not say where the interference came from.")
+                append((" " + LanguageText.text("ui.red.diamond.where.phone") + " "))
+                append((LanguageText.text("ui.path.key.has.time") + " "))
+                append(LanguageText.text("ui.does.not.say.where"))
             }
         }
         return SitPathPlot.Figure(
-            kicker = "OPERATOR PATH",
+            kicker = LanguageText.text("ui.operator.path"),
             tracks = listOf(SitPathPlot.FigureTrack(title, path)),
             dots = plot.points,
             lengthM = Geo.pathLengthM(path),
@@ -717,31 +716,31 @@ object DebriefReport {
             ),
         )
 
-        appendLine("## Where you were (operator GPS)")
+        appendLine(LanguageText.text("ui.where.were.operator.gps"))
         appendLine("- Tag detections with GPS: ${if (settings.tagLocation) "on" else "off"}.")
         appendLine(
-            "- Online place names: " +
+            (LanguageText.text("ui.online.place.names") + " ") +
                 if (places.attempted) places.note
-                else "off (Settings → Online place names in Debrief). No reverse-geocode this export.",
+                else LanguageText.text("ui.off.settings.online.place"),
         )
         append(whereYouWere(settings, path, pathLen, pathSpan, inWin, names, places, windowEnd, customNames, bookmarkedKeys).trimEnd())
         appendLine()
         appendLine()
         if (path.size < 2 || pathSpan < MOVE_M) {
-            appendLine("- Following test: insufficient movement (need ~45 m span). Do not infer a tail.")
+            appendLine(LanguageText.text("ui.following.test.insufficient.movement"))
             appendLine()
         }
-        appendLine("## GPS co-travel")
+        appendLine(LanguageText.text("ui.gps.co.travel"))
         appendLine(
-            "Only radios that stayed with the operator path are listed. " +
-                "House tags and other radios the operator only passed are omitted — they are not tracking. " +
-                "Not identity. Find My MAC rotation will not stitch a tail that changes address. " +
-                "Possible tail extra gates (walks): trail covers ≥ half the operator path, " +
-                "≥ 2/3 of GPS stamps at −75 dBm or louder, last stamp not 12 dB below loudest. " +
-                "Fail any one → omit (pass-by), not a tail. " +
-                "Finder tags (AirTag / SmartTag / Tile / Chipolo / Pebblebee / Find My / loud pocket Apple) " +
-                "are the tracking test. Retail beacons and wearables that co-travel are listed separately — " +
-                "they do not typically move with you (beacons) or are usually own kit (wearables).",
+            (LanguageText.text("ui.only.radios.stayed.operator") + " ") +
+                (LanguageText.text("ui.house.tags.other.radios") + " ") +
+                (LanguageText.text("ui.not.identity.find.my") + " ") +
+                (LanguageText.text("ui.possible.tail.extra.gates") + " ") +
+                (LanguageText.text("ui.2.3.gps.stamps") + " ") +
+                (LanguageText.text("ui.fail.any.one.omit") + " ") +
+                (LanguageText.text("ui.finder.tags.airtag.smarttag") + " ") +
+                (LanguageText.text("ui.tracking.test.retail.beacons") + " ") +
+                LanguageText.text("ui.they.do.not.typically"),
         )
         fun List<FollowHit>.open(): List<FollowHit> = filter { it.device.key !in mineKeys }
         val followingMd = follow.filter { it.verdict == Verdict.FOLLOWING }.open()
@@ -751,7 +750,7 @@ object DebriefReport {
         val beaconsOpen = beaconsMd.open()
         val wearablesOpen = wearablesMd.open()
         if (followingMd.isEmpty() && wholeSitMd.isEmpty() && beaconsOpen.isEmpty() && wearablesOpen.isEmpty()) {
-            appendLine("- None stayed with the path.")
+            appendLine(LanguageText.text("ui.none.stayed.path"))
         } else {
             fun dump(title: String, rows: List<FollowHit>) {
                 if (rows.isEmpty()) return
@@ -767,19 +766,19 @@ object DebriefReport {
                 }
             }
             dump(
-                "Possible trackers with you (finder tags, whole sit — yours or planted before you started)",
+                LanguageText.text("ui.possible.trackers.finder.tags"),
                 wholeSitMd,
             )
             dump(
-                "Possible tail (finder tags, first heard after this sit started, then stayed)",
+                LanguageText.text("ui.possible.tail.finder.tags"),
                 followingMd,
             )
             dump(
-                "Retail beacons with you (iBeacon / Minew / Estimote / Kontakt.io / Atrius cart tag — fixtures; a pushed cart will co-travel)",
+                LanguageText.text("ui.retail.beacons.ibeacon.minew"),
                 beaconsOpen,
             )
             dump(
-                "Wearables with you (Garmin / Fitbit / Oura / Polar — usually own kit or a companion)",
+                LanguageText.text("ui.wearables.garmin.fitbit.oura"),
                 wearablesOpen,
             )
         }
@@ -827,7 +826,7 @@ object DebriefReport {
                 operatorPath.size < 2 || opSpan < MOVE_M ->
                     Verdict.INSUFFICIENT to "Operator GPS path too short (${opSpan.toInt()} m) to test following."
                 trail.size < 2 ->
-                    Verdict.INSUFFICIENT to "Heard, but not at two GPS points. Cannot test co-travel."
+                    Verdict.INSUFFICIENT to LanguageText.text("ui.heard.but.not.two")
                 onBody && ownHere ->
                     Verdict.OWN_LIKELY to onBodyLine(kind, d, trail.size)
                 cover && ownHere && d.rssiMax >= ON_BODY_MAX ->
@@ -877,11 +876,11 @@ object DebriefReport {
         val decoded = liveDecodeSentence(device)
         val base = when (kind) {
             TrackerMatch.Kind.FINDER ->
-                "With you the whole sit — yours or planted before you started. Account for it."
+                LanguageText.text("ui.whole.sit.yours.planted")
             TrackerMatch.Kind.BEACON ->
-                "Location beacons do not typically move with you. Account for it (own test tag, badge, or a short overlap with a fixture)."
+                LanguageText.text("ui.location.beacons.do.not")
             TrackerMatch.Kind.WEARABLE ->
-                "Typical of a watch or ring you or a companion are wearing. Not typically a planted tracker."
+                LanguageText.text("ui.typical.watch.ring.companion")
         }
         return when {
             decoded != null -> "$base $decoded"
@@ -928,11 +927,11 @@ object DebriefReport {
                         "$loudN/${trail.size} GPS stamps ≥ −75 dBm). "
                 val note = when (kind) {
                     TrackerMatch.Kind.FINDER ->
-                        "Treat as a possible tail until you visually account for it."
+                        LanguageText.text("ui.treat.possible.tail.until")
                     TrackerMatch.Kind.BEACON ->
-                        "Unusual for a retail/location beacon — they do not typically move with you. Account for it; not the same as a Find My tail."
+                        LanguageText.text("ui.unusual.retail.location.beacon")
                     TrackerMatch.Kind.WEARABLE ->
-                        "Typical of a watch that joined the sit (you put it on, or someone walking with you). Not typically a planted tracker."
+                        LanguageText.text("ui.typical.watch.joined.sit")
                 }
                 Verdict.FOLLOWING to stats + note
             }
@@ -963,7 +962,7 @@ object DebriefReport {
         val whenPhrase = if (window.sitName != null) {
             "In sit ${window.sitName}"
         } else {
-            "In the last 15 minutes"
+            LanguageText.text("ui.last.15.minutes.3")
         }
         append("$whenPhrase Fieldwatch heard ${wifi.size} Wi-Fi access points and ${ble.size} BLE advertisers")
         append(" (${named.size} signature-matched")
@@ -980,7 +979,7 @@ object DebriefReport {
         val wholeSit = ownLikely + withYou
         when {
             following.isNotEmpty() || wholeSit.isNotEmpty() -> {
-                append("TRACKING NOTE. ")
+                append((LanguageText.text("ui.tracking.note") + " "))
                 if (wholeSit.isNotEmpty()) {
                     append("${wholeSit.size} finder tag(s) with you the whole sit (your kit or planted before you started): ")
                     append(wholeSit.joinToString { trackId(it) })
@@ -991,23 +990,23 @@ object DebriefReport {
                     append(following.joinToString { trackId(it) })
                     append(". ")
                 }
-                append("Account for every MAC — Fieldwatch cannot tell yours from a plant. ")
+                append((LanguageText.text("ui.account.every.mac.fieldwatch") + " "))
             }
             !settings.tagLocation -> {
-                append("GPS tagging is off, so a following test was not performed. Enable “Tag detections with GPS” and walk to test. ")
+                append((LanguageText.text("ui.gps.tagging.off.so") + " "))
             }
             pathSpan < MOVE_M -> {
                 append("GPS displacement was only ${pathSpan.toInt()} m — too short to test whether a tracker is following. Walk farther with tagging on. ")
             }
-            else -> append("No finder tag clearly stayed with the GPS path in this window. ")
+            else -> append((LanguageText.text("ui.no.finder.tag.clearly") + " "))
         }
         if (beaconsWithYou.isNotEmpty()) {
-            append("Retail beacon(s) also stayed with the path (unusual — fixtures do not typically move with you): ")
+            append((LanguageText.text("ui.retail.beacon.s.also") + " "))
             append(beaconsWithYou.joinToString { "${it.label} ${it.device.mac}" })
             append(". ")
         }
         if (wearablesWithYou.isNotEmpty()) {
-            append("Wearable(s) stayed with the path (usually your watch/ring or a companion): ")
+            append((LanguageText.text("ui.wearable.s.stayed.path") + " "))
             append(wearablesWithYou.joinToString { "${it.label} ${it.device.mac}" })
             append(".")
         }
@@ -1024,20 +1023,20 @@ object DebriefReport {
         wearablesWithYou: List<FollowHit>,
     ): String = buildString {
         if (!settings.tagLocation) {
-            appendLine("GPS tagging is OFF. Fieldwatch cannot test whether a radio moved with you.")
-            appendLine("Turn on Settings → Tag detections with GPS, walk or drive 50+ m, then run Debrief again.")
+            appendLine(LanguageText.text("ui.gps.tagging.off.fieldwatch"))
+            appendLine(LanguageText.text("ui.turn.settings.tag.detections.2"))
             return@buildString
         }
         appendLine("Overall distance traveled: ${fmtDist(pathLen)} along the GPS path (${path.size} samples). Straight-line span ${fmtDist(pathSpan)}.")
-        appendLine("Co-travel is split by class: finder tags (AirTag / Find My, SmartTag, Tile, Chipolo, Pebblebee, loud pocket Apple), retail beacons (iBeacon, Minew, Estimote, Kontakt.io, Atrius cart tag), and wearables (Garmin, Fitbit, Oura, Polar).")
+        appendLine(LanguageText.text("ui.co.travel.split.class"))
         if (path.size < 2 || pathSpan < MOVE_M) {
-            appendLine("Insufficient movement to distinguish a radio that stayed with you from one you passed. Walk or drive farther and re-run.")
+            appendLine(LanguageText.text("ui.insufficient.movement.distinguish.radio"))
             return@buildString
         }
         if (following.isEmpty() && wholeSit.isEmpty() && beaconsWithYou.isEmpty() && wearablesWithYou.isEmpty()) {
-            appendLine("No finder tag, retail beacon, or wearable stayed with you. House tags and other radios you only passed are not listed.")
+            appendLine(LanguageText.text("ui.no.finder.tag.retail"))
         } else {
-            appendLine("Callouts below are only radios that stayed with the path. Radios you passed (store fixtures, house tags) are omitted.")
+            appendLine(LanguageText.text("ui.callouts.below.only.radios"))
         }
     }
 
@@ -1050,7 +1049,7 @@ object DebriefReport {
         val hits = devices.filter { it.key in mineKeys }
         if (hits.isEmpty()) return null
         return buildString {
-            appendLine("Radios you marked mine. Heard in this window. Still listed. No beep while the mark is on.")
+            appendLine(LanguageText.text("ui.radios.marked.mine.heard"))
             hits.sortedWith(
                 compareByDescending<Sighting> { it.rssi }.thenBy { it.mac },
             ).forEach { d ->
@@ -1059,10 +1058,10 @@ object DebriefReport {
                 val verdict = assessed.firstOrNull { it.device.key == d.key }?.verdict
                 val line = when (verdict) {
                     Verdict.FOLLOWING ->
-                        "Marked mine. First heard after the sit started and stayed with the path."
+                        LanguageText.text("ui.marked.mine.first.heard")
                     Verdict.OWN_LIKELY, Verdict.MOVED_WITH_YOU ->
-                        "Marked mine. With you the whole sit."
-                    else -> "Marked mine."
+                        LanguageText.text("ui.marked.mine.whole.sit")
+                    else -> LanguageText.text("ui.marked.mine.4")
                 }
                 appendLine("    $line")
             }
@@ -1080,7 +1079,7 @@ object DebriefReport {
         }
         if (hits.isEmpty()) return null
         return buildString {
-            appendLine("Your captions on radios heard in this window. Same KIND+MAC as Named radios. Not catalog Notes.")
+            appendLine(LanguageText.text("ui.captions.radios.heard.window"))
             hits.sortedWith(
                 compareByDescending<Pair<Sighting, String>> { it.first.rssi }.thenBy { it.first.mac },
             ).forEach { (d, note) ->
@@ -1118,28 +1117,28 @@ object DebriefReport {
         customNames: Map<String, String> = emptyMap(),
         bookmarkedKeys: Set<String> = emptySet(),
     ): String = buildString {
-        appendLine("Phone GPS at hear-time, not the other radio’s location and not a camera pole. Stays are clusters within about 40 m; hops between them are transit. Coordinates are not repeated on every Wi-Fi/BLE line.")
+        appendLine(LanguageText.text("ui.phone.gps.hear.time"))
         if (!settings.tagLocation) {
-            appendLine("GPS tagging is OFF. Turn on Settings → Tag detections with GPS to record where you were when radios were heard.")
+            appendLine(LanguageText.text("ui.gps.tagging.off.turn"))
             return@buildString
         }
         if (path.isEmpty()) {
-            appendLine("GPS tagging is on, but this window has no fixes yet.")
+            appendLine(LanguageText.text("ui.gps.tagging.but.window"))
             return@buildString
         }
         appendLine("Overall: ${fmtDist(pathLen)} along-track, span ${fmtDist(pathSpan)}, ${path.size} fixes.")
         if (places.attempted) {
             appendLine(places.note)
-            appendLine("Street names are approximate. Do not treat a street as the location of a matched camera or tag.")
+            appendLine(LanguageText.text("ui.street.names.approximate.do"))
         }
         val legs = Geo.legs(path, now = now)
         if (legs.isEmpty()) {
-            appendLine("No path legs.")
+            appendLine(LanguageText.text("ui.no.path.legs"))
             return@buildString
         }
         val stopNames = legs.filter { it.stay }.mapNotNull { places.nameNear(it.lat, it.lon) }
         if (stopNames.isNotEmpty()) {
-            appendLine("Stops: " + stopNames.joinToString(" → "))
+            appendLine((LanguageText.text("ui.stops.label") + " ") + stopNames.joinToString(" → "))
         }
         var stayN = 0
         legs.forEachIndexed { i, leg ->
@@ -1158,7 +1157,7 @@ object DebriefReport {
                 here.filter { inventoryKeep(it, settings, bookmarkedKeys) }.sortedByDescending { it.rssi }.take(4).forEach { d ->
                     appendLine("   · ${d.reportName(customNames)}  ${d.mac}  ${d.rssi} dBm")
                 }
-                if (here.isEmpty()) appendLine("   · No GPS-stamped radios tied to this stay (tagging may have started after they were first heard).")
+                if (here.isEmpty()) appendLine(("   " + LanguageText.text("ui.no.gps.stamped.radios")))
             } else {
                 appendLine()
                 appendLine(
@@ -1172,7 +1171,7 @@ object DebriefReport {
         val stays = legs.count { it.stay }
         if (stays == 1 && pathSpan < MOVE_M) {
             appendLine()
-            appendLine("One stay — you did not move far enough in this window to split locations.")
+            appendLine(LanguageText.text("ui.one.stay.did.not"))
         }
     }
 
@@ -1199,11 +1198,11 @@ object DebriefReport {
         val ap = wifi.size
         val persistAp = persistent.count { it.kind == RadioKind.WIFI }
         val guess = when {
-            pathSpan > 200 && ap in 1..25 -> "In motion (walk/vehicle) through mixed RF."
-            ap <= 4 && ble.size < 30 && persistAp >= 1 -> "Likely a dwelling or small office — few sitting APs, limited BLE."
-            ap >= 15 && randomized >= 40 -> "Dense public / retail / street: many APs and phone-like randomized BLE."
-            ap >= 8 && persistAp >= 4 -> "Likely a building with standing infrastructure APs plus patrons."
-            else -> "Mixed or under-sampled environment."
+            pathSpan > 200 && ap in 1..25 -> LanguageText.text("ui.motion.walk.vehicle.through")
+            ap <= 4 && ble.size < 30 && persistAp >= 1 -> LanguageText.text("ui.likely.dwelling.small.office")
+            ap >= 15 && randomized >= 40 -> LanguageText.text("ui.dense.public.retail.street")
+            ap >= 8 && persistAp >= 4 -> LanguageText.text("ui.likely.building.standing.infrastructure")
+            else -> LanguageText.text("ui.mixed.under.sampled.environment")
         }
         return "$guess  (${ap} APs, ${ble.size} BLE, ${persistAp} persistent APs, traveled ${fmtDist(pathLen)}, span ${fmtDist(pathSpan)}.)"
     }
@@ -1272,11 +1271,11 @@ object DebriefReport {
             val n = counts[kind] ?: return@mapNotNull null
             ReportBar(kind.label(), n)
         }.toMutableList()
-        if (unmatched > 0) rows += ReportBar("Unmatched", unmatched)
+        if (unmatched > 0) rows += ReportBar(LanguageText.text("ui.unmatched.label"), unmatched)
         if (rows.isEmpty()) return null
         return ReportChart(
             rows = rows,
-            caption = if (multi) "A radio in two classes counts in each." else "",
+            caption = if (multi) LanguageText.text("ui.radio.two.classes.counts") else "",
         )
     }
 
@@ -1305,10 +1304,10 @@ object DebriefReport {
     ): String {
         if (rows.isEmpty()) return ""
         return buildString {
-            appendLine("Named or marked:")
+            appendLine(LanguageText.text("ui.named.marked"))
             rows.sortedByDescending { it.rssi }.forEach { d ->
                 appendLine("  · ${wifiLine(d, names, from, now, customNames)}")
-                if (d.key in mineKeys) appendLine("    Marked mine")
+                if (d.key in mineKeys) appendLine(("    " + LanguageText.text("ui.marked.mine")))
                 d.attentionNotes(fleets).forEach { (sig, note) ->
                     appendLine("    extra attention ($sig): $note")
                 }
@@ -1326,10 +1325,10 @@ object DebriefReport {
     ): String {
         if (rows.isEmpty()) return ""
         return buildString {
-            appendLine("Named or marked:")
+            appendLine(LanguageText.text("ui.named.marked"))
             rows.sortedByDescending { it.rssi }.forEach { d ->
                 appendLine("  · ${bleLine(d, names, from, now, customNames)}")
-                if (d.key in mineKeys) appendLine("    Marked mine")
+                if (d.key in mineKeys) appendLine(("    " + LanguageText.text("ui.marked.mine")))
             }
         }.trimEnd()
     }
@@ -1350,7 +1349,7 @@ object DebriefReport {
             rows.forEach { appendLine(it.reportLine()) }
             if (onPath) {
                 appendLine()
-                appendLine("The path map marks where this phone was. It does not say where the interference came from.")
+                appendLine(LanguageText.text("ui.path.map.marks.where"))
             }
         }.trimEnd()
     }
@@ -1378,7 +1377,7 @@ object DebriefReport {
         }
         if (pairing.isNotEmpty()) {
             out += if (showAll || pairing.size <= 8) {
-                "Google Fast Pair in pairing mode: " +
+                (LanguageText.text("ui.google.fast.pair.pairing") + " ") +
                     pairing.joinToString { "${it.reportName(customNames)} ${it.mac}" }
             } else {
                 "Google Fast Pair in pairing mode: ${pairing.size} radios."
@@ -1389,7 +1388,7 @@ object DebriefReport {
                 inventoryKeep(it, settings, bookmarkedKeys)
         }
         if (loudUnknown.isNotEmpty()) {
-            out += "Very strong unnamed radios (≥ −50 dBm): " +
+            out += (LanguageText.text("ui.very.strong.unnamed.radios") + " ") +
                 loudUnknown.take(8).joinToString { "${it.mac} ${it.rssi} dBm" }
         }
         val rand = devices.count { it.kind == RadioKind.BLE && it.randomized }
@@ -1410,15 +1409,15 @@ object DebriefReport {
     ): String = buildString {
         append("A passive observer with the same radios would see ${wifi.size} named/hidden APs ")
         append("and ${ble.size} BLE advertisers ($randomized randomized). ")
-        if (hidden.isNotEmpty()) append("Hidden SSIDs still beacon and identify the AP by BSSID. ")
-        if (settings.tagLocation) append("This debrief includes operator GPS samples used for distance and the following test. ")
+        if (hidden.isNotEmpty()) append((LanguageText.text("ui.hidden.ssids.still.beacon") + " "))
+        if (settings.tagLocation) append((LanguageText.text("ui.debrief.includes.operator.gps") + " "))
         if (includeAircraft) {
-            append("This debrief includes advertised aircraft positions from radios that broadcast a latitude and longitude. ")
+            append((LanguageText.text("ui.debrief.includes.advertised.aircraft") + " "))
         }
         if (places.attempted && places.available) {
-            append("Street names came from the phone’s system geocoder while online. ")
+            append((LanguageText.text("ui.street.names.came.phone") + " "))
         }
-        append("Do not share this file off-device without redaction.")
+        append(LanguageText.text("ui.do.not.share.file"))
     }
 
     private fun actions(
@@ -1436,27 +1435,27 @@ object DebriefReport {
         if (ownLikely.isNotEmpty() || withYou.isNotEmpty()) {
             add(
                 "Possible trackers with you: ${(ownLikely + withYou).joinToString { trackId(it) }}. " +
-                    "Could be yours or planted in the car/bag/on you before you started. Account for each MAC — do not dismiss as yours.",
+                    LanguageText.text("ui.could.yours.planted.car"),
             )
         }
         if (beaconsWithYou.isNotEmpty()) {
             add(
-                "Retail beacons with you (unusual — fixtures do not typically move with you): " +
+                (LanguageText.text("ui.retail.beacons.unusual.fixtures") + " ") +
                     beaconsWithYou.joinToString { it.label + " " + it.device.mac } +
-                    ". Account for a test tag or badge before treating it as a follower.",
+                    LanguageText.text("ui.account.test.tag.badge"),
             )
         }
         if (wearablesWithYou.isNotEmpty()) {
             add(
-                "Wearables with you (usually own kit or a companion): " +
+                (LanguageText.text("ui.wearables.usually.own.kit") + " ") +
                     wearablesWithYou.joinToString { it.label + " " + it.device.mac } +
                     ".",
             )
         }
-        if (!settings.tagLocation) add("Enable Tag detections with GPS and walk 50+ m, then run Debrief again for a following test.")
-        else if (pathSpan < MOVE_M) add("Walk farther (50+ m) with GPS tagging on, then re-run Debrief.")
-        add("Use Live → Pause to inspect a busy list. Watch tracker signatures if this sit was noisy.")
-        add("Station-side Wi-Fi (probes/clients) still needs a dedicated sniffer — Fieldwatch cannot see them.")
+        if (!settings.tagLocation) add(LanguageText.text("ui.enable.tag.detections.gps"))
+        else if (pathSpan < MOVE_M) add(LanguageText.text("ui.walk.farther.50.m"))
+        add(LanguageText.text("ui.use.live.pause.inspect"))
+        add(LanguageText.text("ui.station.side.wi.fi"))
     }
 
     private fun takeaway(
@@ -1471,12 +1470,12 @@ object DebriefReport {
     ): String {
         val extra = buildString {
             if (beaconsWithYou.isNotEmpty()) {
-                append(" Retail beacon(s) also with the path (unusual): ")
+                append((" " + LanguageText.text("ui.retail.beacon.s.also.2") + " "))
                 append(beaconsWithYou.joinToString { it.label + " (" + it.device.mac + ")" })
                 append(".")
             }
             if (wearablesWithYou.isNotEmpty()) {
-                append(" Wearable(s) with the path (usually own kit): ")
+                append((" " + LanguageText.text("ui.wearable.s.path.usually") + " "))
                 append(wearablesWithYou.joinToString { it.label + " (" + it.device.mac + ")" })
                 append(".")
             }
@@ -1488,17 +1487,17 @@ object DebriefReport {
             following.isNotEmpty() ->
                 "Possible tail (appeared after this sit started): ${following.joinToString { trackId(it) }}. Account for it on the person/vehicle."
             !settings.tagLocation ->
-                "Turn on GPS tagging and walk before you can test whether a tracker is following you."
+                LanguageText.text("ui.turn.gps.tagging.walk")
             pathSpan < MOVE_M ->
                 "Not enough GPS movement (${pathSpan.toInt()} m) to test following; walk and re-run Debrief."
             ownLikely.isNotEmpty() || withYou.isNotEmpty() ->
                 "Finder tags with you (yours or planted before you started): ${(ownLikely + withYou).joinToString { trackId(it) }}. No new arrival this window. Account for each MAC — do not dismiss as yours."
             beaconsWithYou.isNotEmpty() || wearablesWithYou.isNotEmpty() ->
-                "No finder tag stayed with the path."
+                LanguageText.text("ui.no.finder.tag.stayed")
             named.isEmpty() ->
-                "No signature hits and no GPS co-travel of trackers in this 15-minute window."
+                LanguageText.text("ui.no.signature.hits.no")
             else ->
-                "No finder tag, retail beacon, or wearable clearly stayed with your GPS path in this window."
+                LanguageText.text("ui.no.finder.tag.retail.2")
         }
         return (core + extra).trim()
     }

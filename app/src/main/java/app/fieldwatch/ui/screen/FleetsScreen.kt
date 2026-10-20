@@ -68,6 +68,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.fieldwatch.domain.Fleet
+import app.fieldwatch.domain.LanguageText
 import app.fieldwatch.domain.MatchRule
 import app.fieldwatch.domain.Palette
 import app.fieldwatch.ui.theme.LocalNightMode
@@ -144,7 +145,7 @@ fun FleetsScreen(
         topBar = { NestedTopBar("Signatures (${state.fleets.size})") },
         floatingActionButton = {
             FloatingActionButton(onClick = vm::beginNewFleet) {
-                Icon(Icons.Outlined.Add, "New signature")
+                Icon(Icons.Outlined.Add, LanguageText.text("ui.new.signature"))
             }
         },
     ) { pad ->
@@ -158,9 +159,9 @@ fun FleetsScreen(
             item {
                 Text(
                     if (sort == SignatureListSort.CLASS) {
-                        "Tap a class to open its signatures. Bookmark = beep. Hide a family on Filters, not here."
+                        LanguageText.text("ui.tap.class.open.its")
                     } else {
-                        "Tap to edit. Bookmark = beep when that family appears. Hide a family on Filters, not here."
+                        LanguageText.text("ui.tap.edit.bookmark.alert")
                     },
                     style = compactLine(12.sp, 14.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -173,12 +174,12 @@ fun FleetsScreen(
                     FieldwatchFilterChip(
                         selected = sort == SignatureListSort.NAME,
                         onClick = { vm.setSignatureListSort(SignatureListSort.NAME) },
-                        label = { Text("Name A–Z") },
+                        label = { Text(LanguageText.text("sort.name")) },
                     )
                     FieldwatchFilterChip(
                         selected = sort == SignatureListSort.CLASS,
                         onClick = { vm.setSignatureListSort(SignatureListSort.CLASS) },
-                        label = { Text("Class A–Z") },
+                        label = { Text(LanguageText.text("sort.class")) },
                     )
                 }
             }
@@ -307,7 +308,7 @@ private fun SignatureRow(fleet: Fleet, state: FieldwatchUi, vm: FieldwatchViewMo
             ) {
                 Icon(
                     if (vm.isFleetWatched(fleet.id)) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,
-                    "Beep when this signature appears",
+                    LanguageText.text("ui.beep.when.signature.appears"),
                     modifier = Modifier.size(20.dp),
                 )
             }
@@ -334,9 +335,9 @@ fun FleetEditor(
         contentWindowInsets = NestedTabInsets,
         topBar = {
             NestedTopBar(
-                title = if (isNew) "New signature" else "Edit signature",
-                navigationIcon = { TextButton(onClick = onCancel) { Text("Cancel") } },
-                actions = { TextButton(onClick = { onSave(fleet) }) { Text("Save") } },
+                title = if (isNew) LanguageText.text("ui.new.signature") else LanguageText.text("ui.edit.signature"),
+                navigationIcon = { TextButton(onClick = onCancel) { Text(LanguageText.text("language.cancel")) } },
+                actions = { TextButton(onClick = { onSave(fleet) }) { Text(LanguageText.text("ui.save.label")) } },
             )
         },
     ) { pad ->
@@ -348,30 +349,30 @@ fun FleetEditor(
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SectionCard("Identity") {
-            FieldwatchOutlinedField(fleet.name, { fleet = fleet.copy(name = it) }, "Name")
+            SectionCard(LanguageText.text("ui.identity.label")) {
+            FieldwatchOutlinedField(fleet.name, { fleet = fleet.copy(name = it) }, LanguageText.text("ui.name.label"))
             FieldwatchOutlinedField(
                 fleet.notes,
                 { fleet = fleet.copy(notes = it) },
-                "Notes",
-                supportingText = "Shows on radio detail for matching radios, and in Share / AI Export. Not Extra attention — no Live “!” and not the amber card.",
+                LanguageText.text("ui.notes.label"),
+                supportingText = LanguageText.text("ui.shows.radio.detail.matching"),
                 singleLine = false,
                 minLines = 2,
             )
             FieldwatchOutlinedField(
                 fleet.attentionNote,
                 { fleet = fleet.copy(attentionNote = it) },
-                "Extra attention",
-                supportingText = "Optional. If this is not empty, matching radios get a “!” on Live, this amber card on detail, and a line in Debrief. Separate from Notes above.",
+                LanguageText.text("chrome.extra.attention"),
+                supportingText = LanguageText.text("ui.optional.if.not.empty"),
                 singleLine = false,
                 minLines = 3,
             )
             }
 
-            SectionCard("Matching") {
+            SectionCard(LanguageText.text("ui.matching.label")) {
             var classMenu by remember { mutableStateOf(false) }
             ExposedDropdownMenuBox(classMenu, { classMenu = it }) {
-                FieldwatchDropdownField("Class", fleet.kind.label(), classMenu)
+                FieldwatchDropdownField(LanguageText.text("voice.class"), fleet.kind.label(), classMenu)
                 ExposedDropdownMenu(classMenu, { classMenu = false }) {
                     SignatureClass.visible.sortedBy { it.label().lowercase() }.forEach { kind ->
                         DropdownMenuItem(
@@ -385,47 +386,46 @@ fun FleetEditor(
                 }
             }
             Text(
-                "Filters → Show only / Hide these. Class sits (Finder tags, Cameras, …) are those chips — Save current as… if you want a preset.",
+                LanguageText.text("ui.class.filters.uses.show"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Match any rule (OR)", Modifier.weight(1f))
+                Text(LanguageText.text("ui.match.any.rule"), Modifier.weight(1f))
                 FieldwatchSwitch(fleet.matchAny, { fleet = fleet.copy(matchAny = it) })
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Cluster by OUI", Modifier.weight(1f))
+                Text(LanguageText.text("ui.cluster.oui"), Modifier.weight(1f))
                 FieldwatchSwitch(fleet.clusterByOui, { fleet = fleet.copy(clusterByOui = it) })
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Sequential MACs", Modifier.weight(1f))
+                Text(LanguageText.text("ui.sequential.macs"), Modifier.weight(1f))
                 FieldwatchSwitch(fleet.sequentialMac, { fleet = fleet.copy(sequentialMac = it) })
             }
             FieldwatchOutlinedField(
                 fleet.minPeers.toString(),
                 { fleet = fleet.copy(minPeers = it.toIntOrNull() ?: 0) },
-                "Min peers (0 = off)",
+                LanguageText.text("ui.min.peers.0.3"),
             )
             FieldwatchOutlinedField(
                 fleet.peerWindowSec.toString(),
                 { fleet = fleet.copy(peerWindowSec = it.toIntOrNull() ?: 60) },
-                "Peer window (seconds)",
+                LanguageText.text("ui.peer.window.seconds"),
             )
             }
 
-            SectionCard("Color") {
+            SectionCard(LanguageText.text("ui.color.label")) {
             ColorPicker(fleet.colorIndex) { fleet = fleet.copy(colorIndex = it) }
             Text(
-                "Stock colors are by class (red pentest, amber cameras/ALPR, purple phones/tags, cyan wearables, green mesh, orange audio/glasses, teal in-car/vehicle). Change any row.",
+                LanguageText.text("ui.stock.colors.follow.class"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             }
 
-            SectionCard("Rules") {
+            SectionCard(LanguageText.text("ui.rules.label")) {
             Text(
-                "Each rule has its own switch. Off keeps the rule but it does not match. " +
-                    "Use that to mute noisy OUIs or names on one signature without deleting them.",
+                LanguageText.text("ui.off.keeps.rule.stops"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -447,12 +447,12 @@ fun FleetEditor(
                     fleet = fleet.copy(rules = fleet.rules + MatchRule(RuleKind.OUI, text = ""))
                 },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Add rule") }
+            ) { Text(LanguageText.text("ui.add.rule")) }
             }
 
             if (fleet.canHaveBleDecode()) {
                 val decodeCount = fleet.decode?.fields?.size ?: 0
-                SectionCard("Decode fields") {
+                SectionCard(LanguageText.text("ui.decode.fields")) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -460,7 +460,7 @@ fun FleetEditor(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        if (decodeCount == 0) "None" else "$decodeCount fields",
+                        if (decodeCount == 0) LanguageText.text("display.none") else "$decodeCount fields",
                         Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyLarge,
                     )
@@ -471,7 +471,7 @@ fun FleetEditor(
                     )
                 }
                 Text(
-                    "Optional. After this signature matches, map cleartext BLE bytes to labels. Encrypted payloads stay hex.",
+                    LanguageText.text("ui.optional.after.signature.matches"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -484,7 +484,7 @@ fun FleetEditor(
                 ) {
                     Icon(Icons.Outlined.Delete, null)
                     Spacer(Modifier.padding(4.dp))
-                    Text("Delete signature")
+                    Text(LanguageText.text("ui.delete.signature"))
                 }
             }
         }
@@ -492,11 +492,11 @@ fun FleetEditor(
     if (confirmDelete && onDelete != null) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("Delete this signature?") },
+            title = { Text(LanguageText.text("ui.delete.signature.2")) },
             text = {
                 Text(
                     if (initial.builtIn) {
-                        "“${fleet.name}” is a built-in signature. Deleting it removes matching, its bookmark, and filter chips. Restore default signatures in Settings will bring the stock set back."
+                        "“${fleet.name}” is a built-in signature. Deleting it removes matching, its bookmark, and filter chips. Settings → Restore default signatures & presets brings the stock set back."
                     } else {
                         "“${fleet.name}” will be removed. Matching, its bookmark, and filter chips go with it. This cannot be undone."
                     },
@@ -506,10 +506,10 @@ fun FleetEditor(
                 TextButton(onClick = {
                     confirmDelete = false
                     onDelete()
-                }) { Text("Delete") }
+                }) { Text(LanguageText.text("ui.delete.label")) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmDelete = false }) { Text("Cancel") }
+                TextButton(onClick = { confirmDelete = false }) { Text(LanguageText.text("language.cancel")) }
             },
         )
     }
@@ -545,7 +545,7 @@ private fun ColorPicker(selected: Int, onSelect: (Int) -> Unit) {
                         if (on) {
                             Icon(
                                 Icons.Outlined.Check,
-                                contentDescription = "Selected color",
+                                contentDescription = LanguageText.text("ui.selected.color"),
                                 tint = if (fill.luminance() > 0.45f) {
                                     Color(0xFF12171C)
                                 } else {
@@ -582,7 +582,7 @@ private fun RuleEditor(rule: MatchRule, onChange: (MatchRule) -> Unit, onDelete:
                     .weight(1f)
                     .padding(start = 8.dp, end = 4.dp),
             ) {
-                FieldwatchDropdownField("Kind", ruleKindLabel(rule.kind), expanded)
+                FieldwatchDropdownField(LanguageText.text("ui.kind.label"), ruleKindLabel(rule.kind), expanded)
                 ExposedDropdownMenu(expanded, { expanded = false }) {
                     RuleKind.entries.forEach { kind ->
                         DropdownMenuItem(text = { Text(ruleKindLabel(kind)) }, onClick = {
@@ -592,7 +592,7 @@ private fun RuleEditor(rule: MatchRule, onChange: (MatchRule) -> Unit, onDelete:
                     }
                 }
             }
-            IconButton(onClick = onDelete) { Icon(Icons.Outlined.Delete, "Delete rule") }
+            IconButton(onClick = onDelete) { Icon(Icons.Outlined.Delete, LanguageText.text("ui.delete.rule")) }
         }
         Column(
             Modifier.padding(top = 12.dp, start = 8.dp),
@@ -603,7 +603,7 @@ private fun RuleEditor(rule: MatchRule, onChange: (MatchRule) -> Unit, onDelete:
                 FieldwatchOutlinedField(
                     rule.text,
                     { onChange(rule.copy(text = it)) },
-                    "Value",
+                    LanguageText.text("ui.value.label"),
                 )
             }
             RuleKind.MANUFACTURER_ID -> {
@@ -613,7 +613,7 @@ private fun RuleEditor(rule: MatchRule, onChange: (MatchRule) -> Unit, onDelete:
                         val parsed = it.removePrefix("0x").removePrefix("0X").toIntOrNull(16) ?: 0
                         onChange(rule.copy(companyId = parsed))
                     },
-                    "Company ID hex",
+                    LanguageText.text("ui.company.id.hex"),
                 )
             }
             RuleKind.MANUFACTURER_DATA -> {
@@ -623,50 +623,50 @@ private fun RuleEditor(rule: MatchRule, onChange: (MatchRule) -> Unit, onDelete:
                         val parsed = it.removePrefix("0x").removePrefix("0X").toIntOrNull(16) ?: 0
                         onChange(rule.copy(companyId = parsed))
                     },
-                    "Company ID hex",
+                    LanguageText.text("ui.company.id.hex"),
                 )
                 FieldwatchOutlinedField(
                     rule.dataPrefixHex,
                     { onChange(rule.copy(dataPrefixHex = it)) },
-                    "Data prefix hex",
+                    LanguageText.text("ui.data.prefix.hex"),
                 )
             }
             RuleKind.SERVICE_DATA -> {
                 FieldwatchOutlinedField(
                     rule.text,
                     { onChange(rule.copy(text = it)) },
-                    "Service UUID (empty = any, contains)",
+                    LanguageText.text("ui.service.uuid.empty.any"),
                 )
                 FieldwatchOutlinedField(
                     rule.dataPrefixHex,
                     { onChange(rule.copy(dataPrefixHex = it)) },
-                    if (rule.text.isBlank()) "Contains hex" else "Data prefix hex",
+                    if (rule.text.isBlank()) LanguageText.text("ui.contains.hex") else LanguageText.text("ui.data.prefix.hex"),
                 )
             }
             RuleKind.RADIO_KIND -> {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Wi-Fi", Modifier.padding(end = 8.dp))
+                    Text(LanguageText.text("radio.wifi"), Modifier.padding(end = 8.dp))
                     FieldwatchSwitch(rule.radio != RadioKind.BLE, { onChange(rule.copy(radio = if (it) RadioKind.WIFI else RadioKind.BLE)) })
                 }
             }
-            RuleKind.HIDDEN_SSID -> Text("Matches hidden SSIDs", style = MaterialTheme.typography.bodySmall)
+            RuleKind.HIDDEN_SSID -> Text(LanguageText.text("rule.hidden.ssid"), style = MaterialTheme.typography.bodySmall)
         }
         }
     }
 }
 
 private fun ruleKindLabel(kind: RuleKind): String = when (kind) {
-    RuleKind.OUI -> "OUI"
-    RuleKind.MAC_PREFIX -> "MAC prefix"
-    RuleKind.NAME_CONTAINS -> "Name contains"
-    RuleKind.NAME_GLOB -> "Name glob"
-    RuleKind.SERVICE_UUID -> "Service UUID"
-    RuleKind.SERVICE_DATA -> "Service data"
-    RuleKind.MANUFACTURER_ID -> "Manufacturer ID"
-    RuleKind.MANUFACTURER_DATA -> "Manufacturer data"
-    RuleKind.RADIO_KIND -> "Radio kind"
-    RuleKind.HIDDEN_SSID -> "Hidden SSID"
-    RuleKind.VENDOR_IE_OUI -> "Vendor IE OUI"
+    RuleKind.OUI -> LanguageText.text("rule.oui")
+    RuleKind.MAC_PREFIX -> LanguageText.text("rule.mac.prefix")
+    RuleKind.NAME_CONTAINS -> LanguageText.text("ui.name.contains")
+    RuleKind.NAME_GLOB -> LanguageText.text("ui.name.glob")
+    RuleKind.SERVICE_UUID -> LanguageText.text("ui.service.uuid")
+    RuleKind.SERVICE_DATA -> LanguageText.text("ui.service.data")
+    RuleKind.MANUFACTURER_ID -> LanguageText.text("ui.manufacturer.id")
+    RuleKind.MANUFACTURER_DATA -> LanguageText.text("ui.manufacturer.data")
+    RuleKind.RADIO_KIND -> LanguageText.text("ui.radio.kind")
+    RuleKind.HIDDEN_SSID -> LanguageText.text("rule.hidden.label")
+    RuleKind.VENDOR_IE_OUI -> LanguageText.text("ui.vendor.ie.oui")
 }
 
 private fun compactLine(

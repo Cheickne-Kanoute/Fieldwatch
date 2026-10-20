@@ -4,6 +4,8 @@ import android.content.Context
 import app.fieldwatch.domain.AppSettings
 import app.fieldwatch.domain.DefaultCatalog
 import app.fieldwatch.domain.FilterEngine
+import app.fieldwatch.domain.LIVE_TOUR_REV
+import app.fieldwatch.domain.offerLiveTourOnce
 import app.fieldwatch.domain.FilterPreset
 import app.fieldwatch.domain.FilterState
 import app.fieldwatch.domain.Fleet
@@ -19,6 +21,7 @@ import app.fieldwatch.domain.SignatureExchange
 import app.fieldwatch.domain.SignatureImportResult
 import app.fieldwatch.domain.SignaturePack
 import app.fieldwatch.domain.StockCatalogUpdateResult
+import app.fieldwatch.domain.TakInstall
 import app.fieldwatch.domain.WatchTarget
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,6 +48,7 @@ class ConfigStore(context: Context) {
     val fleets: List<Fleet> get() = _config.value.fleets
     val filter: FilterState get() = _config.value.filter
     val settings: AppSettings get() = _config.value.settings
+    val takInstallTag: String get() = _config.value.takInstallTag
     val presets: List<FilterPreset> get() = _config.value.presets
     val watchlist: List<WatchTarget> get() = _config.value.watchlist
 
@@ -64,7 +68,9 @@ class ConfigStore(context: Context) {
                     file.writeText(json.encodeToString(seeded))
                     _config.value = seeded
                 } else {
-                    val patched = patchBuiltIn(loaded)
+                    val patched = TakInstall.ensure(patchBuiltIn(loaded)).let {
+                        it.copy(settings = it.settings.offerLiveTourOnce())
+                    }
                     _config.value = patched
                     if (patched != loaded) {
                         file.writeText(json.encodeToString(patched))
@@ -92,8 +98,11 @@ class ConfigStore(context: Context) {
     }
 
     suspend fun restoreDefaults() {
-        val accepted = _config.value.settings.disclaimerAccepted
-        val rev = _config.value.settings.disclaimerRev
+        val cur = _config.value
+        val accepted = cur.settings.disclaimerAccepted
+        val rev = cur.settings.disclaimerRev
+        val tag = cur.takInstallTag
+        val retired = cur.takLegacySelfRetired
         update {
             val fresh = seed()
             fresh.copy(
@@ -101,6 +110,8 @@ class ConfigStore(context: Context) {
                     disclaimerAccepted = accepted,
                     disclaimerRev = rev,
                 ),
+                takInstallTag = TakInstall.clean(tag).ifEmpty { fresh.takInstallTag },
+                takLegacySelfRetired = retired,
             )
         }
     }
@@ -1161,6 +1172,17 @@ class ConfigStore(context: Context) {
             }
             version = CATALOG_V95
         }
+        if (version < CATALOG_V96) {
+            fleets = fleets.map { fleet ->
+                if (!fleet.builtIn || fleet.id != "fleet-chipolo") return@map fleet
+                val stock = catalog[fleet.id] ?: return@map fleet
+                if (fleet.notes != "Chipolo item finder (Find Hub / Find My). A tag you clip to keys or a bag.") {
+                    return@map fleet
+                }
+                fleet.copy(notes = stock.notes)
+            }
+            version = CATALOG_V96
+        }
         if (!settings.darkTheme) settings = settings.copy(darkTheme = true)
         if (settings.scanControlsExpanded) settings = settings.copy(scanControlsExpanded = false)
         presets = presets.filterNot { it.isBuiltIn() && it.id in hiddenPresetIds }
@@ -1199,13 +1221,15 @@ class ConfigStore(context: Context) {
             filter = FilterState(),
             presets = FilterEngine().defaultPresets(fleets),
             watchlist = DefaultCatalog.defaultWatchlist(),
-            settings = AppSettings(),
+            settings = AppSettings(liveTourRev = LIVE_TOUR_REV),
+            takInstallTag = TakInstall.newTag(),
+            takLegacySelfRetired = true,
         )
     }
 
     companion object {
         /** Stock catalog generation. Settings footer and the GitHub pack use this. */
-        const val CATALOG_VERSION = 95
+        const val CATALOG_VERSION = 96
         private const val CATALOG_V2 = 2
         private const val CATALOG_V3 = 3
         private const val CATALOG_V4 = 4
@@ -1299,7 +1323,8 @@ class ConfigStore(context: Context) {
         private const val CATALOG_V92 = 92
         private const val CATALOG_V93 = 93
         private const val CATALOG_V94 = 94
-        private const val CATALOG_V95 = CATALOG_VERSION
+        private const val CATALOG_V95 = 95
+        private const val CATALOG_V96 = CATALOG_VERSION
         private val GENERIC_GATT_UUIDS = setOf("180A", "180D", "180F")
         private val POLICY_FLEET_IDS = setOf(
             "fleet-flock-cameras",

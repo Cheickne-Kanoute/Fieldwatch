@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <files-path name="logs" path="logs/" />
+    <files-path name="gnss-raw" path="gnss-raw/" />
     <cache-path name="debrief" path="debrief/" />
     <cache-path name="export" path="export/" />
     <cache-path name="signatures" path="signatures/" />
     <cache-path name="settings" path="settings/" />
+    <cache-path name="language" path="language/" />
 </paths>

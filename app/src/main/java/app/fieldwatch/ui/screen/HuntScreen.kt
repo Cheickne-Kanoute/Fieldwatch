@@ -1,5 +1,7 @@
 package app.fieldwatch.ui.screen
 
+import app.fieldwatch.domain.LanguageText
+
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -112,11 +114,11 @@ fun HuntScreen(
             TopAppBar(
                 title = {
                     val shown = hunt.device?.let { MacUtil.redactMacIn(hunt.title, it.mac, demoMode) } ?: hunt.title
-                    Text(shown.ifBlank { "Hunt" }, maxLines = 1)
+                    Text(shown.ifBlank { LanguageText.text("ui.hunt.label") }, maxLines = 1)
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, LanguageText.text("chrome.back"))
                     }
                 },
             )
@@ -134,13 +136,13 @@ fun HuntScreen(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = hunt.active,
                 ) {
-                    Text("Reset this hunt")
+                    Text(LanguageText.text("ui.reset.hunt"))
                 }
                 FieldwatchActionButton(
                     onClick = onBack,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Back to detail")
+                    Text(LanguageText.text("ui.back.detail"))
                 }
                 Row(
                     Modifier.fillMaxWidth(),
@@ -151,7 +153,7 @@ fun HuntScreen(
                         Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("Beep", Modifier.weight(1f))
+                        Text(LanguageText.text("ui.beep.label"), Modifier.weight(1f))
                         FieldwatchSwitch(
                             huntBeep,
                             { on ->
@@ -164,7 +166,7 @@ fun HuntScreen(
                         Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("Vibrate", Modifier.weight(1f))
+                        Text(LanguageText.text("ui.vibrate.label"), Modifier.weight(1f))
                         FieldwatchSwitch(
                             huntVibrate,
                             { on ->
@@ -226,7 +228,7 @@ fun HuntScreen(
                 color = accent,
             )
             Text(
-                rssi?.let { DeviceExplain.rssiExplain(it) } ?: "no live RSSI",
+                rssi?.let { DeviceExplain.rssiExplain(it) } ?: LanguageText.text("ui.no.live.rssi"),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -234,14 +236,14 @@ fun HuntScreen(
                 if (hunt.peakRssi > -127) {
                     "Loudest this hunt  ${hunt.peakRssi} dBm"
                 } else {
-                    "Loudest this hunt  —"
+                    LanguageText.text("ui.loudest.hunt")
                 },
                 fontFamily = FontFamily.Monospace,
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
                 when {
-                    heardAgo == null -> "last heard  —"
+                    heardAgo == null -> LanguageText.text("ui.last.heard")
                     heardAgo < 60L -> "last heard ${heardAgo}s ago"
                     else -> "last heard ${heardAgo / 60L}m ago"
                 },

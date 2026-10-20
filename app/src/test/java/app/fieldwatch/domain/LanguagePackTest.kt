@@ -1,0 +1,669 @@
+package app.fieldwatch.domain
+
+import app.fieldwatch.data.DebriefPdf
+import app.fieldwatch.data.LanguageAssets
+import app.fieldwatch.data.LanguageSnapshot
+import app.fieldwatch.data.LanguageStore
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.io.File
+import java.util.Locale
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+
+class LanguagePackTest {
+    @After
+    fun clearLanguage() {
+        LanguageText.clear()
+    }
+
+    @Test
+    fun noPackReturnsEnglishWithoutReadingAFile() {
+        var reads = 0
+        val store = LanguageStore(tempFile(), LanguageAssets {
+            reads++
+            null
+        })
+        val snap = store.load(Locale.ENGLISH)
+        LanguageText.apply(snap.overlay)
+        assertEquals(0, reads)
+        assertTrue(snap.overlay.isEmpty())
+        assertEquals("Live", LanguageText.text("tab.live"))
+        assertEquals("Finder tags", SignatureClass.FINDER.label())
+        assertEquals(0, reads)
+    }
+
+    @Test
+    fun missingEmptyAndWhitespaceStayEnglish() {
+        val blank = LanguagePack.parse(pack("tab.live" to "   ", "tab.pause" to "").toByteArray())
+        assertEquals(LanguageErrors.NONE, (blank as LanguageParse.Reject).messageKey)
+        assertEquals("Live", LanguageText.text("tab.live"))
+        val parsed = ok(pack("tab.live" to "   ", "tab.pause" to "", "tab.filters" to "Filtres"))
+        LanguageText.apply(parsed.accepted)
+        assertEquals("Live", LanguageText.text("tab.live"))
+        assertEquals("Pause", LanguageText.text("tab.pause"))
+        assertEquals("Filtres", LanguageText.text("tab.filters"))
+        assertFalse(parsed.accepted.containsKey("tab.live"))
+        assertFalse(parsed.accepted.containsKey("tab.pause"))
+    }
+
+    @Test
+    fun completeOlderLineIsUsed() {
+        val parsed = ok(pack("tab.live" to "Direkt", writtenFor = "1.1.21"))
+        assertEquals("1.1.21", parsed.writtenFor)
+        LanguageText.apply(parsed.accepted)
+        assertEquals("Direkt", LanguageText.text("tab.live"))
+    }
+
+    @Test
+    fun placeholderMismatchStaysEnglish() {
+        val parsed = ok(pack("language.confirm.change" to "changed", "tab.live" to "Direct"))
+        LanguageText.apply(parsed.accepted)
+        assertEquals("{n} lines will change.", LanguageText.text("language.confirm.change"))
+        assertEquals("Direct", LanguageText.text("tab.live"))
+        assertFalse(parsed.accepted.containsKey("language.confirm.change"))
+        val onlyBad = LanguagePack.parse(pack("tab.live" to "Live {n}").toByteArray())
+        assertEquals(LanguageErrors.NONE, (onlyBad as LanguageParse.Reject).messageKey)
+        assertEquals("3 lignes", ok(pack("language.confirm.change" to "{n} lignes")).let {
+            LanguageText.apply(it.accepted)
+            LanguageText.text("language.confirm.change", mapOf("n" to "3"))
+        })
+    }
+
+    @Test
+    fun placeholderFillDoesNotRescanTheValue() {
+        LanguageText.apply(mapOf("language.confirm.change" to "%s {n} %s"))
+        val filled = LanguageText.text("language.confirm.change", mapOf("n" to "%s {n}"))
+        assertEquals("%s %s {n} %s", filled)
+        assertFalse(filled.contains("String.format"))
+    }
+
+    @Test
+    fun missingPlaceholderValueReturnsEnglish() {
+        LanguageText.apply(mapOf("language.confirm.change" to "{n} lignes"))
+        assertEquals(
+            "{n} lines will change.",
+            LanguageText.text("language.confirm.change", emptyMap()),
+        )
+    }
+
+    @Test
+    fun scriptAndUrlsStayCharacters() {
+        val raw = "<script>alert(1)</script> javascript: intent: file: content: https://evil.example"
+        val parsed = ok(pack("language.err.not" to raw))
+        LanguageText.apply(parsed.accepted)
+        assertEquals(raw, LanguageText.text("language.err.not"))
+        assertEquals(OfficialSentences.NOT_REVIEWED, OfficialSentences.NOT_REVIEWED)
+        assertFalse(EnglishCopy.byKey.containsKey("official.not_reviewed"))
+    }
+
+    @Test
+    fun officialSentencesAreNotKeys() {
+        LanguageText.apply(
+            mapOf(
+                "official.not_reviewed" to "hidden",
+                "official.ai" to "hidden",
+                "official.author" to "hidden",
+            ),
+        )
+        assertEquals(
+            "Language packs are made by other people. They are not reviewed or certified by Off Grid Pete LLC.",
+            OfficialSentences.NOT_REVIEWED,
+        )
+        assertEquals(
+            "This language was translated with AI. If a line is wrong, please open a GitHub issue.",
+            OfficialSentences.AI,
+        )
+        assertEquals(
+            "To write a language file, export the English template and follow the author guide on GitHub.",
+            OfficialSentences.AUTHOR_GUIDE,
+        )
+        assertEquals(
+            "https://github.com/OffGridPete/Fieldwatch/blob/main/docs/language-pack-author-guide.md",
+            OfficialSentences.AUTHOR_GUIDE_URL,
+        )
+        assertTrue(EnglishCopy.lines.none { it.text == OfficialSentences.NOT_REVIEWED })
+        assertTrue(EnglishCopy.lines.none { it.text == OfficialSentences.AI })
+        assertTrue(EnglishCopy.lines.none { it.text == OfficialSentences.AUTHOR_GUIDE })
+        assertEquals("Export English template", LanguageExportCopy.BUTTON)
+        assertEquals("Fieldwatch English template", LanguageExportCopy.SHARE)
+        assertEquals("Could not export the English template", LanguageExportCopy.FAILED)
+        assertTrue(EnglishCopy.lines.none { it.key == "language.export" || it.key == "ui.fieldwatch.english.template" || it.key == "ui.could.not.export.english" })
+    }
+
+    @Test
+    fun nestedSecondDocumentAndZipAreRejected() {
+        LanguageText.apply(mapOf("tab.live" to "Direkt"))
+        val nested = """{"format":"fieldwatch-language","formatVersion":1,"language":"X","strings":{"tab.live":{"a":"b"}}}"""
+        assertReject(LanguagePack.parse(nested.toByteArray()))
+        assertEquals("Direkt", LanguageText.text("tab.live"))
+        val two = """{"format":"fieldwatch-language","formatVersion":1,"language":"X","strings":{"tab.live":"Bonjour"}}{"format":"nope"}"""
+        assertReject(LanguagePack.parse(two.toByteArray()))
+        assertEquals("Direkt", LanguageText.text("tab.live"))
+        val zip = zipBytes()
+        assertReject(LanguagePack.parse(zip))
+        assertEquals("Direkt", LanguageText.text("tab.live"))
+    }
+
+    @Test
+    fun wrongFilesAreRejectedAndTheCurrentPackStays() {
+        val store = storeWith(pack("tab.live" to "Direkt"))
+        LanguageText.apply(store.current().overlay)
+        assertEquals("Direkt", LanguageText.text("tab.live"))
+        assertEquals(LanguageErrors.EMPTY, (LanguagePack.parse(ByteArray(0)) as LanguageParse.Reject).messageKey)
+        assertEquals(LanguageErrors.NOT_PACK, (LanguagePack.parse("not json".toByteArray()) as LanguageParse.Reject).messageKey)
+        assertEquals(
+            LanguageErrors.SETTINGS,
+            (LanguagePack.parse("""{"format":"fieldwatch-settings","formatVersion":1}""".toByteArray()) as LanguageParse.Reject).messageKey,
+        )
+        assertEquals(
+            "That is a settings pack. Use Import settings.",
+            EnglishCopy.text(LanguageErrors.SETTINGS),
+        )
+        assertEquals(
+            LanguageErrors.SIGNATURES,
+            (LanguagePack.parse("""{"format":"fieldwatch-signatures","formatVersion":1}""".toByteArray()) as LanguageParse.Reject).messageKey,
+        )
+        assertEquals(
+            LanguageErrors.SIGNATURES,
+            (LanguagePack.parse("""{"format":"spectre-signatures"}""".toByteArray()) as LanguageParse.Reject).messageKey,
+        )
+        assertEquals(
+            "That is a signature pack. Use Import signatures.",
+            EnglishCopy.text(LanguageErrors.SIGNATURES),
+        )
+        assertEquals(
+            "Not a Fieldwatch language pack.",
+            EnglishCopy.text(LanguageErrors.NOT_PACK),
+        )
+        val big = ByteArray(LanguagePack.MAX_BYTES + 1) { ' '.code.toByte() }
+        assertEquals(LanguageErrors.LARGE, (LanguagePack.parse(big) as LanguageParse.Reject).messageKey)
+        val useless = """{"format":"fieldwatch-language","formatVersion":1,"language":"X","strings":{"not.a.key":"Hi"}}"""
+        assertEquals(LanguageErrors.NONE, (LanguagePack.parse(useless.toByteArray()) as LanguageParse.Reject).messageKey)
+        assertEquals("Direkt", LanguageText.text("tab.live"))
+        assertEquals("Direkt", store.current().overlay.getValue("tab.live"))
+    }
+
+    @Test
+    fun unknownKeyAndUnknownFieldAreIgnored() {
+        val raw = """{"format":"fieldwatch-language","formatVersion":1,"language":"Français","extra":"hello","strings":{"tab.live":"Direct","made.up":"nope"}}"""
+        val parsed = ok(raw)
+        assertEquals("Français", parsed.language)
+        assertEquals(mapOf("tab.live" to "Direct"), parsed.accepted)
+        assertEquals(1, parsed.ignored)
+    }
+
+    @Test
+    fun newlinesAndBidi() {
+        val kept = ok(pack("language.remove.body" to "Une ligne.\n\nDeux."))
+        assertEquals("Une ligne.\n\nDeux.", kept.accepted.getValue("language.remove.body"))
+        val dropped = ok(pack("tab.live" to "Bon\njour", "tab.pause" to "Pa\u200Euse"))
+        assertFalse(dropped.accepted.containsKey("tab.live"))
+        assertEquals("Pause", dropped.accepted.getValue("tab.pause"))
+        assertEquals(1, dropped.ignored)
+    }
+
+    @Test
+    fun confirmCountsAndNewSince() {
+        val older = ok(pack("tab.live" to "Direct", writtenFor = "1.1.21"))
+        assertEquals(1, older.changed)
+        assertEquals(EnglishCopy.lines.size - 1, older.stayEnglish)
+        assertEquals(EnglishCopy.lines.size - 1, older.newSince)
+        assertFalse(older.formatNewer)
+        val current = ok(pack("tab.live" to "Direct", writtenFor = "1.1.27"))
+        assertEquals(0, current.newSince)
+        val missing = ok(pack("tab.live" to "Direct"))
+        assertNull(missing.newSince)
+        val odd = ok(pack("tab.live" to "Direct", writtenFor = "v1.1.21"))
+        assertNull(odd.newSince)
+        assertEquals("v1.1.21", odd.writtenFor)
+        val newer = ok(
+            """{"format":"fieldwatch-language","formatVersion":9,"language":"X","writtenFor":"1.1.27","strings":{"tab.live":"Direct"}}""",
+        )
+        assertTrue(newer.formatNewer)
+        assertEquals("Direct", newer.accepted.getValue("tab.live"))
+    }
+
+    @Test
+    fun classChipCapAndSpokenClassCap() {
+        val longChip = "X".repeat(19)
+        val spoken = "Y".repeat(20)
+        val parsed = ok(pack("class.law" to longChip, "speech.law" to spoken))
+        assertFalse(parsed.accepted.containsKey("class.law"))
+        assertEquals(spoken, parsed.accepted.getValue("speech.law"))
+        LanguageText.apply(parsed.accepted)
+        assertEquals("Public safety", SignatureClass.LAW_ENFORCEMENT.label())
+        assertEquals(spoken, SignatureClass.LAW_ENFORCEMENT.speechLabel())
+        assertTrue(spoken.length <= EnglishCopy.cap("speech.law"))
+    }
+
+    @Test
+    fun capFillingPackIsAcceptedAndNotShipped() {
+        val strings = LinkedHashMap<String, String>()
+        for (line in EnglishCopy.lines) {
+            val marks = EnglishCopy.placeholders.getValue(line.key).joinToString("") { "{$it}" }
+            val pad = EnglishCopy.cap(line) - marks.length
+            strings[line.key] = "é".repeat(pad) + marks
+        }
+        val parsed = ok(json(strings))
+        assertEquals(EnglishCopy.lines.size, parsed.accepted.size)
+        assertEquals(0, parsed.ignored)
+        LanguageText.apply(parsed.accepted)
+        for (line in EnglishCopy.lines) {
+            assertEquals(EnglishCopy.cap(line), LanguageText.text(line.key).length)
+        }
+        val shipped = repoFile("app/src/main/assets/lang")
+        if (shipped.isDirectory) {
+            val joined = shipped.listFiles().orEmpty().joinToString("\n") { it.readText() }
+            assertFalse(joined.contains("é".repeat(40)))
+        }
+    }
+
+    @Test
+    fun secondPackReplacesTheFirst() {
+        val phone = Locale.FRANCE
+        val store = LanguageStore(tempFile(), assets())
+        store.load(phone)
+        store.confirm(ok(pack("tab.live" to "Un", "tab.pause" to "Deux")), phone)
+        store.confirm(ok(pack("tab.live" to "Trois")), phone)
+        LanguageText.apply(store.current().overlay)
+        assertEquals("Trois", LanguageText.text("tab.live"))
+        assertEquals("Pause", LanguageText.text("tab.pause"))
+    }
+
+    @Test
+    fun cancelDoesNotChangeTheLanguage() {
+        val phone = Locale.FRANCE
+        val store = LanguageStore(tempFile(), assets())
+        val before = store.load(phone)
+        val pending = ok(pack("tab.live" to "Trois"))
+        LanguageText.apply(before.overlay)
+        assertEquals(before.overlay, store.current().overlay)
+        assertEquals("Direct", LanguageText.text("tab.live"))
+        assertTrue(pending.accepted.containsKey("tab.live"))
+        assertFalse(store.current().imported)
+    }
+
+    @Test
+    fun removeReturnsToThePhoneLanguage() {
+        val file = tempFile()
+        val french = LanguageStore(file, assets())
+        french.load(Locale.FRANCE)
+        french.confirm(ok(pack("tab.live" to "Importé")), Locale.FRANCE)
+        val back = french.remove(Locale.FRANCE)
+        assertFalse(back.imported)
+        assertEquals("fr", back.activeTag)
+        assertEquals("Direct", back.overlay.getValue("tab.live"))
+        val other = LanguageStore(tempFile(), assets())
+        other.load(Locale.JAPAN)
+        other.confirm(ok(pack("tab.live" to "Importé")), Locale.JAPAN)
+        val english = other.remove(Locale.JAPAN)
+        assertEquals("English", english.activeName)
+        assertTrue(english.overlay.isEmpty())
+        assertEquals(LanguageSnapshot.CHOICE_FOLLOW, english.choice)
+    }
+
+    @Test
+    fun settingsImportDoesNotTouchTheLanguageFile() {
+        val file = tempFile()
+        val store = LanguageStore(file, assets())
+        store.load(Locale.FRANCE)
+        store.choose(LanguageSnapshot.CHOICE_ENGLISH, Locale.FRANCE)
+        val before = file.readText()
+        val local = PersistedConfig(settings = AppSettings(demoMode = true), takInstallTag = "AB23")
+        val pack = SettingsExchange.pack(
+            settings = AppSettings(demoMode = false),
+            filter = FilterState(),
+            presets = emptyList(),
+            watchlist = emptyList(),
+            hiddenPresetIds = emptySet(),
+            appVersion = "1.1.27",
+            exportedAt = "2026-10-20T00:00:00Z",
+        )
+        val (next, _) = SettingsExchange.apply(local, pack)
+        assertEquals(before, file.readText())
+        assertEquals("AB23", local.takInstallTag)
+        assertFalse(next.settings.demoMode)
+        val encoded = SettingsExchange.encode(pack)
+        assertFalse(encoded.contains("fieldwatch-language"))
+        assertFalse(encoded.contains("doorDismissed"))
+        assertEquals(LanguageSnapshot.CHOICE_ENGLISH, store.current().choice)
+    }
+
+    @Test
+    fun processStartDropsALineWhosePlaceholdersDrifted() {
+        val file = tempFile()
+        val store = LanguageStore(file, assets())
+        store.load(Locale.US)
+        store.confirm(ok(pack("tab.live" to "Direct", "language.confirm.change" to "{n} lignes")), Locale.US)
+        val disk = LanguagePack.json.decodeFromString(app.fieldwatch.data.LanguageDisk.serializer(), file.readText())
+        val drifted = disk.copy(
+            pack = disk.pack!!.copy(
+                strings = disk.pack!!.strings + ("tab.pause" to "Pause {gone}"),
+            ),
+        )
+        file.writeText(LanguagePack.json.encodeToString(app.fieldwatch.data.LanguageDisk.serializer(), drifted))
+        val again = LanguageStore(file, assets()).load(Locale.US)
+        LanguageText.apply(again.overlay)
+        assertEquals("Direct", LanguageText.text("tab.live"))
+        assertEquals("Pause", LanguageText.text("tab.pause"))
+        assertEquals("3 lignes", LanguageText.text("language.confirm.change", mapOf("n" to "3")))
+        file.writeText("{")
+        val broken = LanguageStore(file, assets()).load(Locale.FRANCE)
+        assertEquals("English", broken.activeName)
+        assertTrue(broken.overlay.isEmpty())
+        assertFalse(broken.overlay.containsKey("tab.live"))
+    }
+
+    @Test
+    fun translatedCsvCellKeepsTheFormulaGuard() {
+        LanguageText.apply(mapOf("tab.live" to "=HYPERLINK(\"x\")"))
+        val cell = CsvCells.quote(LanguageText.text("tab.live"))
+        assertTrue(cell.startsWith("\"'"))
+        assertTrue(cell.contains("=HYPERLINK"))
+    }
+
+    @Test
+    fun templateContainsEveryKey() {
+        val text = LanguagePack.template("1.1.27")
+        val parsed = ok(text)
+        assertEquals("English", parsed.language)
+        assertEquals("1.1.27", parsed.writtenFor)
+        assertEquals(EnglishCopy.lines.size, parsed.accepted.size)
+        assertTrue(text.contains("\"slots\""))
+        for (line in EnglishCopy.lines) {
+            assertEquals(line.text, parsed.accepted.getValue(line.key))
+        }
+        val over = ok(pack("class.law" to "X".repeat(19), "tab.live" to "Direct"))
+        assertFalse(over.accepted.containsKey("class.law"))
+        assertEquals("Direct", over.accepted.getValue("tab.live"))
+    }
+
+    @Test
+    fun voiceChoiceStaysAndUserPhraseStays() {
+        LanguageText.apply(mapOf("speech.finder" to "balises", "voice.signature" to "changed"))
+        assertEquals("balises", SignatureClass.FINDER.speechLabel())
+        assertEquals("balises", testWatchPhrase(AlertVoiceWhat.CLASS))
+        assertEquals("Apple AirTags", testWatchPhrase(AlertVoiceWhat.SIGNATURE))
+        assertTrue(testWatchPhrase(AlertVoiceWhat.BOTH).contains("Apple AirTags"))
+        assertEquals("Kitchen cam", speakableWatchName("Kitchen cam"))
+        val device = sighting("radio-1", "Kitchen cam")
+        val named = WatchTarget(id = "w", deviceKey = device.key, label = "Kitchen cam")
+        assertEquals("Kitchen cam", spokenWatchPhrase(device, emptyList(), AlertVoiceWhat.CLASS, named))
+        val fleet = Fleet(id = "f", name = "Apple AirTags", kind = SignatureClass.FINDER)
+        val hit = device.copy(fleetIds = setOf("f"))
+        assertEquals("balises", spokenWatchPhrase(hit, listOf(fleet), AlertVoiceWhat.CLASS))
+        assertEquals("Apple AirTags", spokenWatchPhrase(hit, listOf(fleet), AlertVoiceWhat.SIGNATURE))
+    }
+
+    @Test
+    fun wigleHeadersAndAtakRemarksStayEnglish() {
+        LanguageText.apply(mapOf("header.wifi.on" to "Wi-Fi oui", "tak.remarks" to "HACKED", "cot.type" to "HACKED"))
+        val wigle = "MAC,SSID,AuthMode,FirstSeen,Channel,RSSI,CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type"
+        assertTrue(wigle.contains("MAC,SSID"))
+        assertTrue(wigle.contains("RSSI"))
+        val remarks = TakGnss.remarks(null, emptyList())
+        assertTrue(remarks.contains("Where this phone was. Not the source."))
+        assertFalse(remarks.contains("HACKED"))
+        val xml = CotEvent.selfXml(1.0, 2.0, 0L, "AB23", "Scout")
+        assertTrue(xml.contains("type=\"a-f-G-U-C\""))
+        assertTrue(xml.contains("Fieldwatch TAK heartbeat (this phone)"))
+        assertFalse(xml.contains("HACKED"))
+        val pin = CotEvent.remarks(sighting("aa", "Porch"), emptyList(), advertised = false)
+        assertTrue(pin.contains("heard here (operator GPS)"))
+        assertTrue(pin.contains("Wi-Fi"))
+        assertFalse(pin.contains("HACKED"))
+    }
+
+    @Test
+    fun cyrillicIsNotStrippedBeforeThePdfDraw() {
+        val line = "Здравей свят"
+        assertEquals(line, LanguagePack.clean(line, allowNewline = false))
+        assertEquals(line, DebriefPdf.charactersDrawn(line))
+        assertEquals("sans-serif", DebriefPdf.PDF_SANS)
+    }
+
+    @Test
+    fun launcherNameStaysFieldwatch() {
+        val xml = repoFile("src/main/res/values/strings.xml").readText()
+        assertTrue(xml.contains(">Fieldwatch<"))
+    }
+
+    @Test
+    fun phoneLanguageSelectsTheBundledFile() {
+        assertEquals("fr", LanguagePack.bundledTag(Locale.FRANCE))
+        assertEquals("fr", LanguagePack.bundledTag(Locale.CANADA_FRENCH))
+        assertEquals("fr", LanguagePack.bundledTag(Locale.forLanguageTag("fr-LU")))
+        assertEquals("de", LanguagePack.bundledTag(Locale.forLanguageTag("de-LU")))
+        assertNull(LanguagePack.bundledTag(Locale.forLanguageTag("lb")))
+        assertEquals("hr", LanguagePack.bundledTag(Locale.forLanguageTag("hr-HR")))
+        assertEquals("hr", LanguagePack.bundledTag(Locale.forLanguageTag("cnr")))
+        assertEquals("hr", LanguagePack.bundledTag(Locale.forLanguageTag("sr-ME")))
+        assertNull(LanguagePack.bundledTag(Locale.forLanguageTag("sr-RS")))
+        assertNull(LanguagePack.bundledTag(Locale.JAPAN))
+        assertEquals("nb", LanguagePack.bundledTag(Locale.forLanguageTag("nb-NO")))
+        assertEquals("nb", LanguagePack.bundledTag(Locale.forLanguageTag("nn-NO")))
+        assertEquals("nb", LanguagePack.bundledTag(Locale.forLanguageTag("no")))
+        assertNull(LanguagePack.bundledTag(Locale.ENGLISH))
+        val store = LanguageStore(tempFile(), assets())
+        val french = store.load(Locale.FRANCE)
+        assertEquals("fr", french.activeTag)
+        assertEquals("Direct", french.overlay.getValue("tab.live"))
+        assertTrue(french.showAi)
+        assertFalse(french.showDoor)
+        LanguageText.apply(french.overlay)
+        assertEquals("Filters", LanguageText.text("tab.filters"))
+        val japan = LanguageStore(tempFile(), assets()).load(Locale.JAPAN)
+        assertTrue(japan.showDoor)
+        assertEquals("English", japan.activeName)
+        val dismissed = LanguageStore(tempFile(), assets())
+        dismissed.load(Locale.JAPAN)
+        assertFalse(dismissed.dismissDoor(Locale.JAPAN).showDoor)
+    }
+
+    @Test
+    fun languageMenuIsEnglishAlphabetical() {
+        val menu = (listOf("English") + BundledLanguages.all.map { it.english }).sorted()
+        assertEquals(
+            listOf(
+                "Albanian", "Bulgarian", "Croatian", "Czech", "Danish", "Dutch", "English",
+                "Estonian", "Finnish", "French", "German", "Greek", "Hungarian", "Icelandic",
+                "Italian", "Latvian", "Lithuanian", "Macedonian", "Norwegian", "Polish",
+                "Portuguese", "Romanian", "Slovak", "Slovenian", "Spanish", "Swedish", "Turkish",
+            ),
+            menu,
+        )
+    }
+
+    @Test
+    fun bundledAssetFilesMatchTheLineRules() {
+        val dir = repoFile("src/main/assets/lang")
+        assertTrue(dir.isDirectory)
+        val tags = BundledLanguages.all.map { it.tag }.sorted()
+        val files = dir.listFiles().orEmpty().map { it.nameWithoutExtension }.sorted()
+        assertEquals(tags, files)
+        val tokens = listOf("Wi-Fi", "Bluetooth", "GPS", "GNSS", "PDF", "CSV", "ATAK", "SSID", "MAC", "RSSI", "OUI")
+        for (bundled in BundledLanguages.all) {
+            val parsed = LanguagePack.parse(File(dir, "${bundled.tag}.json").readBytes())
+            val preview = (parsed as LanguageParse.Ok).preview
+            assertEquals(bundled.name, preview.language)
+            for ((key, value) in preview.accepted) {
+                val english = EnglishCopy.text(key)
+                assertTrue("${bundled.tag} $key over cap", value.length <= EnglishCopy.cap(key))
+                for (token in tokens) {
+                    if (english.contains(token)) {
+                        assertTrue("${bundled.tag} $key lost $token", value.contains(token))
+                    }
+                }
+                if (EnglishCopy.byKey.getValue(key).slot == LanguageSlot.CLASSCHIP) {
+                    assertTrue("${bundled.tag} $key chip ${value.length}", value.length <= 18)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun englishProtocolNamesStayInTheMap() {
+        val tokens = listOf(
+            "Wi-Fi", "Bluetooth", "GPS", "GNSS", "PDF", "CSV", "ATAK", "SSID", "MAC", "RSSI", "OUI",
+        )
+        for (token in tokens) {
+            assertTrue(
+                token,
+                EnglishCopy.lines.any { it.text.contains(token) },
+            )
+        }
+        assertTrue(EnglishCopy.lines.none { it.text.contains("USB") })
+    }
+
+    @Test
+    fun englishKeysAreWellFormed() {
+        val keyRe = Regex("^[a-z0-9]+(\\.[a-z0-9]+)+$")
+        val tokenRe = Regex("\\{[A-Za-z][A-Za-z0-9_]*\\}")
+        assertEquals(EnglishCopy.lines.size, EnglishCopy.lines.map { it.key }.toSet().size)
+        for (line in EnglishCopy.lines) {
+            assertTrue(line.key, keyRe.matches(line.key))
+            assertEquals(placeholderNames(line.text), EnglishCopy.placeholders.getValue(line.key))
+            for (match in tokenRe.findAll(line.text)) {
+                assertEquals(match.range.first, line.text.lastIndexOf('{', match.range.first))
+            }
+        }
+    }
+
+    @Test
+    fun authorGuideExists() {
+        val guide = repoFile("../docs/language-pack-author-guide.md")
+        val text = guide.readText()
+        assertTrue(text.contains("Export English template"))
+        assertTrue(text.contains("count: {n}"))
+        assertTrue(text.contains("not reviewed or certified"))
+        assertTrue(text.contains("Wi-Fi"))
+        assertTrue(text.contains("256 KiB"))
+    }
+
+    @Test
+    fun nonUtf8IsRejected() {
+        val bytes = byteArrayOf(0xFF.toByte(), 0xFE.toByte(), 0x00)
+        assertEquals(LanguageErrors.NOT_PACK, (LanguagePack.parse(bytes) as LanguageParse.Reject).messageKey)
+    }
+
+    @Test
+    fun choosingEnglishDoesNotReadABundledFile() {
+        var reads = 0
+        val store = LanguageStore(tempFile(), LanguageAssets {
+            reads++
+            bundled("fr")
+        })
+        store.load(Locale.FRANCE)
+        assertEquals(1, reads)
+        val english = store.choose(LanguageSnapshot.CHOICE_ENGLISH, Locale.FRANCE)
+        assertEquals(1, reads)
+        assertTrue(english.overlay.isEmpty())
+        assertEquals("English", english.activeName)
+        assertFalse(english.showAi)
+    }
+
+    private fun ok(text: String): LanguagePreview {
+        val parsed = LanguagePack.parse(text.toByteArray(Charsets.UTF_8))
+        assertTrue(parsed.toString(), parsed is LanguageParse.Ok)
+        return (parsed as LanguageParse.Ok).preview
+    }
+
+    private fun assertReject(parsed: LanguageParse) {
+        assertTrue(parsed.toString(), parsed is LanguageParse.Reject)
+    }
+
+    private fun pack(vararg lines: Pair<String, String>, writtenFor: String? = null): String = json(
+        lines.toMap(),
+        writtenFor,
+    )
+
+    private fun json(strings: Map<String, String>, writtenFor: String? = null): String {
+        val body = strings.entries.joinToString(",") { (key, value) ->
+            "\"$key\":${jsonString(value)}"
+        }
+        val written = writtenFor?.let { ""","writtenFor":${jsonString(it)}""" }.orEmpty()
+        return """{"format":"fieldwatch-language","formatVersion":1,"language":"Test","languageTag":"fr"$written,"strings":{$body}}"""
+    }
+
+    private fun jsonString(value: String): String = buildString {
+        append('"')
+        for (ch in value) {
+            when (ch) {
+                '\\' -> append("\\\\")
+                '"' -> append("\\\"")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                else -> append(ch)
+            }
+        }
+        append('"')
+    }
+
+    private fun zipBytes(): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        ZipOutputStream(out).use { zip ->
+            zip.putNextEntry(ZipEntry("classes.dex"))
+            zip.write(byteArrayOf(1, 2, 3))
+            zip.closeEntry()
+        }
+        return out.toByteArray()
+    }
+
+    private fun tempFile(): File {
+        val file = File.createTempFile("fieldwatch-language", ".json")
+        file.delete()
+        file.deleteOnExit()
+        return file
+    }
+
+    private fun assets(): LanguageAssets = LanguageAssets { tag ->
+        if (tag == "fr") bundled("fr") else null
+    }
+
+    private fun bundled(tag: String): ByteArray = """
+        {"format":"fieldwatch-language","formatVersion":1,"language":"Français","languageTag":"$tag","writtenFor":"1.1.27","strings":{"tab.live":"Direct"}}
+    """.trim().toByteArray()
+
+    private fun storeWith(text: String): LanguageStore {
+        val store = LanguageStore(tempFile(), assets())
+        store.load(Locale.US)
+        store.confirm(ok(text), Locale.US)
+        return store
+    }
+
+    private fun sighting(key: String, name: String) = Sighting(
+        key = key,
+        kind = RadioKind.WIFI,
+        mac = "AA:BB:CC:DD:EE:FF",
+        name = name,
+        rssi = -40,
+        rssiMin = -40,
+        rssiMax = -40,
+        channel = 1,
+        frequencyMhz = 2412,
+        vendor = null,
+        randomized = false,
+        hiddenSsid = false,
+        serviceUuids = emptyList(),
+        manufacturerId = null,
+        manufacturerDataHex = "",
+        rawHex = "",
+        extras = "",
+        firstSeen = 1L,
+        lastSeen = 1L,
+        hitCount = 1,
+        fleetIds = emptySet(),
+        rssiHistory = emptyList(),
+        presence = emptyList(),
+    )
+
+    private fun repoFile(path: String): File {
+        val candidates = listOf(File(path), File("app/$path"))
+        return candidates.firstOrNull { it.exists() } ?: candidates.last()
+    }
+}

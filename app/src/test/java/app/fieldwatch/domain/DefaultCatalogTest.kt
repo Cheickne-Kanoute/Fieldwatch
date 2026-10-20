@@ -611,6 +611,48 @@ class DefaultCatalogTest {
         )
     }
 
+    @Test
+    fun chipoloMatchesServiceUuidNotNeighborUuids() {
+        val stock = DefaultCatalog.fleets()
+        val chipolo = stock.single { it.id == "fleet-chipolo" }
+        assertTrue(chipolo.attentionNote.isBlank())
+        assertFalse("fleet-chipolo" in DefaultCatalog.defaultWatchlist().mapNotNull { it.fleetId })
+        assertTrue(chipolo.rules.any { it.kind == RuleKind.SERVICE_UUID && it.text.equals("FE33", true) })
+        assertFalse(chipolo.rules.any { it.text.equals("FE65", true) || it.text.equals("FE34", true) })
+        assertTrue(DeviceExplain.uuidGloss("FE33")!!.contains("Chipolo"))
+        assertEquals(254, stock.size)
+
+        val unnamed = ble(name = "", serviceUuids = listOf("FE33"))
+            .copy(key = "BLE:c1", mac = "AA:BB:CC:DD:EE:41")
+        val longForm = ble(name = "", serviceUuids = listOf("0000FE33-0000-1000-8000-00805F9B34FB"))
+            .copy(key = "BLE:c2", mac = "AA:BB:CC:DD:EE:42")
+        val serviceData = ble(name = "").copy(
+            key = "BLE:c3",
+            mac = "AA:BB:CC:DD:EE:43",
+            facts = RadioFacts(serviceData = listOf(ServiceDataRecord("FE33", "01"))),
+        )
+        val named = ble(name = "Chipolo")
+            .copy(key = "BLE:c4", mac = "AA:BB:CC:DD:EE:44")
+        val fe65 = ble(name = "", serviceUuids = listOf("FE65"))
+            .copy(key = "BLE:c5", mac = "AA:BB:CC:DD:EE:45")
+        val fe34 = ble(name = "", serviceUuids = listOf("FE34"))
+            .copy(key = "BLE:c6", mac = "AA:BB:CC:DD:EE:46")
+        val feaa = ble(name = "", serviceUuids = listOf("FEAA"))
+            .copy(key = "BLE:c7", mac = "AA:BB:CC:DD:EE:47")
+        val hits = SignatureEngine().match(
+            listOf(unnamed, longForm, serviceData, named, fe65, fe34, feaa),
+            stock,
+        )
+        fun ids(radio: Sighting) = hits.getValue(radio.key)
+        assertTrue("unnamed FE33", "fleet-chipolo" in ids(unnamed))
+        assertTrue("long-form FE33", "fleet-chipolo" in ids(longForm))
+        assertTrue("service data FE33", "fleet-chipolo" in ids(serviceData))
+        assertTrue("Chipolo name", "fleet-chipolo" in ids(named))
+        assertFalse("FE65", "fleet-chipolo" in ids(fe65))
+        assertFalse("FE34", "fleet-chipolo" in ids(fe34))
+        assertFalse("FEAA is Find Hub, not Chipolo", "fleet-chipolo" in ids(feaa))
+    }
+
     private fun tagged(tail: String, name: String, manufacturerId: Int?) =
         ble(name = name, manufacturerId = manufacturerId)
             .copy(key = "BLE:$tail", mac = "AA:BB:CC:DD:EE:$tail")

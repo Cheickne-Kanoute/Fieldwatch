@@ -1,5 +1,7 @@
 package app.fieldwatch.ui.screen
 
+import app.fieldwatch.domain.LanguageText
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,8 +19,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.GroupAdd
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
 import app.fieldwatch.ui.component.FieldwatchActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,10 +66,10 @@ fun CandidatesScreen(
         contentWindowInsets = NestedTabInsets,
         topBar = {
             NestedTopBar(
-                title = "Signature candidates",
+                title = LanguageText.text("reports.candidates"),
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, LanguageText.text("chrome.back"))
                     }
                 },
             )
@@ -76,16 +78,21 @@ fun CandidatesScreen(
         when {
             ui.loading -> {
                 Column(
-                    Modifier.padding(pad).fillMaxSize(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                    Modifier.padding(pad).padding(16.dp).fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    CircularProgressIndicator()
-                    Spacer(Modifier.height(16.dp))
                     Text(
-                        "Reading the log and re-matching the catalog…",
+                        ui.message.ifBlank { LanguageText.text("ui.reading.log") },
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    LinearProgressIndicator(
+                        progress = { ui.progress },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        "${(ui.progress * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontFamily = FontFamily.Monospace,
                     )
                 }
             }
@@ -103,8 +110,8 @@ fun CandidatesScreen(
                 ) {
                     item {
                         Text(
-                            (report?.sourceLabel ?: "Rotating log") +
-                                " · re-matched now" +
+                            (report?.sourceLabel ?: LanguageText.text("ui.rotating.log")) +
+                                (" " + LanguageText.text("ui.re.matched.now")) +
                                 (report?.let { " · ${it.families.size} ${if (it.families.size == 1) "family" else "families"}" } ?: ""),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -129,7 +136,7 @@ fun CandidatesScreen(
                     if (report == null || report.families.isEmpty()) {
                         item {
                             Text(
-                                "No signature families in this log. Randomized addresses and house-like names are skipped. A candidate needs a unique on-air ID on two or more radios.",
+                                LanguageText.text("ui.no.signature.families.log"),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 12.dp),
@@ -220,7 +227,7 @@ private fun CandidateCard(
                 FieldwatchActionButton(onClick = { onCreate(cand) }) {
                     Icon(Icons.Outlined.GroupAdd, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Create signature")
+                    Text(LanguageText.text("ui.create.signature"))
                 }
             }
         }
@@ -228,12 +235,12 @@ private fun CandidateCard(
 }
 
 private fun skipLine(report: app.fieldwatch.domain.CandidateReport): String = buildString {
-    append("Skipped ")
+    append((LanguageText.text("ui.skipped.label") + " "))
     val bits = ArrayList<String>(2)
     if (report.skippedRandomized > 0) bits += "${report.skippedRandomized} randomized addresses"
     if (report.skippedHouseLike > 0) bits += "${report.skippedHouseLike} house-like names"
     append(bits.joinToString(" and "))
-    append(". Those are not catalog families.")
+    append(LanguageText.text("ui.those.not.catalog.families"))
 }
 
 private fun looksLikeMac(text: String): Boolean =

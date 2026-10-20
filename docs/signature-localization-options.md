@@ -1,8 +1,17 @@
 # Signature localization
 
-Vision for a later phase. This document does not authorize that work. Phase 1 is the app language pack in `docs/language-pack-requirements.md`. Phase 1 does not translate the catalog. Do not start this phase until asked.
+Held for a later phase. This document does not authorize that work. Do not start it until asked. Phase 1 is the app language pack in `docs/language-pack-requirements.md`. Class names and the short spoken class names are already in that pack. This document does not change them, and it does not translate the catalog.
 
-The purpose of writing it now is to keep one picture of localization. The language pack and any later signature work should follow the same rules: English stays in the official files, a missing line stays English, a pack is display text, and Off Grid Pete LLC does not review or certify translations.
+English stays in the official files. A missing line stays English. A pack is display text. Off Grid Pete LLC does not review or certify translations.
+
+## Held
+
+Decided 20 October 2026. These stay until they are explicitly reopened.
+
+- Signature names stay English on the screen, in speech, and in the TAK callsign. That includes names that are more than a brand, such as "Atrius cart tag" and "Flock Safety Cameras".
+- The bundled NATO languages do not include catalog notes, Extra attention, or decode labels. Choosing one of those languages leaves that prose in English.
+- A catalog translation is a separate file. The user exports an English template from the catalog on the phone, someone translates it elsewhere, and the user imports it. Fieldwatch does not download it and does not ship one for the bundled languages.
+- The reason to leave them out of the APK: those sentences tell the operator what a hit means. The bundled languages are AI drafts. A wrong warning is worse than a wrong button. Catalog text also changes when the stock catalog is updated, including without an app release, so a translation baked into the APK would go stale.
 
 ## Two kinds of signature text
 
@@ -10,8 +19,8 @@ A signature row has words the operator reads, and words the matcher uses. Only t
 
 | Text | Where it lives | Later phase |
 | --- | --- | --- |
-| Class names, such as Finder tags, Drones, Public safety | App code, `SignatureClass.label` and `speechLabel`. The catalog stores the enum token `DRONE`, not the English words. | Can use the language pack. It is app chrome, not a catalog row. |
-| Signature name, such as Apple AirTags or Actiontec | `Fleet.name` in the catalog | Leave in English. See below. |
+| Class names, such as Finder tags, Drones, Public safety | App code, `SignatureClass.label` and `speechLabel`. The catalog stores the enum token `DRONE`, not the English words. | Already in the language pack. It is app chrome, not a catalog row. |
+| Signature name, such as Apple AirTags, Actiontec, or Atrius cart tag | `Fleet.name` in the catalog | Stay English. Decided above. |
 | Notes on the radio detail | `Fleet.notes` | Translate with a display overlay. |
 | Extra attention warning | `Fleet.attentionNote` | Translate with a display overlay. A pack must not silence it. |
 | Decode labels, named values, and the sentences for those values | `Fleet.decode` labels, `enum`, `enumNotes` | Translate with a display overlay. |
@@ -24,25 +33,21 @@ These stay as they are. Translating them changes what matches, what is saved, or
 - Decode ids, offsets, types, endian, scales, units such as `kPa` and `°C`, and the `when` gates.
 - Anything heard on the air.
 - Names and notes the user typed, including custom signatures and watch labels.
-- WiGLE CSV, sit and log headers, and TAK/CoT. The TAK callsign is built from the signature name. That feed keeps the English catalog name even if a screen someday shows a translation.
+- WiGLE CSV, sit and log headers, and TAK/CoT. The TAK callsign is built from the signature name and stays that English name.
 
-Update stock catalog from GitHub replaces stock rows, including notes and Extra attention, from the English v2 file. Bookmarks, settings, and signatures the user added stay. A translation that is written into a copy of that file is wiped by the next update, or it becomes a second catalog that can change match rules. That is the constraint every option has to respect.
+Update stock catalog from GitHub replaces stock rows, including notes and Extra attention, from the English v2 file. Bookmarks, settings, and signatures the user added stay. A translation that is written into a copy of that file is wiped by the next update, or it becomes a second catalog that can change match rules. That is the constraint the catalog-text file has to respect.
 
-## Option A. Class labels in the language pack
+## Class labels
 
-Class names and their spoken forms are about twenty app sentences. They are not in the signature file.
-
-They can be keys in the phase 1 language pack. Missing keys stay English. No catalog file changes. Update stock catalog does not affect them. Voice that speaks the class uses the same line. Voice that speaks the signature name still uses the English catalog name.
+Class names and their spoken forms are app sentences in the phase 1 language pack. They are not in the signature file. Missing keys stay English. Update stock catalog does not affect them. Voice that speaks the class uses the same line. Voice that speaks the signature name still uses the English catalog name.
 
 This does not translate notes, Extra attention, or decode labels.
 
-Recommendation: do this when the language pack is built, or as the first slice afterward. It does not need a signature project. Phase 1 as written leaves these English. Pulling them into the language pack does not open the catalog.
+## Catalog prose
 
-## Option B. A display overlay for catalog prose
+The later phase, if it is built. Do not start it until asked. The bundled languages do not include this file.
 
-Recommended later phase.
-
-A second file, separate from the language pack and separate from a signature pack, supplies translations for stock display text. The stored catalog stays the English catalog plus anything the user edited or added. Matching still uses that catalog. The overlay is consulted only when the screen, a spoken class line, a report, or a PDF needs words.
+A second file, separate from the language pack and separate from a signature pack, supplies translations for stock display text. The stored catalog stays the English catalog plus anything the user edited or added. Matching still uses that catalog. The overlay is consulted only when the screen, a report, or a PDF needs those catalog words. Class speech stays in the language pack.
 
 ```json
 {
@@ -64,7 +69,7 @@ The key is the fleet id plus the field. The `source` hash is the English sentenc
 Rules for the overlay:
 
 - Translate notes, Extra attention, decode labels, enum labels, and enum notes.
-- Leave `Fleet.name` in English. Those names are product and maker names, they are what people learn, and the TAK callsign uses them. An author guide can say the name is not in the template.
+- Leave `Fleet.name` in English. That is decided. The names are what people learn, and the TAK callsign uses them. An author guide can say the name is not in the template.
 - Do not overlay a row the user added. Do not overlay a stock note the user has edited. Compare the stored text with the stock English. If the user changed it, show what the user wrote.
 - If the English Extra attention is empty, the overlay cannot add one. If the English warning is present, a blank translation shows the English warning. A pack cannot turn Extra attention off.
 - A missing key, a hash miss, or a failed file shows English.
@@ -72,12 +77,12 @@ Rules for the overlay:
 - Same injection rules as the language pack. Display text only. The official not-reviewed sentence is compiled into the APK and is not a key in this file.
 - Screen fit uses the same slots. Notes and warnings are body text. Decode labels and live chips are controls.
 - Import is its own Settings action, with a confirm dialog. It does not replace the language pack, and Import signatures does not apply it. Update stock catalog does not delete it.
-- The author exports an English template of those display strings from the catalog version on the phone. They host the finished file. Fieldwatch does not download it and does not publish a signature-translation repo.
+- The author exports an English template of those display strings from the catalog version on the phone. They host the finished file. The user imports it. Fieldwatch does not download it, does not publish a signature-translation repo, and does not bundle a catalog translation for the stock languages.
 - `writtenForCatalog` is informational except for the hash check. A pack written for catalog 92 still loads on catalog 93. Lines whose English changed fall back. New rows stay English.
 
 The language pack and this overlay stay two files. The app version and the catalog version move on different days. One file that held both would let a UI translation touch fleet ids, and a catalog update would force a new UI pack.
 
-## Option C. A translated signature pack
+## Rejected: a translated signature pack
 
 Reject this as the way to localize.
 
@@ -85,7 +90,7 @@ Someone translates `fieldwatch-signatures-v2.json` and the user imports that fil
 
 A full translated catalog is a fork. It can change behavior. The language-pack rule is that a translation cannot change behavior.
 
-## Option D. Languages inside the official catalog
+## Rejected: languages inside the official catalog
 
 Reject this too.
 
@@ -96,14 +101,14 @@ French notes in the stock file, or `notesFr` fields beside the English, would ma
 | What the user reads | When | How |
 | --- | --- | --- |
 | Buttons, dialogs, Settings, the tour, fixed spoken phrases | Phase 1 | Language pack. English in the APK. |
-| Class names and class speech | With the language pack, or immediately after | Same language pack. App strings. |
-| Stock notes, Extra attention, decode labels | Later, if built | Display overlay. English catalog stays the matcher. |
-| Signature names | Not translated | English catalog name on screen, in voice, and in TAK. |
+| Class names and class speech | Done in the language pack | Same language pack. App strings. |
+| Stock notes, Extra attention, decode labels | Later, if built. Not bundled with the stock languages. | Display overlay the user imports. English catalog stays the matcher. Until that file is imported, the prose stays English. |
+| Signature names | Decided. Not translated. | English catalog name on screen, in voice, and in TAK. |
 | User-written names and notes | Never replaced | The user already chose the words. |
 | Match rules and protocol | Never translated | English tokens and bytes. |
 
-Every pack stays a file the user imports. A missing line stays English. Nothing is downloaded. Nothing is hosted as an official translation. The not-reviewed sentence stays official APK text.
+The bundled language files stay the app screens only. A catalog translation stays a file the user imports. A missing line stays English. Nothing is downloaded. Nothing is hosted as an official catalog translation. The not-reviewed sentence stays official APK text.
 
 ## Not decided here
 
-This file records the options and the recommended shape. It does not set the hash algorithm, the Settings wording, or the template layout. Those belong to the implementation request, if this phase is started.
+The product choices above are held. This file does not set the hash algorithm, the Settings wording, or the template layout. Those belong to the implementation request, if this phase is started. Bundling a catalog translation for the stock languages is not one of those open choices.

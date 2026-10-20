@@ -25,17 +25,24 @@ fun ExposedDropdownMenuBoxScope.FieldwatchDropdownField(
     value: String,
     expanded: Boolean,
     modifier: Modifier = Modifier.fillMaxWidth(),
+    enabled: Boolean = true,
+    leadingIcon: (@Composable () -> Unit)? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val colors = OutlinedTextFieldDefaults.colors()
     val textStyle = MaterialTheme.typography.bodySmall.merge(
-        color = MaterialTheme.colorScheme.onSurface,
+        color = if (enabled) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        },
     )
     BasicTextField(
         value = value,
         onValueChange = {},
         readOnly = true,
         singleLine = true,
+        enabled = enabled,
         textStyle = textStyle,
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         interactionSource = interactionSource,
@@ -46,17 +53,19 @@ fun ExposedDropdownMenuBoxScope.FieldwatchDropdownField(
             OutlinedTextFieldDefaults.DecorationBox(
                 value = value,
                 innerTextField = inner,
-                enabled = true,
+                enabled = enabled,
                 singleLine = true,
                 visualTransformation = VisualTransformation.None,
                 interactionSource = interactionSource,
                 label = { Text(label, style = MaterialTheme.typography.bodySmall) },
+                // Prefix, not leadingIcon: that slot is 48 dp and would stretch this 36 dp field.
+                prefix = leadingIcon,
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
                 colors = colors,
                 contentPadding = FieldwatchFieldPadding,
                 container = {
                     OutlinedTextFieldDefaults.Container(
-                        enabled = true,
+                        enabled = enabled,
                         isError = false,
                         interactionSource = interactionSource,
                         colors = colors,

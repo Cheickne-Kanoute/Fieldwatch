@@ -7,6 +7,40 @@ import org.junit.Test
 
 class SettingsExchangeTest {
     @Test
+    fun upgradeShowsTheLiveTourOnce() {
+        val saved = AppSettings(liveTourDone = true)
+        val offered = saved.offerLiveTourOnce()
+        assertFalse(offered.liveTourDone)
+        assertEquals(LIVE_TOUR_REV, offered.liveTourRev)
+        val dismissed = offered.copy(liveTourDone = true)
+        assertEquals(dismissed, dismissed.offerLiveTourOnce())
+    }
+
+    @Test
+    fun importKeepsThisPhonesLiveTour() {
+        val local = localConfig(
+            settings = AppSettings(
+                liveTourDone = true,
+                liveTourRev = LIVE_TOUR_REV,
+                disclaimerAccepted = true,
+                disclaimerRev = DISCLAIMER_REV,
+            ),
+        )
+        val pack = SettingsExchange.pack(
+            settings = AppSettings(liveTourDone = false, liveTourRev = 0),
+            filter = FilterState(),
+            presets = stockPresets,
+            watchlist = emptyList(),
+            hiddenPresetIds = emptySet(),
+            appVersion = "1.1.27",
+            exportedAt = "2026-10-20T00:00:00Z",
+        )
+        val (next, _) = SettingsExchange.apply(local, pack)
+        assertTrue(next.settings.liveTourDone)
+        assertEquals(LIVE_TOUR_REV, next.settings.liveTourRev)
+    }
+
+    @Test
     fun factorySettingsVoiceAndJump() {
         val stock = AppSettings()
         assertTrue(stock.alertVoice)
@@ -151,6 +185,39 @@ class SettingsExchangeTest {
     }
 
     @Test
+    fun importCopiesATypedCallsignAndLeavesTheInstallTag() {
+        val local = localConfig(
+            settings = AppSettings(takCallsign = "", disclaimerAccepted = true, disclaimerRev = DISCLAIMER_REV),
+        ).copy(takInstallTag = "AB23", takLegacySelfRetired = false)
+        val named = SettingsExchange.pack(
+            settings = AppSettings(takCallsign = "  Scout 1  "),
+            filter = FilterState(),
+            presets = stockPresets,
+            watchlist = emptyList(),
+            hiddenPresetIds = emptySet(),
+            appVersion = "1.1.27",
+            exportedAt = "2026-10-19T00:00:00Z",
+        )
+        val (next, _) = SettingsExchange.apply(local, named)
+        assertEquals("AB23", next.takInstallTag)
+        assertFalse(next.takLegacySelfRetired)
+        assertEquals("Scout 1", next.settings.takCallsign)
+        val blank = SettingsExchange.pack(
+            settings = AppSettings(takCallsign = "   "),
+            filter = FilterState(),
+            presets = stockPresets,
+            watchlist = emptyList(),
+            hiddenPresetIds = emptySet(),
+            appVersion = "1.1.27",
+            exportedAt = "2026-10-19T00:00:00Z",
+        )
+        val (cleared, _) = SettingsExchange.apply(next, blank)
+        assertEquals("", cleared.settings.takCallsign)
+        assertEquals("AB23", cleared.takInstallTag)
+        assertEquals("Fieldwatch-AB23", TakInstall.callsign(cleared.settings.takCallsign, cleared.takInstallTag))
+    }
+
+    @Test
     fun applyTwiceIsIdempotent() {
         val local = localConfig()
         val (once, _) = SettingsExchange.apply(local, samplePack())
@@ -224,6 +291,7 @@ class SettingsExchangeTest {
             gnssFullTracking = true,
             gnssCorrelation = true,
             gnssInvertAgc = true,
+            gnssRawLog = true,
         )
         val encoded = SettingsExchange.encode(
             SettingsExchange.pack(
@@ -238,6 +306,7 @@ class SettingsExchangeTest {
         )
         assertTrue(encoded.contains("\"gnssSensitivity\": \"HIGH\""))
         assertTrue(encoded.contains("\"gnssMonitor\": true"))
+        assertTrue(encoded.contains("\"gnssRawLog\": true"))
         val parsed = SettingsExchange.parse(encoded)
         assertEquals(tuned.gnssSettings(), parsed.settings.gnssSettings())
         val (next, _) = SettingsExchange.apply(localConfig(), parsed)
@@ -269,9 +338,11 @@ class SettingsExchangeTest {
         assertEquals(TakGnssHold.HOUR, missing.takGnssHold)
         assertEquals(TakGnssHold.HOUR, missing.takRadioHold)
         assertEquals(TakFloodSend.OFF, missing.takFlood)
+        assertEquals("", missing.takCallsign)
         assertEquals(GnssAlertFloor.MEDIUM, missing.gnssAlertFloor)
         assertTrue(missing.gnssBeep)
         assertTrue(missing.gnssVoice)
         assertFalse(missing.gnssShade)
+        assertFalse(missing.gnssRawLog)
     }
 }

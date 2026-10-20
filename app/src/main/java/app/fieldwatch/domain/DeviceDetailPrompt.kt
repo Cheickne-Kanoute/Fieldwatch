@@ -15,6 +15,7 @@ object DeviceDetailPrompt {
         signatureNotes: List<Pair<String, String>> = emptyList(),
         fleets: List<Fleet> = emptyList(),
         mine: Boolean = false,
+        placeLines: List<String> = emptyList(),
     ): String {
         val title = device.listTitle(signatureNames)
         val kind = if (device.kind == RadioKind.WIFI) "Wi-Fi access point" else "Bluetooth LE advertiser"
@@ -35,6 +36,7 @@ object DeviceDetailPrompt {
             appendLine("- RSSI is loudness at the phone, not a measured distance.")
             appendLine("- Do not invent fields that are not in the dump. If data is thin, say so and say what would help.")
             appendLine("- Do not claim this radio is following anyone. Do not give safety advice.")
+            appendLine("- A session line that this radio was seen at more than one place means this phone heard that stable address at those stops in the last 7 days. The coordinates are where this phone was, not this radio. A street is the system geocoder when Online place names is on. It is not a claim that anyone followed the operator.")
             appendLine("- Treat this paste as operationally sensitive (MAC, SSID, payload, GPS).")
             appendLine()
             appendLine("## Collection context")
@@ -57,7 +59,7 @@ object DeviceDetailPrompt {
             }
             appendLine("## Observation dump (verbatim from the detail page)")
             appendLine()
-            append(DeviceDetailText.build(device, signatureNames, now, attentionNotes, signatureNotes, fleets, mine).trimEnd())
+            append(DeviceDetailText.build(device, signatureNames, now, attentionNotes, signatureNotes, fleets, mine, placeLines).trimEnd())
             appendLine()
             appendLine()
             appendLine("## Your analysis (required sections)")

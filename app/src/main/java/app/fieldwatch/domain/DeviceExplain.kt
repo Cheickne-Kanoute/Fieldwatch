@@ -196,6 +196,7 @@ object DeviceExplain {
             0xFD44 -> "Apple Find My related"
             0xFEED, 0xFEDD, 0xFEEC -> "Tile tracker"
             0xFEEE -> "Polar heart-rate strap or watch"
+            0xFE33 -> "Chipolo item finder"
             0xFD50 -> "Tuya IoT"
             0xFEBE, 0xFE21 -> "Bose"
             0xFE78 -> "HP printer"

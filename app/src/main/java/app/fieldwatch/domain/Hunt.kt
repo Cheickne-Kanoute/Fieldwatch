@@ -56,23 +56,23 @@ object Hunt {
     }
 
     fun label(cue: HuntCue): String = when (cue) {
-        HuntCue.VERY_CLOSE -> "Very Close"
-        HuntCue.CLOSER -> "Closer"
-        HuntCue.FURTHER -> "Further"
-        HuntCue.SAME -> "About the same"
-        HuntCue.WAITING -> "Listening…"
-        HuntCue.QUIET -> "Quiet"
-        HuntCue.GONE -> "Gone"
+        HuntCue.VERY_CLOSE -> LanguageText.text("ui.very.close")
+        HuntCue.CLOSER -> LanguageText.text("ui.closer.label")
+        HuntCue.FURTHER -> LanguageText.text("ui.further.label")
+        HuntCue.SAME -> LanguageText.text("ui.about.same")
+        HuntCue.WAITING -> LanguageText.text("ui.listening.label")
+        HuntCue.QUIET -> LanguageText.text("ui.quiet.label")
+        HuntCue.GONE -> LanguageText.text("ui.gone.label")
     }
 
     fun hint(cue: HuntCue): String = when (cue) {
-        HuntCue.VERY_CLOSE -> "Screaming loud here. Look around — usually in-hand, pocket, or the same bag. Not meters."
-        HuntCue.CLOSER -> "Louder than a few seconds ago. Keep walking that way."
-        HuntCue.FURTHER -> "Quieter than a few seconds ago. Turn or back up."
-        HuntCue.SAME -> "No clear change yet. Slow down; hold the phone still."
-        HuntCue.WAITING -> "Need a few seconds of packets to compare."
-        HuntCue.QUIET -> "No packet for a few seconds. Silent, or behind a wall."
-        HuntCue.GONE -> "Left the live set. Randomized BLE often vanishes mid-hunt."
+        HuntCue.VERY_CLOSE -> LanguageText.text("ui.screaming.loud.here.look")
+        HuntCue.CLOSER -> LanguageText.text("ui.louder.than.few.seconds")
+        HuntCue.FURTHER -> LanguageText.text("ui.quieter.than.few.seconds")
+        HuntCue.SAME -> LanguageText.text("ui.no.clear.change.yet")
+        HuntCue.WAITING -> LanguageText.text("ui.need.few.seconds.packets")
+        HuntCue.QUIET -> LanguageText.text("ui.no.packet.few.seconds")
+        HuntCue.GONE -> LanguageText.text("ui.left.live.set.randomized")
     }
 
     /**

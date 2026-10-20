@@ -8,11 +8,11 @@ enum class HeaderTone { OFF, IDLE, HEALTHY, PROBLEM }
 
 /** Wi-Fi icon in the list header. Green is healthy, including the wait between scans. */
 fun wifiHeader(scanning: Boolean, locationOn: Boolean, radio: ScanRadioFacts): Pair<HeaderTone, String> {
-    if (!radio.wifiOn) return HeaderTone.OFF to "Wi-Fi off"
-    if (!scanning) return HeaderTone.IDLE to "Wi-Fi idle"
-    if (!locationOn) return HeaderTone.PROBLEM to "Wi-Fi, Location is off"
-    if (radio.wifiWaitingOnOs) return HeaderTone.PROBLEM to "Wi-Fi waiting on Android"
-    return HeaderTone.HEALTHY to "Wi-Fi on"
+    if (!radio.wifiOn) return HeaderTone.OFF to LanguageText.text("header.wifi.off")
+    if (!scanning) return HeaderTone.IDLE to LanguageText.text("header.wifi.idle")
+    if (!locationOn) return HeaderTone.PROBLEM to LanguageText.text("header.wifi.location")
+    if (radio.wifiWaitingOnOs) return HeaderTone.PROBLEM to LanguageText.text("header.wifi.wait")
+    return HeaderTone.HEALTHY to LanguageText.text("header.wifi.on")
 }
 
 /**
@@ -27,21 +27,21 @@ fun gpsHeader(
     alertShowing: Boolean,
 ): Pair<HeaderTone, String>? {
     if (!monitorOn) return null
-    if (alertShowing) return HeaderTone.PROBLEM to "GPS alert"
-    if (statusLine == GnssCopy.PAUSED) return HeaderTone.IDLE to "GPS paused"
-    if (!scanning || suppressAlerts) return HeaderTone.IDLE to "GPS on"
+    if (alertShowing) return HeaderTone.PROBLEM to LanguageText.text("header.gps.alert")
+    if (statusLine == GnssCopy.PAUSED) return HeaderTone.IDLE to LanguageText.text("header.gps.paused")
+    if (!scanning || suppressAlerts) return HeaderTone.IDLE to LanguageText.text("header.gps.on")
     val ready = statusLine == "armed" || statusLine.startsWith("AGC not available")
-    return if (ready) HeaderTone.HEALTHY to "GPS on" else HeaderTone.IDLE to "GPS on"
+    return if (ready) HeaderTone.HEALTHY to LanguageText.text("header.gps.on") else HeaderTone.IDLE to LanguageText.text("header.gps.on")
 }
 
 /** Bluetooth icon in the list header. A planned rest stays healthy. */
 fun bleHeader(scanning: Boolean, locationOn: Boolean, radio: ScanRadioFacts): Pair<HeaderTone, String> {
-    if (!radio.bleOn) return HeaderTone.OFF to "Bluetooth off"
-    if (!scanning) return HeaderTone.IDLE to "Bluetooth idle"
-    if (!locationOn) return HeaderTone.PROBLEM to "Bluetooth, Location is off"
+    if (!radio.bleOn) return HeaderTone.OFF to LanguageText.text("header.ble.off")
+    if (!scanning) return HeaderTone.IDLE to LanguageText.text("header.ble.idle")
+    if (!locationOn) return HeaderTone.PROBLEM to LanguageText.text("header.ble.location")
     val stuck = !radio.bleRunning && !radio.bleParked && !radio.bleRetrying && !radio.bleStarting
-    if (radio.bleRetrying || stuck) return HeaderTone.PROBLEM to "Bluetooth waiting on Android"
-    return HeaderTone.HEALTHY to "Bluetooth on"
+    if (radio.bleRetrying || stuck) return HeaderTone.PROBLEM to LanguageText.text("header.ble.wait")
+    return HeaderTone.HEALTHY to LanguageText.text("header.ble.on")
 }
 
 data class ScanRadioFacts(
@@ -75,6 +75,7 @@ data class ScanPhoneFacts(
     val customNamesOnly: Boolean = false,
     val showOnly: Boolean = false,
     val movingWithYou: Boolean = false,
+    val seenAtPlaces: Boolean = false,
     val showWifi: Boolean = true,
     val showBle: Boolean = true,
     val nameFilter: Boolean = false,
@@ -104,31 +105,31 @@ object ScanStatus {
         gnssRows: List<Pair<String, String>> = emptyList(),
     ): ScanStatusReport {
         val rows = listOf(
-            "App" to "${phone.versionName} (${phone.versionCode})",
-            "Catalog" to phone.catalogVersion.toString(),
-            "Phone" to "${phone.manufacturer} ${phone.model}".trim(),
-            "Android" to "${phone.androidRelease} (API ${phone.sdkInt})",
-            "Fingerprint" to phone.fingerprint,
-            "Wi-Fi" to if (radio.wifiOn) "on" else "off",
-            "Last Wi-Fi scan" to lastWifi(radio, now),
-            "Bluetooth" to if (radio.bleOn) "on" else "off",
-            "BLE" to bleState(radio),
-            "BLE results last minute" to radio.bleHitsLastMin.coerceAtLeast(0).toString(),
-            "Faster Wi-Fi AP scans" to fasterWifi(phone),
-            "Allow background usage" to onOff(phone.backgroundUsage),
-            "Unrestricted battery" to onOff(phone.unrestrictedBattery),
-            "Location" to if (phone.locationOn) "on" else "off",
-            "Location permission" to if (phone.locationPermission) "granted" else "missing",
-            "GPS fix" to ageLabel(phone.gpsFixAgeMs),
-            "Filters" to filtersLabel(phone),
+            LanguageText.text("ui.app.label") to "${phone.versionName} (${phone.versionCode})",
+            LanguageText.text("ui.catalog.label") to phone.catalogVersion.toString(),
+            LanguageText.text("ui.phone.label.2") to "${phone.manufacturer} ${phone.model}".trim(),
+            LanguageText.text("ui.android.label") to "${phone.androidRelease} (API ${phone.sdkInt})",
+            LanguageText.text("ui.fingerprint.label") to phone.fingerprint,
+            LanguageText.text("radio.wifi") to if (radio.wifiOn) LanguageText.text("diag.on") else LanguageText.text("diag.off"),
+            LanguageText.text("ui.last.wi.fi.scan") to lastWifi(radio, now),
+            LanguageText.text("ui.bluetooth.label") to if (radio.bleOn) LanguageText.text("diag.on") else LanguageText.text("diag.off"),
+            LanguageText.text("radio.ble") to bleState(radio),
+            LanguageText.text("ui.ble.results.last.minute") to radio.bleHitsLastMin.coerceAtLeast(0).toString(),
+            LanguageText.text("ui.faster.wi.fi.ap") to fasterWifi(phone),
+            LanguageText.text("ui.allow.background.usage") to onOff(phone.backgroundUsage),
+            LanguageText.text("ui.unrestricted.battery") to onOff(phone.unrestrictedBattery),
+            LanguageText.text("settings.topic.location") to if (phone.locationOn) LanguageText.text("diag.on") else LanguageText.text("diag.off"),
+            LanguageText.text("ui.location.permission") to if (phone.locationPermission) LanguageText.text("diag.granted") else LanguageText.text("diag.missing"),
+            LanguageText.text("ui.gps.fix") to ageLabel(phone.gpsFixAgeMs),
+            LanguageText.text("tab.filters") to filtersLabel(phone),
         ) + gnssRows
         val verdict = verdict(radio, phone, radiosOnAir)
         val checks = checks(radio, phone, radiosOnAir)
         val blocked = isBlocked(radio, phone.locationOn, phone.locationPermission)
         val text = buildString {
             rows.forEach { (k, v) -> append(k).append(": ").append(v).append('\n') }
-            append("Verdict: ").append(verdict).append('\n')
-            append("Check:\n")
+            append((LanguageText.text("ui.verdict.label") + " ")).append(verdict).append('\n')
+            append((LanguageText.text("ui.check.label") + "\n"))
             checks.forEach { append("- ").append(it).append('\n') }
         }
         return ScanStatusReport(rows, verdict, checks, text, blocked)
@@ -142,7 +143,7 @@ object ScanStatus {
     }
 
     /** Appended to an empty Live list while a scan is blocked. */
-    const val EMPTY_POINTER = "Settings → Diagnostics."
+    val EMPTY_POINTER get() = LanguageText.text("ui.settings.diagnostics")
 
     private fun wifiUsable(radio: ScanRadioFacts): Boolean =
         radio.wifiOn && !radio.wifiWaitingOnOs
@@ -154,26 +155,26 @@ object ScanStatus {
         val wifiOk = wifiUsable(radio)
         val bleOk = bleUsable(radio)
         return when {
-            !radio.scanning -> "Scanning is not running."
-            !phone.locationOn -> "Location is off. Android will not deliver scan results."
-            !phone.locationPermission -> "Location permission is off."
-            !radio.wifiOn && !radio.bleOn -> "Wi-Fi and Bluetooth are off."
-            radio.bleStarting && !radio.bleRunning && !radio.wifiWaitingOnOs -> "Scanning is starting."
+            !radio.scanning -> LanguageText.text("ui.scanning.not.running")
+            !phone.locationOn -> LanguageText.text("ui.location.off.android.will.2")
+            !phone.locationPermission -> LanguageText.text("ui.location.permission.off")
+            !radio.wifiOn && !radio.bleOn -> LanguageText.text("ui.wi.fi.bluetooth.off")
+            radio.bleStarting && !radio.bleRunning && !radio.wifiWaitingOnOs -> LanguageText.text("ui.scanning.starting")
             !wifiOk && !bleOk && radio.wifiWaitingOnOs && radio.bleParked ->
-                "Wi-Fi scan refused. BLE scan is parked. Both radios are on."
+                LanguageText.text("ui.wi.fi.scan.refused")
             !wifiOk && !bleOk && radio.bleParked ->
-                "BLE scan is parked. Bluetooth is on."
-            !wifiOk && !bleOk && radio.bleRetrying -> "BLE scan is retrying."
+                LanguageText.text("ui.ble.scan.parked.bluetooth")
+            !wifiOk && !bleOk && radio.bleRetrying -> LanguageText.text("ui.ble.scan.retrying")
             !wifiOk && !bleOk && radio.wifiWaitingOnOs ->
-                "Wi-Fi scan refused. Wi-Fi is on."
-            !wifiOk && !bleOk -> "Wi-Fi and Bluetooth scans are not running."
-            radio.wifiWaitingOnOs && bleOk -> "Wi-Fi scan refused. BLE is running."
-            radio.bleParked && wifiOk -> "BLE scan is parked. Wi-Fi is running."
-            !radio.wifiOn && bleOk -> "Wi-Fi is off. BLE is running."
-            !radio.bleOn && wifiOk -> "Bluetooth is off. Wi-Fi is running."
-            filterHiding(phone) -> "Scans are running. A filter is hiding the list."
-            radiosOnAir > 0 -> "Scans are running."
-            else -> "Scans are running. Nothing is on the air."
+                LanguageText.text("ui.wi.fi.scan.refused.2")
+            !wifiOk && !bleOk -> LanguageText.text("ui.wi.fi.bluetooth.scans")
+            radio.wifiWaitingOnOs && bleOk -> LanguageText.text("ui.wi.fi.scan.refused.3")
+            radio.bleParked && wifiOk -> LanguageText.text("ui.ble.scan.parked.wi")
+            !radio.wifiOn && bleOk -> LanguageText.text("ui.wi.fi.off.ble")
+            !radio.bleOn && wifiOk -> LanguageText.text("ui.bluetooth.off.wi.fi")
+            filterHiding(phone) -> LanguageText.text("ui.scans.running.filter.hiding")
+            radiosOnAir > 0 -> LanguageText.text("ui.scans.running")
+            else -> LanguageText.text("ui.scans.running.nothing.air")
         }
     }
 
@@ -186,50 +187,50 @@ object ScanStatus {
     private fun checks(radio: ScanRadioFacts, phone: ScanPhoneFacts, radiosOnAir: Int): List<String> {
         val lines = mutableListOf<String>()
         if (!radio.scanning) {
-            lines += "Scanning is not running. Open Live. If Fieldwatch asks for permission, allow Location, Nearby devices, and Notifications."
+            lines += LanguageText.text("ui.scanning.not.running.open")
         }
         if (!phone.locationOn) {
-            lines += "Turn Location on. Android will not return Wi-Fi or Bluetooth results while Location is off."
+            lines += LanguageText.text("ui.turn.location.android.will")
         }
         if (!phone.locationPermission) {
-            lines += "Allow location for Fieldwatch. Phone Settings, Apps, Fieldwatch, Permissions, Location."
+            lines += LanguageText.text("ui.allow.location.fieldwatch.phone")
         }
         val wifiOk = wifiUsable(radio)
         val bleOk = bleUsable(radio)
         val locationReady = phone.locationOn && phone.locationPermission
         if (!radio.wifiOn && !radio.bleOn) {
-            lines += "Turn Wi-Fi or Bluetooth on. Fieldwatch hears access points and Bluetooth advertisements."
+            lines += LanguageText.text("ui.turn.wi.fi.bluetooth")
         } else {
             if (!radio.wifiOn && bleOk) {
-                lines += "Wi-Fi is off, so access points will not appear. Bluetooth is running."
+                lines += LanguageText.text("ui.wi.fi.off.so")
             }
             if (!radio.bleOn && wifiOk) {
-                lines += "Bluetooth is off, so Bluetooth radios will not appear. Wi-Fi is running."
+                lines += LanguageText.text("ui.bluetooth.off.so.bluetooth")
             }
             if (locationReady && radio.wifiOn && radio.wifiWaitingOnOs) {
-                lines += "Wi-Fi scans are being refused. The Wi-Fi radio is on. Toggle Wi-Fi off and on, then reopen Fieldwatch."
+                lines += LanguageText.text("ui.wi.fi.scans.being")
             }
             if (locationReady && radio.bleOn && radio.bleParked) {
-                lines += "Bluetooth scans are parked. The Bluetooth radio is on. Fieldwatch will try again."
+                lines += LanguageText.text("ui.bluetooth.scans.parked.bluetooth")
             }
             if (radio.bleOn && radio.bleRetrying) {
-                lines += "Bluetooth scan is retrying. Toggle Bluetooth off and on, then reopen Fieldwatch."
+                lines += LanguageText.text("ui.bluetooth.scan.retrying.toggle")
             }
             if (radio.bleOn && radio.bleStarting && !radio.bleRunning) {
-                lines += "Bluetooth is still starting. Wait a few seconds."
+                lines += LanguageText.text("ui.bluetooth.still.starting.wait")
             }
             if (radio.bleOn && !radio.bleRunning && !radio.bleParked && !radio.bleRetrying && !radio.bleStarting) {
-                lines += "Bluetooth is on, and the scan is not running. Toggle Bluetooth off and on, then reopen Fieldwatch."
+                lines += LanguageText.text("ui.bluetooth.scan.not.running")
             }
         }
         if (filterHiding(phone)) {
-            lines += "A filter is hiding radios. Filters is ${filtersLabel(phone)}. Set Filters to All Traffic to see everything the phone hears."
+            lines += LanguageText.text("diag.filter.hiding", mapOf("filters" to filtersLabel(phone)))
         }
         if (lines.isEmpty()) {
             lines += if (radiosOnAir > 0) {
-                "Nothing that needs to be on is off. Scans are running."
+                LanguageText.text("ui.nothing.needs.off.scans")
             } else {
-                "Nothing that needs to be on is off. Scans are running. Nothing is on the air right now."
+                LanguageText.text("ui.nothing.needs.off.scans.2")
             }
         }
         return lines
@@ -237,49 +238,57 @@ object ScanStatus {
 
     private fun filterHiding(phone: ScanPhoneFacts): Boolean =
         phone.arrivalsOnly || phone.watchedOnly || phone.customNamesOnly || phone.showOnly ||
-            phone.movingWithYou || !phone.showWifi || !phone.showBle || phone.nameFilter || phone.ouiFilter
+            phone.movingWithYou || phone.seenAtPlaces || !phone.showWifi || !phone.showBle ||
+            phone.nameFilter || phone.ouiFilter
 
     private fun filtersLabel(phone: ScanPhoneFacts): String {
         val parts = buildList {
-            if (phone.arrivalsOnly) add("Arrivals only")
-            if (phone.watchedOnly) add("Watched only")
-            if (phone.customNamesOnly) add("Named radios only")
-            if (phone.showOnly) add("Show only")
-            if (phone.movingWithYou) add("Moving with you")
-            if (!phone.showWifi) add("Wi-Fi hidden")
-            if (!phone.showBle) add("BLE hidden")
-            if (phone.nameFilter) add("Name filter on")
-            if (phone.ouiFilter) add("OUI filter on")
+            if (phone.arrivalsOnly) add(LanguageText.text("ui.arrivals.only"))
+            if (phone.watchedOnly) add(LanguageText.text("ui.keep.watched.only"))
+            if (phone.customNamesOnly) add(LanguageText.text("ui.keep.named.only"))
+            if (phone.showOnly) add(LanguageText.text("ui.show.only"))
+            if (phone.movingWithYou) add(LanguageText.text("ui.moving.label"))
+            if (phone.seenAtPlaces) add(LanguageText.text("ui.seen.more.than.one"))
+            if (!phone.showWifi) add(LanguageText.text("ui.wi.fi.hidden"))
+            if (!phone.showBle) add(LanguageText.text("ui.ble.hidden"))
+            if (phone.nameFilter) add(LanguageText.text("ui.name.filter"))
+            if (phone.ouiFilter) add(LanguageText.text("ui.oui.filter"))
         }
-        return if (parts.isEmpty()) "All Traffic" else parts.joinToString(", ")
+        return if (parts.isEmpty()) LanguageText.text("ui.all.traffic") else parts.joinToString(", ")
     }
 
-    private fun onOff(on: Boolean): String = if (on) "on" else "off"
+    private fun onOff(on: Boolean): String =
+        if (on) LanguageText.text("diag.on") else LanguageText.text("diag.off")
 
     private fun fasterWifi(phone: ScanPhoneFacts): String =
-        if (phone.wifiOsThrottled) "off" else "on"
+        if (phone.wifiOsThrottled) LanguageText.text("diag.off") else LanguageText.text("diag.on")
 
     private fun lastWifi(radio: ScanRadioFacts, now: Long): String {
         val age = ageLabel(if (radio.lastWifiScanAt > 0L) now - radio.lastWifiScanAt else null)
         return when {
-            radio.wifiWaitingOnOs && radio.lastWifiScanAt > 0L -> "waiting on OS ($age)"
-            radio.wifiWaitingOnOs -> "waiting on OS"
+            radio.wifiWaitingOnOs && radio.lastWifiScanAt > 0L ->
+                LanguageText.text("diag.waiting.age", mapOf("age" to age))
+            radio.wifiWaitingOnOs -> LanguageText.text("ui.waiting.os")
             else -> age
         }
     }
 
     private fun bleState(radio: ScanRadioFacts): String = when {
-        !radio.bleOn -> "off"
-        radio.bleParked -> "parked"
-        radio.bleRetrying -> "retrying"
-        radio.bleStarting && !radio.bleRunning -> "starting"
-        radio.bleRunning -> "running"
-        else -> "not running"
+        !radio.bleOn -> LanguageText.text("diag.off")
+        radio.bleParked -> LanguageText.text("diag.parked")
+        radio.bleRetrying -> LanguageText.text("diag.retrying")
+        radio.bleStarting && !radio.bleRunning -> LanguageText.text("diag.starting")
+        radio.bleRunning -> LanguageText.text("diag.running")
+        else -> LanguageText.text("ui.not.running")
     }
 
     private fun ageLabel(ageMs: Long?): String {
-        if (ageMs == null || ageMs < 0L) return "none"
+        if (ageMs == null || ageMs < 0L) return LanguageText.text("diag.none")
         val sec = (ageMs / 1000L).toInt()
-        return if (sec < 60) "${sec}s ago" else "${sec / 60} min ago"
+        return if (sec < 60) {
+            LanguageText.text("diag.seconds.ago", mapOf("n" to sec.toString()))
+        } else {
+            LanguageText.text("diag.minutes.ago", mapOf("n" to (sec / 60).toString()))
+        }
     }
 }

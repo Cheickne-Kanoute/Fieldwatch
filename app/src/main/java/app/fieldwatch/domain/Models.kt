@@ -19,11 +19,11 @@ enum class ViewMode {
     ;
 
     fun label(): String = when (this) {
-        RADAR -> "Classic radar"
-        LIST -> "Strength list"
-        TIMELINE -> "Timeline"
-        HYBRID -> "Hybrid + sparklines"
-        BY_CLASS -> "By class"
+        RADAR -> LanguageText.text("view.radar")
+        LIST -> LanguageText.text("view.list")
+        TIMELINE -> LanguageText.text("view.timeline")
+        HYBRID -> LanguageText.text("view.hybrid")
+        BY_CLASS -> LanguageText.text("view.by.class")
     }
 }
 
@@ -63,52 +63,52 @@ enum class SignatureClass {
     ;
 
     fun label(): String = when (this) {
-        FINDER -> "Finder tags"
-        BEACON -> "Retail beacons"
-        SIGNAGE -> "Signage"
-        WEARABLE -> "Wearables"
-        SURVEILLANCE -> "Surveillance"
-        DRONE -> "Drones"
-        HACKING -> "Pentest"
-        BODYWORN -> "Body-worn"
-        LAW_ENFORCEMENT -> "Public safety"
-        VEHICLE -> "Vehicle"
-        GLASSES -> "Glasses"
-        AUDIO -> "Audio"
-        CAMERA -> "Cameras"
-        THERMOSTAT -> "Thermostats"
-        LOCK -> "Access control"
-        HEALTH -> "Health"
-        HOME -> "Home IoT"
-        ISP -> "ISP / routers"
-        MESH -> "Mesh"
-        PHONE -> "Phones / PCs"
-        OTHER -> "Other"
+        FINDER -> LanguageText.text("class.finder")
+        BEACON -> LanguageText.text("class.beacon")
+        SIGNAGE -> LanguageText.text("class.signage")
+        WEARABLE -> LanguageText.text("class.wearable")
+        SURVEILLANCE -> LanguageText.text("class.surveillance")
+        DRONE -> LanguageText.text("class.drone")
+        HACKING -> LanguageText.text("class.hacking")
+        BODYWORN -> LanguageText.text("class.bodyworn")
+        LAW_ENFORCEMENT -> LanguageText.text("class.law")
+        VEHICLE -> LanguageText.text("class.vehicle")
+        GLASSES -> LanguageText.text("class.glasses")
+        AUDIO -> LanguageText.text("class.audio")
+        CAMERA -> LanguageText.text("class.camera")
+        THERMOSTAT -> LanguageText.text("class.thermostat")
+        LOCK -> LanguageText.text("class.lock")
+        HEALTH -> LanguageText.text("class.health")
+        HOME -> LanguageText.text("class.home")
+        ISP -> LanguageText.text("class.isp")
+        MESH -> LanguageText.text("class.mesh")
+        PHONE -> LanguageText.text("class.phone")
+        OTHER -> LanguageText.text("class.other")
     }
 
-    /** Short spoken form for watchlist voice. */
+    /** Short spoken form for watchlist voice. Uses the control slot, not the chip cap. */
     fun speechLabel(): String = when (this) {
-        FINDER -> "finder tags"
-        BEACON -> "retail beacons"
-        SIGNAGE -> "signage"
-        WEARABLE -> "wearables"
-        SURVEILLANCE -> "surveillance"
-        DRONE -> "drones"
-        HACKING -> "pentest"
-        BODYWORN -> "body worn"
-        LAW_ENFORCEMENT -> "public safety"
-        VEHICLE -> "vehicle"
-        GLASSES -> "glasses"
-        AUDIO -> "audio"
-        CAMERA -> "cameras"
-        THERMOSTAT -> "thermostats"
-        LOCK -> "access control"
-        HEALTH -> "health"
-        HOME -> "home I O T"
-        ISP -> "I S P routers"
-        MESH -> "mesh"
-        PHONE -> "phones"
-        OTHER -> "other"
+        FINDER -> LanguageText.text("speech.finder")
+        BEACON -> LanguageText.text("speech.beacon")
+        SIGNAGE -> LanguageText.text("speech.signage")
+        WEARABLE -> LanguageText.text("speech.wearable")
+        SURVEILLANCE -> LanguageText.text("speech.surveillance")
+        DRONE -> LanguageText.text("speech.drone")
+        HACKING -> LanguageText.text("speech.hacking")
+        BODYWORN -> LanguageText.text("speech.bodyworn")
+        LAW_ENFORCEMENT -> LanguageText.text("speech.law")
+        VEHICLE -> LanguageText.text("speech.vehicle")
+        GLASSES -> LanguageText.text("speech.glasses")
+        AUDIO -> LanguageText.text("speech.audio")
+        CAMERA -> LanguageText.text("speech.camera")
+        THERMOSTAT -> LanguageText.text("speech.thermostat")
+        LOCK -> LanguageText.text("speech.lock")
+        HEALTH -> LanguageText.text("speech.health")
+        HOME -> LanguageText.text("speech.home")
+        ISP -> LanguageText.text("speech.isp")
+        MESH -> LanguageText.text("speech.mesh")
+        PHONE -> LanguageText.text("speech.phone")
+        OTHER -> LanguageText.text("speech.other")
     }
 
     /**
@@ -133,9 +133,9 @@ enum class AlertVoiceWhat {
     ;
 
     fun label(): String = when (this) {
-        CLASS -> "Class"
-        SIGNATURE -> "Signature"
-        BOTH -> "Class + signature"
+        CLASS -> LanguageText.text("voice.class")
+        SIGNATURE -> LanguageText.text("voice.signature")
+        BOTH -> LanguageText.text("voice.both")
     }
 }
 
@@ -193,8 +193,8 @@ enum class SignatureListSort {
     ;
 
     fun label(): String = when (this) {
-        NAME -> "Name A–Z"
-        CLASS -> "Class A–Z"
+        NAME -> LanguageText.text("sort.name")
+        CLASS -> LanguageText.text("sort.class")
     }
 }
 
@@ -475,6 +475,8 @@ data class FilterState(
     val ouiQuery: String = "",
     val logic: FilterLogic = FilterLogic.AND,
     val movingWithYou: Boolean = false,
+    /** Live include: stable radios already heard at two or more places. */
+    val seenAtPlaces: Boolean = false,
     /** Hide already-seen radios; Mark seen / Reset seen live with this switch. */
     val arrivalsOnly: Boolean = false,
     /**
@@ -482,7 +484,7 @@ data class FilterState(
      * dual-chip radios stay. Hide selected Fast Pair still drops pairing-mode too.
      */
     val hideFastPairAccountKey: Boolean = false,
-    /** Include or hide Live rows by [Fleet.kind]. Independent of signature matching on/off. */
+    /** Include or hide Live rows by [Fleet.kind]. Off keeps [classes] and [excludeClasses]. */
     val useClassFilter: Boolean = false,
     val excludeClasses: Boolean = false,
     val classes: Set<SignatureClass> = emptySet(),
@@ -497,6 +499,102 @@ data class FilterState(
         includeSignatures && includeFleetIds.isNotEmpty()
 
     fun namedOnlyImplied(): Boolean = classIncludeActive() || signatureIncludeActive()
+
+    /** Keep or hide row. On when any of its switches is on. */
+    fun whoStaysOn(): Boolean =
+        namedOnly || customNamesOnly || watchedOnly || hideMine || hideFastPairAccountKey
+
+    /**
+     * Selected signatures is one list.
+     * Show only is [includeSignatures]. Hide these is [excludeSignatures] while show is off.
+     * An old save with both lists on counts as Show only.
+     */
+    fun signatureShowOn(): Boolean = includeSignatures
+
+    fun signatureHideOn(): Boolean = excludeSignatures && !includeSignatures
+
+    /** Selected signatures row. On when Show only or Hide these is on. */
+    fun signaturesOn(): Boolean = signatureShowOn() || signatureHideOn()
+
+    /** The one pick list. Show wins when an old save had two different lists. */
+    fun selectedSignatureIds(): Set<String> = when {
+        includeSignatures -> includeFleetIds
+        excludeSignatures -> fleetIds
+        includeFleetIds.isNotEmpty() -> includeFleetIds
+        else -> fleetIds
+    }
+
+    /** Show only chip. Tap again to turn the mode off. Picks stay. */
+    fun toggleSignatureShow(): FilterState {
+        val ids = selectedSignatureIds()
+        val on = !signatureShowOn()
+        return copy(
+            includeSignatures = on,
+            excludeSignatures = false,
+            includeFleetIds = ids,
+            fleetIds = ids,
+        )
+    }
+
+    /** Hide these chip. Tap again to turn the mode off. Picks stay. */
+    fun toggleSignatureHide(): FilterState {
+        val ids = selectedSignatureIds()
+        val on = !signatureHideOn()
+        return copy(
+            includeSignatures = false,
+            excludeSignatures = on,
+            includeFleetIds = ids,
+            fleetIds = ids,
+        )
+    }
+
+    /** One signature row. Adding a pick while the mode is off turns Show only on. */
+    fun toggleSignaturePick(id: String, checked: Boolean): FilterState {
+        val ids = selectedSignatureIds().toMutableSet().apply {
+            if (checked) add(id) else remove(id)
+        }
+        val show = signatureShowOn()
+        val hide = signatureHideOn()
+        val turnShowOn = checked && !show && !hide
+        return copy(
+            includeFleetIds = ids,
+            fleetIds = ids,
+            includeSignatures = show || turnShowOn,
+            excludeSignatures = if (turnShowOn) false else hide,
+        )
+    }
+
+    /** Signal, name, MAC, vendor row. On when RSSI, name, vendor, or OR is set. */
+    fun fineOn(): Boolean =
+        rssiMin > -100 || nameQuery.isNotBlank() || ouiQuery.isNotBlank() || logic == FilterLogic.OR
+
+    fun clearWhoStays(): FilterState = copy(
+        namedOnly = false,
+        customNamesOnly = false,
+        watchedOnly = false,
+        hideMine = false,
+        hideFastPairAccountKey = false,
+    )
+
+    fun clearClasses(): FilterState = copy(
+        useClassFilter = false,
+        excludeClasses = false,
+        classes = emptySet(),
+    )
+
+    fun clearSelectedSignatures(): FilterState = copy(
+        includeSignatures = false,
+        excludeSignatures = false,
+        includeFleetIds = emptySet(),
+        fleetIds = emptySet(),
+    )
+
+    fun clearFine(): FilterState = copy(
+        rssiMin = -100,
+        nameQuery = "",
+        ouiQuery = "",
+        logic = FilterLogic.AND,
+    )
 }
 
 @Serializable
@@ -569,6 +667,11 @@ data class AppSettings(
     val snapToBeep: Boolean = true,
     val alertShade: Boolean = false,
     val tagLocation: Boolean = true,
+    /**
+     * Remember a stable tracker heard at two or more places, and a return after
+     * a quiet stretch. Ordinary Wi-Fi and Bluetooth stay out. Missing JSON is on.
+     */
+    val placeWatch: Boolean = true,
     /** Reverse-geocode GPS stamps in Debrief when the phone is online. Default on. */
     val onlineLookup: Boolean = true,
     val viewMode: ViewMode = ViewMode.BY_CLASS,
@@ -646,6 +749,11 @@ data class AppSettings(
     /** Flood line on this phone's TAK marker while a flood is detected. */
     val takFlood: TakFloodSend = TakFloodSend.OFF,
     /**
+     * Map name for this phone. Blank sends Fieldwatch- plus the install tag.
+     * A typed name is copied with settings. The tag is not.
+     */
+    val takCallsign: String = "",
+    /**
      * Red-on-black field display. Off by default. The rest of the UI is always dark.
      * Phone brightness is unchanged.
      */
@@ -655,6 +763,11 @@ data class AppSettings(
     val disclaimerRev: Int = 0,
     /** Chrome overlay on Live after the license. Settings can show it again. */
     val liveTourDone: Boolean = false,
+    /**
+     * Last Live-tour offer applied on this phone. Missing or older than [LIVE_TOUR_REV]
+     * shows the tour once more, then this catches up so later launches do not.
+     */
+    val liveTourRev: Int = 0,
     /** Signatures tab: Name A–Z (default) or Class A–Z. */
     val signatureListSort: SignatureListSort = SignatureListSort.NAME,
     /** By class: hide class headers with 0 radios. Off = show all (zeros stay). */
@@ -678,11 +791,22 @@ data class AppSettings(
     val gnssCorrelation: Boolean = false,
     /** A few phones report gain backwards. Off unless a router test rises. */
     val gnssInvertAgc: Boolean = false,
+    /** Raw GNSS file around a hit. Off until chosen. Privacy mode does not record. */
+    val gnssRawLog: Boolean = false,
 )
 
 const val DISCLAIMER_REV = 3
 
+/** Bump when an upgrade should show the Live tour one more time. */
+const val LIVE_TOUR_REV = 1
+
 fun AppSettings.disclaimerOk(): Boolean = disclaimerRev >= DISCLAIMER_REV
+
+/** One offer per [LIVE_TOUR_REV]. A phone already on this rev is left as saved. */
+fun AppSettings.offerLiveTourOnce(): AppSettings {
+    if (liveTourRev >= LIVE_TOUR_REV) return this
+    return copy(liveTourDone = false, liveTourRev = LIVE_TOUR_REV)
+}
 
 data class DetectionPolicy(
     val ssidKeywords: Boolean = true,
@@ -702,6 +826,7 @@ fun AppSettings.gnssSettings(): List<Any> = listOf(
     gnssFullTracking,
     gnssCorrelation,
     gnssInvertAgc,
+    gnssRawLog,
 )
 
 fun AppSettings.detectionPolicy() = DetectionPolicy(
@@ -722,6 +847,16 @@ data class PersistedConfig(
     val arrivalKnownKeys: Set<String> = emptySet(),
     /** Stock filter-chip ids the operator removed. Catalog migrates do not put these back. */
     val hiddenPresetIds: Set<String> = emptySet(),
+    /**
+     * 4-character id for this install's TAK markers. Not part of a settings pack.
+     * Blank until the first load fills it. A new install is filled in the seed.
+     */
+    val takInstallTag: String = "",
+    /**
+     * True after FIELDWATCH-SELF was deleted, or when this install never sent that name.
+     * A missing key on an older file stays false so the delete can still go out.
+     */
+    val takLegacySelfRetired: Boolean = false,
 )
 
 data class RssiSample(
@@ -1093,7 +1228,8 @@ object Palette {
     fun color(index: Int): Int = fleet[index.mod(fleet.size)]
 }
 
-fun RadioKind.label(): String = if (this == RadioKind.WIFI) "Wi-Fi" else "BLE"
+fun RadioKind.label(): String =
+    if (this == RadioKind.WIFI) LanguageText.text("radio.wifi") else LanguageText.text("radio.ble")
 
 fun uuidShortOrFull(raw: String): String {
     val hex = raw.filter { it.isLetterOrDigit() }.uppercase()
