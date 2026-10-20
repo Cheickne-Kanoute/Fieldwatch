@@ -2,7 +2,7 @@
 
 Requirements for a later implementation. This document does not authorize that work by itself. Do not start it until asked. When asked, implement this document and stop there. Do not ship, tag, sideload, or open a GitHub Release unless that request says so.
 
-English in the APK is the source of truth. The APK also carries a bundled language for each NATO member language listed below. Those files start as an AI draft. A missing line stays English. The phone language selects a bundled language when one matches. Every other language is a file the user imports. Fieldwatch does not download either kind. Off Grid Pete LLC does not review an imported pack. The app must say that before an imported pack is applied. A bundled language shows a different official sentence, the AI sentence below. The Language page also shows the author-guide sentence. A pack cannot hide any of these sentences.
+English in the APK is the source of truth. The APK also carries a bundled language for each available language listed below. Those files start as an AI draft. A missing line stays English. The phone language selects a bundled language when one matches. Every other language is a file the user imports. Fieldwatch does not download either kind. Off Grid Pete LLC does not review an imported pack. The app must say that before an imported pack is applied. A bundled language shows a different official sentence, the AI sentence below. The Language page also shows the author-guide sentence. A pack cannot hide any of these sentences.
 
 ## Outcome
 

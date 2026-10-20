@@ -4,7 +4,7 @@ A language pack is a JSON file. It does not replace the APK, and it is not a for
 
 Language packs are made by other people. They are not reviewed or certified by Off Grid Pete LLC. The app shows that sentence itself. The sentence is not in the template, and a pack cannot change it.
 
-The NATO languages that ship inside the APK are a separate draft. They were translated with AI. A line can be wrong. Perfection is not guaranteed. They are already on the phone. Do not tell those users to import the bundled file. If a bundled line is wrong, open a GitHub issue: https://github.com/OffGridPete/Fieldwatch/issues
+The available languages that ship inside the APK are a separate draft. They were translated with AI. A line can be wrong. Perfection is not guaranteed. They are already on the phone. Do not tell those users to import the bundled file. If a bundled line is wrong, open a GitHub issue: https://github.com/OffGridPete/Fieldwatch/issues
 
 Off Grid Pete LLC is not adding more languages to this repository. To share a translation, put the file in a repository of your own. People import that file. This guide is for a language that is not in the APK, or for a replacement a person chooses to import.
 

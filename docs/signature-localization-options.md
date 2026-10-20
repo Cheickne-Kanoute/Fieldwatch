@@ -9,7 +9,7 @@ English stays in the official files. A missing line stays English. A pack is dis
 Decided 20 October 2026. These stay until they are explicitly reopened.
 
 - Signature names stay English on the screen, in speech, and in the TAK callsign. That includes names that are more than a brand, such as "Atrius cart tag" and "Flock Safety Cameras".
-- The bundled NATO languages do not include catalog notes, Extra attention, or decode labels. Choosing one of those languages leaves that prose in English.
+- The available languages do not include catalog notes, Extra attention, or decode labels. Choosing one of those languages leaves that prose in English.
 - A catalog translation is a separate file. The user exports an English template from the catalog on the phone, someone translates it elsewhere, and the user imports it. Fieldwatch does not download it and does not ship one for the bundled languages.
 - The reason to leave them out of the APK: those sentences tell the operator what a hit means. The bundled languages are AI drafts. A wrong warning is worse than a wrong button. Catalog text also changes when the stock catalog is updated, including without an app release, so a translation baked into the APK would go stale.
 
