@@ -1078,6 +1078,8 @@
     "ui.starting.radios": "Radyolar başlatılıyor…",
     "ui.fieldwatch.scanning": "Fieldwatch tarıyor",
     "ui.passive.wi.fi.bluetooth": "Edilgen Wi-Fi ve Bluetooth tarama durumu",
-    "language.section.set.about": "Mevcut bir dil seçin."
+    "language.section.set.about": "Mevcut bir dil seçin.",
+    "crash.closed": "Fieldwatch beklenmedik şekilde kapandı",
+    "crash.send": "Bunu kopyalayıp gönderin."
   }
 }

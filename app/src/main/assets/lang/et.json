@@ -1026,6 +1026,8 @@
     "ui.starting.radios": "Raadiod käivituvad…",
     "ui.fieldwatch.scanning": "Fieldwatch otsib",
     "ui.passive.wi.fi.bluetooth": "Passiivne Wi-Fi ja Bluetoothi otsingu olek",
-    "language.section.set.about": "Valige saadaval olev keel."
+    "language.section.set.about": "Valige saadaval olev keel.",
+    "crash.closed": "Fieldwatch sulgus ootamatult",
+    "crash.send": "Kopeerige see ja saatke."
   }
 }

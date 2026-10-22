@@ -81,10 +81,11 @@ class ScanService : LifecycleService() {
         startAsForeground()
         app.devices.setScanning(true, wifi.throttleHint())
         publishScanRadio()
-        app.syncLocationUpdates()
-        restartRadios()
-        locationQuiet.seed(runCatching { app.systemLocationOn() }.getOrDefault(false))
+        val locationOn = runCatching { app.systemLocationOn() }.getOrDefault(false)
+        locationQuiet.seed(locationOn)
         registerLocationWatch()
+        app.syncLocationUpdates()
+        if (locationOn) restartRadios()
         gnssStartJob = lifecycleScope.launch {
             delay(GNSS_START_DELAY_MS)
             gnssReady = true
@@ -94,42 +95,45 @@ class ScanService : LifecycleService() {
         loop = lifecycleScope.launch(Dispatchers.Default) {
             while (isActive) {
                 val locationOn = runCatching { app.systemLocationOn() }.getOrDefault(false)
-                if (locationQuiet.observe(locationOn)) holdRadiosForLocation()
+                noteLocation(locationOn)
                 val hold = locationQuiet.radioHoldMs()
                 if (hold > 0L) {
                     delay(hold.coerceAtMost(2_000L))
                     continue
                 }
-                var resumeRadios = locationQuiet.takeRadioResume()
-                if (resumeRadios) restartRadios()
-                val settings = app.config.settings
-                if (lastIntensity != settings.intensity) restartRadios()
-                val unthrottled = !WifiRadio.osScanThrottled(this@ScanService)
-                val wifiMin = if (unthrottled) {
-                    WifiRadio.FAST_INTERVAL_MS
-                } else when (settings.intensity) {
-                    ScanIntensity.PERFORMANCE -> 30_000L
-                    ScanIntensity.BALANCED -> 40_000L
-                    ScanIntensity.SAVER -> 55_000L
-                }
-                if (!locationQuiet.radiosHeld()) {
-                    wifi.requestScan(wifiMin, unthrottled = unthrottled)
-                }
-                if (!bleStartPending() && ble.needsRestart() && !locationQuiet.radiosHeld()) {
-                    app.devices.setRadioHold(ble = true)
-                    if (ble.isRunning()) {
-                        ble.stop()
-                        delay(ble.restartBackoffMs())
+                var resumeRadios = false
+                if (locationOn) {
+                    resumeRadios = locationQuiet.takeRadioResume()
+                    if (resumeRadios) restartRadios()
+                    val settings = app.config.settings
+                    if (lastIntensity != settings.intensity) restartRadios()
+                    val unthrottled = !WifiRadio.osScanThrottled(this@ScanService)
+                    val wifiMin = if (unthrottled) {
+                        WifiRadio.FAST_INTERVAL_MS
+                    } else when (settings.intensity) {
+                        ScanIntensity.PERFORMANCE -> 30_000L
+                        ScanIntensity.BALANCED -> 40_000L
+                        ScanIntensity.SAVER -> 55_000L
                     }
-                    when {
-                        locationQuiet.radiosHeld() -> Unit
-                        locationQuiet.takeRadioResume() -> {
-                            // The shade toggle landed during this backoff. Stagger BLE
-                            // instead of starting it on the same pass as the GPS listener.
-                            resumeRadios = true
-                            restartRadios()
+                    if (!locationQuiet.radiosHeld()) {
+                        wifi.requestScan(wifiMin, unthrottled = unthrottled)
+                    }
+                    if (!bleStartPending() && ble.needsRestart() && !locationQuiet.radiosHeld()) {
+                        app.devices.setRadioHold(ble = true)
+                        if (ble.isRunning()) {
+                            ble.stop()
+                            delay(ble.restartBackoffMs())
                         }
-                        else -> ble.start(settings.intensity)
+                        when {
+                            locationQuiet.radiosHeld() -> Unit
+                            locationQuiet.takeRadioResume() -> {
+                                // The shade toggle landed during this backoff. Stagger BLE
+                                // instead of starting it on the same pass as the GPS listener.
+                                resumeRadios = true
+                                restartRadios()
+                            }
+                            else -> ble.start(settings.intensity)
+                        }
                     }
                 }
                 app.devices.setRadioHold(
@@ -173,8 +177,7 @@ class ScanService : LifecycleService() {
     private val locationWatch = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val app = application as? FieldwatchApp ?: return
-            val on = runCatching { app.systemLocationOn() }.getOrDefault(false)
-            if (locationQuiet.observe(on)) holdRadiosForLocation()
+            noteLocation(runCatching { app.systemLocationOn() }.getOrDefault(false))
         }
     }
 
@@ -201,15 +204,24 @@ class ScanService : LifecycleService() {
         locationWatching = false
     }
 
-    /** Stop BLE now. The scan loop starts radios again only after the quiet window. */
+    /** Stop both radios on the way down, and again for the quiet window on the way up. */
+    private fun noteLocation(on: Boolean) {
+        val rose = locationQuiet.observe(on)
+        if (rose || !on) holdRadiosForLocation()
+    }
+
     private fun holdRadiosForLocation() {
         bleStartJob?.cancel()
         bleStartJob = null
         if (::ble.isInitialized) ble.stop()
+        if (::wifi.isInitialized) wifi.stop()
     }
 
     private fun restartRadios() {
-        val intensity = (application as FieldwatchApp).config.settings.intensity
+        val app = application as FieldwatchApp
+        if (locationQuiet.radiosHeld()) return
+        if (!runCatching { app.systemLocationOn() }.getOrDefault(false)) return
+        val intensity = app.config.settings.intensity
         lastIntensity = intensity
         wifi.start()
         if (ble.isRunning()) {
@@ -222,8 +234,12 @@ class ScanService : LifecycleService() {
         bleStartJob = lifecycleScope.launch(Dispatchers.Default) {
             delay(BLE_START_STAGGER_MS)
             if (!isActive || locationQuiet.radiosHeld()) return@launch
-            ble.start((application as FieldwatchApp).config.settings.intensity)
-            if (locationQuiet.radiosHeld()) ble.stop()
+            val app = application as FieldwatchApp
+            if (!runCatching { app.systemLocationOn() }.getOrDefault(false)) return@launch
+            ble.start(app.config.settings.intensity)
+            if (locationQuiet.radiosHeld() || !runCatching { app.systemLocationOn() }.getOrDefault(false)) {
+                ble.stop()
+            }
         }
     }
 

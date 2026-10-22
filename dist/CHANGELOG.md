@@ -4,6 +4,12 @@ Newest first. This is Fieldwatch (`app.fieldwatch`). Each build below is what Se
 
 Fieldwatch continues the Spectre 1.2.14 field build under a new name, application id, and the MIT License. It does not replace Spectre on a phone.
 
+## 1.1.29 — 22 October 2026
+
+- On Radar, Display dims Title line, Subtitle line, Show live path, RSSI bars, Frequency, and First / last seen. Timeline dims RSSI bars. The saved choice stays, and it comes back on a view that uses it. View, Sort, Brief hold, and Signature names stay available.
+- While Location is off, Fieldwatch does not ask for Wi-Fi or Bluetooth scans. Turning Location on waits a moment, then starts them again.
+- If Fieldwatch closes from a crash, the next open shows what happened before anything else starts. Copy sends it. Continue opens the app. A normal close does not show it.
+
 ## 1.1.28 — 22 October 2026
 
 - Show live path is on Display, the first switch, above RSSI bars. It starts off. Turn it on and a north-up map of this phone sits across the top of Live, with the list still under it. Drag the bar between the map and the list. While View is Radar the switch stays dimmed and does not turn off.

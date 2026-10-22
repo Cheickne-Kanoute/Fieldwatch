@@ -1078,6 +1078,8 @@
     "ui.fieldwatch.scanning": "Skenování Fieldwatch",
     "ui.passive.wi.fi.bluetooth": "Stav pasivního skenu Wi-Fi a Bluetooth",
     "ui.mark.seen": "Označit viděné",
-    "language.section.set.about": "Vyberte dostupný jazyk."
+    "language.section.set.about": "Vyberte dostupný jazyk.",
+    "crash.closed": "Fieldwatch se neočekávaně zavřel",
+    "crash.send": "Zkopírujte to a pošlete to."
   }
 }

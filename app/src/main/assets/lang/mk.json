@@ -1026,6 +1026,8 @@
     "ui.starting.radios": "Се пуштаат радијата…",
     "ui.fieldwatch.scanning": "Fieldwatch скенира",
     "ui.passive.wi.fi.bluetooth": "Пасивен статус на Wi-Fi и Bluetooth",
-    "language.section.set.about": "Изберете достапен јазик."
+    "language.section.set.about": "Изберете достапен јазик.",
+    "crash.closed": "Fieldwatch се затвори неочекувано",
+    "crash.send": "Копирајте го и испратете го."
   }
 }

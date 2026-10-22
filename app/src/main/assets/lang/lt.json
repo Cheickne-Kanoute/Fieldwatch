@@ -1022,6 +1022,8 @@
     "ui.starting.radios": "Paleidžiami radijo…",
     "ui.fieldwatch.scanning": "Fieldwatch skenuoja",
     "ui.passive.wi.fi.bluetooth": "Pasyvi Wi-Fi ir Bluetooth skenavimo būsena",
-    "language.section.set.about": "Pasirinkite galimą kalbą."
+    "language.section.set.about": "Pasirinkite galimą kalbą.",
+    "crash.closed": "Fieldwatch netikėtai užsidarė",
+    "crash.send": "Nukopijuokite ir išsiųskite."
   }
 }

@@ -919,6 +919,18 @@ class SitPathPlotTest {
         assertFalse(stock.copy(showLivePath = false, viewMode = ViewMode.LIST).livePathOnScreen())
     }
 
+    @Test
+    fun displayControlsFollowThePicture() {
+        assertFalse(ViewMode.RADAR.usesListFields())
+        assertFalse(ViewMode.RADAR.usesRssiBars())
+        assertTrue(ViewMode.TIMELINE.usesListFields())
+        assertFalse(ViewMode.TIMELINE.usesRssiBars())
+        listOf(ViewMode.LIST, ViewMode.HYBRID, ViewMode.BY_CLASS).forEach { mode ->
+            assertTrue(mode.usesListFields())
+            assertTrue(mode.usesRssiBars())
+        }
+    }
+
     private fun eastFraction(view: SitPathPlot.Viewport, lon: Double): Double {
         val cos0 = kotlin.math.cos(Math.toRadians(view.centerLat)).coerceAtLeast(0.2)
         val east = (lon - view.centerLon) * 111_320.0 * cos0

@@ -1053,6 +1053,14 @@ private fun ViewPicker(
     var openDecay by remember { mutableStateOf(false) }
     var openTitle by remember { mutableStateOf(false) }
     var openSubtitle by remember { mutableStateOf(false) }
+    val listFields = mode.usesListFields()
+    val rssiBars = mode.usesRssiBars()
+    LaunchedEffect(listFields) {
+        if (!listFields) {
+            openTitle = false
+            openSubtitle = false
+        }
+    }
     val sortLabel = when (listSort) {
         ListSort.STRENGTH -> if (sort == StrengthSort.AVERAGE) "Strongest · avg ${windowSec}s" else LanguageText.text("ui.strongest.label")
         ListSort.NEWEST -> LanguageText.text("ui.newest.heard")
@@ -1159,9 +1167,14 @@ private fun ViewPicker(
                     }
                 }
             }
-            ExposedDropdownMenuBox(openTitle, { openTitle = it }, dropdownPad) {
-                FieldwatchDropdownField(LanguageText.text("ui.title.line"), listLineLabel(titleLine), openTitle)
-                ExposedDropdownMenu(openTitle, { openTitle = false }) {
+            ExposedDropdownMenuBox(openTitle && listFields, { if (listFields) openTitle = it }, dropdownPad) {
+                FieldwatchDropdownField(
+                    LanguageText.text("ui.title.line"),
+                    listLineLabel(titleLine),
+                    openTitle && listFields,
+                    enabled = listFields,
+                )
+                ExposedDropdownMenu(openTitle && listFields, { openTitle = false }) {
                     listOf(ListLine.ADVERTISED_NAME, ListLine.NAME_AND_TYPE, ListLine.MAC).forEach { item ->
                         DropdownMenuItem(
                             text = { Text(listLineLabel(item)) },
@@ -1170,9 +1183,14 @@ private fun ViewPicker(
                     }
                 }
             }
-            ExposedDropdownMenuBox(openSubtitle, { openSubtitle = it }, dropdownPad) {
-                FieldwatchDropdownField(LanguageText.text("ui.subtitle.line"), listLineLabel(subtitleLine), openSubtitle)
-                ExposedDropdownMenu(openSubtitle, { openSubtitle = false }) {
+            ExposedDropdownMenuBox(openSubtitle && listFields, { if (listFields) openSubtitle = it }, dropdownPad) {
+                FieldwatchDropdownField(
+                    LanguageText.text("ui.subtitle.line"),
+                    listLineLabel(subtitleLine),
+                    openSubtitle && listFields,
+                    enabled = listFields,
+                )
+                ExposedDropdownMenu(openSubtitle && listFields, { openSubtitle = false }) {
                     listOf(
                         ListLine.ADVERTISED_NAME,
                         ListLine.NAME_AND_TYPE,
@@ -1190,12 +1208,22 @@ private fun ViewPicker(
                 LanguageText.text("display.live.path"),
                 showLivePath,
                 onToggleLivePath,
-                enabled = mode != ViewMode.RADAR,
+                enabled = listFields,
             )
-            OptionSwitch(LanguageText.text("display.rssi"), showBar, onToggleBar)
+            OptionSwitch(LanguageText.text("display.rssi"), showBar, onToggleBar, enabled = rssiBars)
             OptionSwitch(LanguageText.text("ui.signature.names"), showFleet, onToggleFleet)
-            OptionSwitch(LanguageText.text("ui.frequency.label"), showFrequency, onToggleFrequency)
-            OptionSwitch(LanguageText.text("ui.first.last.seen"), showSeenTimes, onToggleSeenTimes)
+            OptionSwitch(
+                LanguageText.text("ui.frequency.label"),
+                showFrequency,
+                onToggleFrequency,
+                enabled = listFields,
+            )
+            OptionSwitch(
+                LanguageText.text("ui.first.last.seen"),
+                showSeenTimes,
+                onToggleSeenTimes,
+                enabled = listFields,
+            )
         }
         if (scroll.canScrollForward) {
             Box(

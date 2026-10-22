@@ -1076,6 +1076,8 @@
     "ui.starting.radios": "Rádiók indítása…",
     "ui.fieldwatch.scanning": "Fieldwatch keres",
     "ui.passive.wi.fi.bluetooth": "Passzív Wi-Fi és Bluetooth keresés állapota",
-    "language.section.set.about": "Válasszon egy elérhető nyelvet."
+    "language.section.set.about": "Válasszon egy elérhető nyelvet.",
+    "crash.closed": "A Fieldwatch váratlanul bezárult",
+    "crash.send": "Másolja ki, és küldje el."
   }
 }

@@ -1075,6 +1075,8 @@
     "ui.starting.radios": "A iniciar as rádios…",
     "ui.fieldwatch.scanning": "Pesquisa do Fieldwatch",
     "ui.passive.wi.fi.bluetooth": "Estado da pesquisa passiva Wi-Fi e Bluetooth",
-    "language.section.set.about": "Selecione um idioma disponível."
+    "language.section.set.about": "Selecione um idioma disponível.",
+    "crash.closed": "O Fieldwatch fechou de repente",
+    "crash.send": "Copie e envie."
   }
 }

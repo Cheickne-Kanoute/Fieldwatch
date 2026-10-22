@@ -8,6 +8,7 @@ import android.location.LocationManager
 import android.os.Looper
 import androidx.core.content.ContextCompat
 import app.fieldwatch.alert.Alerter
+import app.fieldwatch.crash.CrashNotes
 import app.fieldwatch.radio.GnssMonitor
 import app.fieldwatch.data.AssetLanguageFiles
 import app.fieldwatch.data.ConfigStore
@@ -104,11 +105,31 @@ class FieldwatchApp : Application() {
     private var pathLengthM = 0.0
     @Volatile
     private var locating = false
+    @Volatile
+    var pendingCrash: CrashNotes.Pending? = null
+    private var started = false
     private val gpsListener = LocationListener { loc -> onProviderFix(loc, gps = true) }
     private val netListener = LocationListener { loc -> onProviderFix(loc, gps = false) }
 
     override fun onCreate() {
         super.onCreate()
+        CrashNotes.install(this)
+        pendingCrash = runCatching { CrashNotes.pending(this) }.getOrNull()
+        if (pendingCrash != null) return
+        startUp()
+    }
+
+    /** Opens the rest of the app after a crash note is dismissed. A normal launch calls this immediately. */
+    fun dismissCrashNote() {
+        val exitAt = pendingCrash?.exitAt ?: 0L
+        pendingCrash = null
+        runCatching { CrashNotes.dismiss(this, exitAt) }
+        startUp()
+    }
+
+    private fun startUp() {
+        if (started) return
+        started = true
         config = ConfigStore(this)
         RadioDb.init(this)
         devices = DeviceStore()

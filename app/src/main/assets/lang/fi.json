@@ -1076,6 +1076,8 @@
     "ui.starting.radios": "Käynnistetään radioita…",
     "ui.fieldwatch.scanning": "Fieldwatch hakee",
     "ui.passive.wi.fi.bluetooth": "Passiivisen Wi-Fi- ja Bluetooth-haun tila",
-    "language.section.set.about": "Valitse saatavilla oleva kieli."
+    "language.section.set.about": "Valitse saatavilla oleva kieli.",
+    "crash.closed": "Fieldwatch sulkeutui yllättäen",
+    "crash.send": "Kopioi tämä ja lähetä se."
   }
 }

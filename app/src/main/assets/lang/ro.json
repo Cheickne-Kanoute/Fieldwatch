@@ -1072,6 +1072,8 @@
     "ui.starting.radios": "Pornesc radiourile…",
     "ui.fieldwatch.scanning": "Fieldwatch scanează",
     "ui.passive.wi.fi.bluetooth": "Stare scanare pasivă Wi-Fi și Bluetooth",
-    "language.section.set.about": "Selectați o limbă disponibilă."
+    "language.section.set.about": "Selectați o limbă disponibilă.",
+    "crash.closed": "Fieldwatch s-a închis pe neașteptate",
+    "crash.send": "Copiați și trimiteți."
   }
 }

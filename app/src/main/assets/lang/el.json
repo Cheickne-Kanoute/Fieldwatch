@@ -1077,6 +1077,8 @@
     "ui.starting.radios": "Ξεκινούν τα radio…",
     "ui.fieldwatch.scanning": "Το Fieldwatch σαρώνει",
     "ui.passive.wi.fi.bluetooth": "Κατάσταση παθητικής σάρωσης Wi-Fi και Bluetooth",
-    "language.section.set.about": "Επιλέξτε μια διαθέσιμη γλώσσα."
+    "language.section.set.about": "Επιλέξτε μια διαθέσιμη γλώσσα.",
+    "crash.closed": "Το Fieldwatch έκλεισε απρόσμενα",
+    "crash.send": "Αντιγράψτε το και στείλτε το."
   }
 }

@@ -479,7 +479,7 @@ def draw_cover(c, doc):
         y -= 16
     c.setFillColor(MUTED)
     c.setFont("Helvetica", 9)
-    c.drawString(48, 108, "Version 1.1.28")
+    c.drawString(48, 108, "Version 1.1.29")
     c.drawString(48, 94, "22 October 2026")
     c.drawString(48, 80, "Package  app.fieldwatch   ·   Android 10+ (API 29)   ·   Target API 35")
     c.setStrokeColor(colors.HexColor("#2A3340"))
@@ -520,7 +520,7 @@ def draw_body(c, doc):
     c.line(48, 40, PAGE_W - 48, 40)
     c.setFillColor(MUTED)
     c.setFont("Helvetica", 8)
-    c.drawString(48, 28, "v1.1.28  ·  Off Grid Pete LLC")
+    c.drawString(48, 28, "v1.1.29  ·  Off Grid Pete LLC")
     draw_ig_mark(c, 148, 30, 5.2, MUTED)
     c.setFillColor(MUTED)
     c.setFont("Helvetica", 8)
@@ -897,7 +897,7 @@ def story():
         P("3.1 Android platform restrictions", "h2"),
         bullets([
             "<b>Wi-Fi scan throttle.</b> Android rate-limits WifiManager.startScan() to about four scans per two minutes. Fieldwatch therefore spaces requests at about 30 / 40 / 55 seconds (high / balanced / saver) and tracks the quota so it does not burst then black out. Wi-Fi is always a batch-then-wait radio — there is no continuous AP stream on stock Android. Settings → Faster Wi-Fi AP scans can drop that to about 8 s, but only after Developer options → Wi-Fi scan throttling is off and Fieldwatch has read that OS switch (Android 11+). Until then the stock cadence is the ceiling. A miss between batches is a miss for signatures: an interesting AP (Cradlepoint IBR*, AirLink OUI, UniFi, Cisco, a hidden fleet SSID) is only labeled if a scan ran while you were in range. On a drive that window is short. §7.1.1, §10.3.1.",
-            "<b>Location services must be on.</b> Without system Location enabled, BSSIDs and often BLE addresses are hidden or randomized further. Fine location is required even though Fieldwatch is not a mapping app.",
+            "<b>Location services must be on.</b> Without system Location enabled, BSSIDs and often BLE addresses are hidden or randomized further. Fine location is required even though Fieldwatch is not a mapping app. While Location is off, Fieldwatch does not ask for Wi-Fi or Bluetooth scans. Turning Location on waits a moment, then starts them again.",
             "<b>NEARBY_WIFI_DEVICES and BLUETOOTH_SCAN</b> are required on Android 12/13+. Fieldwatch does not set the neverForLocation flag, because that flag would strip the identifiers the signature engine needs.",
             "<b>OEM battery managers</b> (notably Samsung One UI) will freeze background radios unless the app is exempted. Settings → Allow background usage, then Unrestricted battery. Some phones (Samsung among them) do not open onto Unrestricted — tap Allow background usage to click through and select it.",
             "<b>Samsung BLE suspend.</b> Long low-latency unfiltered scans are parked after a few minutes. Fieldwatch recycles the scanner on a duty cycle (~70 s on, a few seconds rest) and restarts if ads go silent for ~18 s. The subtitle may read BLE cycling or BLE parked · restarting.",
@@ -1034,6 +1034,10 @@ def story():
             "Turn on system Location and Bluetooth if either is off. The Live display header and Settings show radio hints (Wi-Fi next Ns, waiting on OS, BLE cycling). Keep screen on is enabled by default. If you will leave the app: Settings → Allow background usage, then Unrestricted battery. Some phones (Samsung among them) do not open onto Unrestricted — tap Allow background usage to click through and select it.",
             ]),
             privacy=False,
+        ),
+        P(
+            "If Fieldwatch closes from a crash, the next open shows what happened before anything else starts. "
+            "The screen stays English. Copy sends the note. Continue opens the app. A normal close does not show it."
         ),
         callout(
             "Stay scanning",
@@ -1441,6 +1445,16 @@ def story():
             "<b>Frequency</b> — Switch, on by default. Channel and MHz sit under the RSSI on the right so a long name does not cut them off (for example <font face='Courier'>ch6 · 2437MHz</font>). BLE advertisements usually have no frequency.",
             "<b>First / last seen</b> — Switch, on by default. Age since first packet this session and age since the last packet, ticking once a second.",
         ]),
+        P(
+            "A control that does nothing on this view stays dimmed and does not change. "
+            "Radar dims Title line, Subtitle line, Show live path, RSSI bars, Frequency, and First / last seen. "
+            "Timeline dims RSSI bars. The dBm number and the presence bar stay. "
+            "View, Sort, Brief hold, and Signature names stay available. "
+            "On Radar, Strongest signal and Strongest (avg 30s) still move the rings, "
+            "Brief hold is how long a blip keeps its last strength, and Signature names still label a matched blip. "
+            "On Timeline, Brief hold is when the presence bar stops. "
+            "The saved choice comes back on a view that uses it. Changing the view does not turn a switch off."
+        ),
         P(
             "<b>Default row</b> (By class, Sort Strongest avg 30s, Title MAC, Subtitle Name + type, "
             "bars on, signatures on, Frequency on, first/last on, Brief hold 10 s): class glyph in "
@@ -6092,8 +6106,8 @@ def story():
                 ["X", "@OGridPete"],
                 ["Document", "User Manual and Technical Documentation"],
                 ["Application ID", "app.fieldwatch"],
-                ["Software version", "1.1.28 (versionCode 38), field build of 22 October 2026"],
-                ["Document version", "1.1.28"],
+                ["Software version", "1.1.29 (versionCode 39), field build of 22 October 2026"],
+                ["Document version", "1.1.29"],
                 ["Document date", "22 October 2026"],
                 ["License", "MIT License (see LICENSE); third-party: NOTICE"],
                 ["Platform", "Android 10+ (minSdk 29), targetSdk 35"],

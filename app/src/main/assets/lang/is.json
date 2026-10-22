@@ -1023,6 +1023,8 @@
     "ui.starting.radios": "Radio ræsast…",
     "ui.fieldwatch.scanning": "Fieldwatch skannar",
     "ui.passive.wi.fi.bluetooth": "Óvirk staða Wi-Fi og Bluetooth skönnunar",
-    "language.section.set.about": "Veldu tiltækt tungumál."
+    "language.section.set.about": "Veldu tiltækt tungumál.",
+    "crash.closed": "Fieldwatch lokaðist óvænt",
+    "crash.send": "Afritið þetta og sendið það."
   }
 }

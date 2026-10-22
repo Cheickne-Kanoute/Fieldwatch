@@ -1,9 +1,9 @@
 package app.fieldwatch.radio
 
 /**
- * Quiet period after the phone's Location switch turns on while a scan is already running.
- * Starting Wi-Fi, BLE, and a GPS listener on that frame has crashed some OEM stacks.
- * Radios stay stopped for [RADIO_QUIET_MS]. The GPS listener waits [LOCATION_LAG_MS] longer
+ * Quiet period after the phone's Location switch turns on.
+ * Scans stay stopped while Location is off. The off-to-on edge holds the radios for
+ * [RADIO_QUIET_MS] before they start again. The GPS listener waits [LOCATION_LAG_MS] longer
  * so it is not requested on the BLE restart frame.
  */
 class LocationQuietWindow(
@@ -25,12 +25,22 @@ class LocationQuietWindow(
         }
     }
 
-    /** True only on the off-to-on edge, which is when the quiet window starts. */
+    /**
+     * True only on the off-to-on edge, which is when the quiet window starts.
+     * Turning Location off cancels a pending restart so the scans stay down.
+     */
     fun observe(locationOn: Boolean): Boolean {
         synchronized(gate) {
-            val arm = wasOn == false && locationOn
+            val previous = wasOn
             wasOn = locationOn
-            if (!arm) return false
+            if (previous == true && !locationOn) {
+                radioUntil = 0L
+                locationUntil = 0L
+                radioResume = false
+                locationResume = false
+                return false
+            }
+            if (previous != false || !locationOn) return false
             val t = nowMs()
             radioUntil = t + radioQuietMs
             locationUntil = radioUntil + locationLagMs

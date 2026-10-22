@@ -1024,6 +1024,8 @@
     "ui.starting.radios": "Duke nisur radiot…",
     "ui.fieldwatch.scanning": "Fieldwatch po skanon",
     "ui.passive.wi.fi.bluetooth": "Gjendje pasive e skanimit Wi-Fi dhe Bluetooth",
-    "language.section.set.about": "Zgjidhni një gjuhë të disponueshme."
+    "language.section.set.about": "Zgjidhni një gjuhë të disponueshme.",
+    "crash.closed": "Fieldwatch u mbyll papritur",
+    "crash.send": "Kopjojeni dhe dërgojeni."
   }
 }

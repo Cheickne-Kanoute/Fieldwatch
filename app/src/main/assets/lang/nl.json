@@ -1061,6 +1061,8 @@
     "ui.starting.radios": "Radio's starten…",
     "ui.fieldwatch.scanning": "Fieldwatch scant",
     "ui.passive.wi.fi.bluetooth": "Passieve Wi-Fi- en Bluetooth-scanstatus",
-    "language.section.set.about": "Kies een beschikbare taal."
+    "language.section.set.about": "Kies een beschikbare taal.",
+    "crash.closed": "Fieldwatch sloot onverwacht",
+    "crash.send": "Kopieer dit en stuur het."
   }
 }

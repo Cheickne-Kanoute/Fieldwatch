@@ -1079,6 +1079,8 @@
     "ui.can.still.tag.path": "Još može označiti putanju. Prozor ostaje ugašen.",
     "ui.path.key.has.time": "Ključ putanje ima vrijeme i što se promijenilo.",
     "ui.retail.beacon.s.also.2": "Trgovinski svjetionici na putanji (neobično):",
-    "language.section.set.about": "Odaberite dostupan jezik."
+    "language.section.set.about": "Odaberite dostupan jezik.",
+    "crash.closed": "Fieldwatch se neočekivano zatvorio",
+    "crash.send": "Kopirajte ovo i pošaljite."
   }
 }

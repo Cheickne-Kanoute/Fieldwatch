@@ -25,6 +25,12 @@ enum class ViewMode {
         HYBRID -> LanguageText.text("view.hybrid")
         BY_CLASS -> LanguageText.text("view.by.class")
     }
+
+    /** Title, subtitle, frequency, first/last, and the live path are list fields. Radar has none of them. */
+    fun usesListFields(): Boolean = this != RADAR
+
+    /** Strength bar on Strength list, Hybrid, and By class. Radar and Timeline show strength another way. */
+    fun usesRssiBars(): Boolean = this == LIST || this == HYBRID || this == BY_CLASS
 }
 
 @Serializable

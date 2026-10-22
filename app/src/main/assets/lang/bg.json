@@ -1083,6 +1083,8 @@
     "ui.can.still.tag.path": "Още може да маркира път. Прозорецът е изключен.",
     "ui.path.key.has.time": "Ключът на пътя има времето и какво се промени.",
     "ui.quieter.than.few.seconds": "По-тихо от преди малко. Обърнете се или назад.",
-    "language.section.set.about": "Изберете наличен език."
+    "language.section.set.about": "Изберете наличен език.",
+    "crash.closed": "Fieldwatch се затвори неочаквано",
+    "crash.send": "Копирайте това и го изпратете."
   }
 }

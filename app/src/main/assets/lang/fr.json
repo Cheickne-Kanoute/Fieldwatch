@@ -1054,6 +1054,8 @@
     "ui.starting.radios": "Démarrage des radios…",
     "ui.fieldwatch.scanning": "Balayage Fieldwatch",
     "ui.passive.wi.fi.bluetooth": "État du balayage passif Wi-Fi et Bluetooth",
-    "language.section.set.about": "Sélectionnez une langue disponible."
+    "language.section.set.about": "Sélectionnez une langue disponible.",
+    "crash.closed": "Fieldwatch s'est fermé sans prévenir",
+    "crash.send": "Copiez ceci et envoyez-le."
   }
 }

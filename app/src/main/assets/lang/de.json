@@ -1062,6 +1062,8 @@
     "ui.starting.radios": "Radios starten…",
     "ui.fieldwatch.scanning": "Fieldwatch-Abtastung",
     "ui.passive.wi.fi.bluetooth": "Passiver Wi-Fi- und Bluetooth-Status",
-    "language.section.set.about": "Wählen Sie eine verfügbare Sprache."
+    "language.section.set.about": "Wählen Sie eine verfügbare Sprache.",
+    "crash.closed": "Fieldwatch wurde unerwartet beendet",
+    "crash.send": "Kopieren und senden."
   }
 }

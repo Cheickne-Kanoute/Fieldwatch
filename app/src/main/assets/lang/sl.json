@@ -1078,6 +1078,8 @@
     "ui.no.internet.use.import": "Ni interneta. Uporabite Import signatures.",
     "ui.phone.was.moving.stand": "Telefon se je gibal. Mirujte in poskusite znova.",
     "ui.quieter.than.few.seconds": "Tišje kot prej. Obrnite se ali se vrnite.",
-    "language.section.set.about": "Izberite razpoložljiv jezik."
+    "language.section.set.about": "Izberite razpoložljiv jezik.",
+    "crash.closed": "Fieldwatch se je nepričakovano zaprl",
+    "crash.send": "Kopirajte in pošljite."
   }
 }

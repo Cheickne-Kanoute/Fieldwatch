@@ -1070,6 +1070,8 @@
     "ui.also.offers": "Offre anche:",
     "ui.check.label": "Controllo:",
     "ui.fieldwatch.app.fieldwatch.stock": "Fieldwatch (app.fieldwatch) · Android di serie · solo ricezione, AP Wi-Fi + annunci BLE",
-    "language.section.set.about": "Seleziona una lingua disponibile."
+    "language.section.set.about": "Seleziona una lingua disponibile.",
+    "crash.closed": "Fieldwatch si è chiuso all'improvviso",
+    "crash.send": "Copialo e invialo."
   }
 }

@@ -1069,6 +1069,8 @@
     "ui.starting.radios": "Startar radio…",
     "ui.fieldwatch.scanning": "Fieldwatch söker",
     "ui.passive.wi.fi.bluetooth": "Passiv Wi-Fi- och Bluetooth-status",
-    "language.section.set.about": "Välj ett tillgängligt språk."
+    "language.section.set.about": "Välj ett tillgängligt språk.",
+    "crash.closed": "Fieldwatch stängdes oväntat",
+    "crash.send": "Kopiera det här och skicka det."
   }
 }

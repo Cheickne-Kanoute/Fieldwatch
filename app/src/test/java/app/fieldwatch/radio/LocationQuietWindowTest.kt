@@ -60,6 +60,19 @@ class LocationQuietWindowTest {
     }
 
     @Test
+    fun turningLocationOffCancelsAPendingRestart() {
+        window.seed(false)
+        assertTrue(window.observe(true))
+        assertTrue(window.radiosHeld())
+        assertFalse(window.observe(false))
+        assertFalse(window.radiosHeld())
+        assertFalse(window.locationHeld())
+        now += LocationQuietWindow.RADIO_QUIET_MS + LocationQuietWindow.LOCATION_LAG_MS
+        assertFalse(window.takeRadioResume())
+        assertFalse(window.takeLocationResume())
+    }
+
+    @Test
     fun aSecondOffToOnRestartsTheWindow() {
         window.seed(false)
         assertTrue(window.observe(true))

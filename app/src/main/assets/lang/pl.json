@@ -1076,6 +1076,8 @@
     "ui.mark.seen": "Oznacz widziane",
     "ui.medium.low.will.steadier": "Średnia lub niska jest spokojniejsza niż wysoka.",
     "ui.can.still.tag.path": "Może oznaczyć ścieżkę. Okno zostaje wyłączone.",
-    "language.section.set.about": "Wybierz dostępny język."
+    "language.section.set.about": "Wybierz dostępny język.",
+    "crash.closed": "Fieldwatch zamknął się niespodziewanie",
+    "crash.send": "Skopiuj to i wyślij."
   }
 }

@@ -1079,6 +1079,8 @@
     "ui.closer.0.dbm.louder": "Bližšie k 0 dBm je hlasnejšie, nie vzdialenosť.",
     "ui.fail.any.one.omit": "Jedna chyba → vynechať (minutie), nie chvost.",
     "ui.quieter.than.few.seconds": "Tichšie než pred chvíľou. Otočte sa či cúvnite.",
-    "language.section.set.about": "Vyberte dostupný jazyk."
+    "language.section.set.about": "Vyberte dostupný jazyk.",
+    "crash.closed": "Fieldwatch sa neočakávane zavrel",
+    "crash.send": "Skopírujte to a pošlite."
   }
 }

@@ -1017,6 +1017,8 @@
     "ui.starting.radios": "Palaiž radio…",
     "ui.fieldwatch.scanning": "Fieldwatch skenē",
     "ui.passive.wi.fi.bluetooth": "Pasīvs Wi-Fi un Bluetooth skenēšanas statuss",
-    "language.section.set.about": "Izvēlieties pieejamu valodu."
+    "language.section.set.about": "Izvēlieties pieejamu valodu.",
+    "crash.closed": "Fieldwatch negaidīti aizvērās",
+    "crash.send": "Nokopējiet un nosūtiet."
   }
 }

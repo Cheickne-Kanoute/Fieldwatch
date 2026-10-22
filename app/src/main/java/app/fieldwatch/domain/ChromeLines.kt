@@ -437,6 +437,8 @@ internal object ChromeLines {
         en("ui.hide.burst", "Hide this burst", LanguageSlot.CONTROL),
 
         en("ui.continue.label", "Continue", LanguageSlot.CONTROL),
+        en("crash.closed", "Fieldwatch closed unexpectedly", LanguageSlot.CONTROL),
+        en("crash.send", "Copy this and send it.", LanguageSlot.BODY),
         en("ui.display.paused.radios.still", "Display paused · radios still scanning and logging. Filters still apply when you run again. Tap Live to run the list again.", LanguageSlot.BODY),
         en("ui.new.only.learning.sitting", "New only · learning sitting Wi-Fi", LanguageSlot.CONTROL),
         en("ui.new.only", "New only", LanguageSlot.CONTROL),
