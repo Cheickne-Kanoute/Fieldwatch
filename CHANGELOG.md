@@ -4,6 +4,10 @@ Newest first. This is Fieldwatch (`app.fieldwatch`). Each build below is what Se
 
 Fieldwatch continues the Spectre 1.2.14 field build under a new name, application id, and the MIT License. It does not replace Spectre on a phone.
 
+## 1.1.30 — 22 October 2026
+
+- Places no longer closes the app on Android 10 and 11.
+
 ## 1.1.29 — 22 October 2026
 
 - On Radar, Display dims Title line, Subtitle line, Show live path, RSSI bars, Frequency, and First / last seen. Timeline dims RSSI bars. The saved choice stays, and it comes back on a view that uses it. View, Sort, Brief hold, and Signature names stay available.

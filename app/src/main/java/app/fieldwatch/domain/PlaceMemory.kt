@@ -293,11 +293,12 @@ object PlaceMemory {
         return if (street.isNullOrBlank()) "$head · $coord" else "$head · $street · $coord"
     }
 
-    private fun onSameDay(at: Long, now: Long, zone: ZoneId): Boolean {
-        val day = LocalDate.ofInstant(Instant.ofEpochMilli(at), zone)
-        val today = LocalDate.ofInstant(Instant.ofEpochMilli(now), zone)
-        return day == today
-    }
+    private fun onSameDay(at: Long, now: Long, zone: ZoneId): Boolean =
+        localDate(at, zone) == localDate(now, zone)
+
+    /** LocalDate.ofInstant is API 31. minSdk is 29. */
+    internal fun localDate(atMs: Long, zone: ZoneId): LocalDate =
+        Instant.ofEpochMilli(atMs).atZone(zone).toLocalDate()
 
     private fun formatAt(at: Long, zone: ZoneId, dated: Boolean): String {
         val zoned = Instant.ofEpochMilli(at).atZone(zone)

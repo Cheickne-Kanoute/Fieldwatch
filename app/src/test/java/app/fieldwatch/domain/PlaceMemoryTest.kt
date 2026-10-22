@@ -8,6 +8,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.time.ZoneOffset
 
 class PlaceMemoryTest {
@@ -238,6 +240,14 @@ class PlaceMemoryTest {
         } finally {
             file.delete()
         }
+    }
+
+    @Test
+    fun localDateFollowsThePhoneZone() {
+        val east = ZoneId.of("America/New_York")
+        val at = Instant.parse("2026-06-15T03:30:00Z")
+        assertEquals(LocalDate.of(2026, 6, 14), PlaceMemory.localDate(at.toEpochMilli(), east))
+        assertEquals(LocalDate.of(2026, 6, 15), PlaceMemory.localDate(at.toEpochMilli(), ZoneOffset.UTC))
     }
 
     private fun visit(prev: PlaceMemory.Record?, at: Pair<Double, Double>, whenAt: Long): PlaceMemory.Record {

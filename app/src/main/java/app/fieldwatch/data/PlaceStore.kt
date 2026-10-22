@@ -13,8 +13,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
-import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 
 /**
@@ -77,7 +75,7 @@ class PlaceStore(private val file: File) {
             for (device in devices) {
                 val id = PlaceMemory.accept(device, names, mine) ?: continue
                 val at = if (device.lastSeen > 0L) device.lastSeen else now
-                val day = LocalDate.ofInstant(Instant.ofEpochMilli(at), zone).toEpochDay()
+                val day = PlaceMemory.localDate(at, zone).toEpochDay()
                 val prev = records[id]
                 val next = PlaceMemory.prune(
                     PlaceMemory.note(
