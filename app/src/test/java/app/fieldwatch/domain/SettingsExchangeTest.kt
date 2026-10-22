@@ -52,6 +52,8 @@ class SettingsExchangeTest {
         assertTrue(stock.alertBeep)
         assertEquals(ViewMode.BY_CLASS, stock.viewMode)
         assertTrue(stock.showRssiBar)
+        assertFalse(stock.showLivePath)
+        assertEquals(0.5f, stock.livePathSplit, 0.001f)
         assertTrue(stock.showFleetName)
         assertTrue(stock.showFrequency)
         assertTrue(stock.showSeenTimes)

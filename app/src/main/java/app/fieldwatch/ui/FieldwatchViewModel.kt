@@ -39,6 +39,7 @@ import app.fieldwatch.domain.FilterEngine
 import app.fieldwatch.domain.Geo
 import app.fieldwatch.domain.GeoExport
 import app.fieldwatch.domain.GpsSample
+import app.fieldwatch.domain.livePathOnScreen
 import app.fieldwatch.domain.LogExportKind
 import app.fieldwatch.domain.LogExportRadios
 import app.fieldwatch.domain.ScanRadioFacts
@@ -93,7 +94,9 @@ import app.fieldwatch.domain.SitPathPlot
 import app.fieldwatch.domain.SitUi
 import app.fieldwatch.radio.RadioPermissions
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -106,6 +109,8 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import java.io.File
 import java.util.UUID
 
@@ -182,6 +187,12 @@ data class FieldwatchUi(
     val takInstallTag: String = "",
     val sit: SitUi = SitUi(),
     val catalogVersion: Int = 0,
+    /** Phone GPS while Show live path is on this view. Empty when the band is off. Windowed. */
+    val operatorPath: List<GpsSample> = emptyList(),
+    /** Start of the live-map window. Sit start, or the later of switch-on and 15 minutes ago. */
+    val livePathSince: Long = Long.MIN_VALUE,
+    /** Watchlist alerts drawn on the live map. Not the filtered list. */
+    val livePathRadios: List<Sighting> = emptyList(),
 )
 
 class FieldwatchViewModel(application: Application) : AndroidViewModel(application) {
@@ -213,6 +224,10 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
     val sitPath: StateFlow<SitPathPlot.Model?> = _sitPath
     private val _pathTiles = MutableStateFlow<List<PathTiles.Tile>>(emptyList())
     val pathTiles: StateFlow<List<PathTiles.Tile>> = _pathTiles
+    private val _livePathTiles = MutableStateFlow<List<PathTiles.Tile>>(emptyList())
+    val livePathTiles: StateFlow<List<PathTiles.Tile>> = _livePathTiles
+    private var livePathTileJob: Job? = null
+    private var livePathTileKey: String? = null
     private val _pathAircraftTiles = MutableStateFlow<List<List<PathTiles.Tile>>>(emptyList())
     val pathAircraftTiles: StateFlow<List<List<PathTiles.Tile>>> = _pathAircraftTiles
     @Volatile private var pathRadios: List<Sighting> = emptyList()
@@ -227,6 +242,19 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
     private val _alertedKeys = MutableStateFlow<Set<String>>(emptySet())
     val alertedKeys: StateFlow<Set<String>> = _alertedKeys
     private val clock = MutableStateFlow(System.currentTimeMillis())
+
+    /** When Show live path last turned on, or when the last sit ended while the switch stayed on. */
+    @Volatile
+    private var livePathArmedAt: Long = System.currentTimeMillis()
+
+    /**
+     * Where the blue dot was at [livePathArmedAt]. The stored line only moves its
+     * tip until the next bend, so the window needs this point to draw a stroke.
+     */
+    @Volatile
+    private var livePathMark: GpsSample? = null
+    private var openSitId: String? = null
+    private var sawSitUi = false
     private val locationEpoch = MutableStateFlow(0)
     private val locationReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -425,6 +453,29 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
             bleStarting = stats.bleStarting,
             bleHitsLastMin = stats.bleHitsLastMin,
         )
+        val pathOn = config.settings.livePathOnScreen()
+        val alertKeys = if (pathOn) RadioBookmarks.alertDeviceKeys(config.watchlist) else emptySet()
+        val watchedFleets = if (pathOn) RadioBookmarks.watchedFleetIds(config.watchlist) else emptySet()
+        val openPath = if (pathOn) {
+            app.sits.openLivePath(alertKeys, watchedFleets, hiddenFlood)
+        } else {
+            null
+        }
+        val pathSince = if (pathOn) {
+            SitPathPlot.livePathSince(now, livePathArmedAt, openPath?.startAt)
+        } else {
+            Long.MIN_VALUE
+        }
+        val pathSamples = when {
+            !pathOn -> emptyList()
+            openPath != null -> openPath.samples
+            else -> SitPathPlot.livePathSamples(app.operatorPathCopy(), pathSince, livePathMark)
+        }
+        val pathRadios = when {
+            !pathOn -> emptyList()
+            openPath != null -> openPath.radios
+            else -> SitPathPlot.livePathRadios(labeled, pathSince, alertKeys, watchedFleets, hiddenFlood)
+        }
         FieldwatchUi(
             devices = labeled,
             filtered = filtered,
@@ -455,6 +506,9 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
             takStatus = takStatus,
             takInstallTag = config.takInstallTag,
             catalogVersion = config.version,
+            operatorPath = pathSamples,
+            livePathSince = pathSince,
+            livePathRadios = pathRadios,
         )
     }.flowOn(Dispatchers.Default)
         .stateIn(
@@ -532,6 +586,7 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     init {
+        armLivePath()
         app.loadedLanguage()?.let { store ->
             _language.value = LanguageUiState(store.current())
         }
@@ -567,7 +622,13 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
         }
         viewModelScope.launch {
             app.sits.ui.collect { sit ->
-                val open = sit.open != null
+                val id = sit.open?.id
+                if (sawSitUi && openSitId != null && id == null) {
+                    armLivePath()
+                }
+                sawSitUi = true
+                openSitId = id
+                val open = id != null
                 app.pairingFlood.setSitOpen(open)
                 app.wifiFlood.setSitOpen(open)
                 refreshSitPath()
@@ -809,6 +870,89 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
             app.config.update {
                 it.copy(settings = it.settings.copy(showRssiBar = !it.settings.showRssiBar))
             }
+        }
+    }
+
+    private fun armLivePath(at: Long = System.currentTimeMillis()) {
+        livePathArmedAt = at
+        val tip = app.operatorPathCopy().lastOrNull()
+        livePathMark = tip?.let { GpsSample(at, it.lat, it.lon) }
+    }
+
+    fun toggleLivePath() {
+        viewModelScope.launch {
+            app.config.update { config ->
+                val on = !config.settings.showLivePath
+                if (on) armLivePath()
+                config.copy(settings = config.settings.copy(showLivePath = on))
+            }
+        }
+    }
+
+    /** Persist the divider after the finger lifts. Skip a write that did not really move. */
+    fun setLivePathSplit(fraction: Float) {
+        val next = fraction.coerceIn(0.22f, 0.78f)
+        viewModelScope.launch {
+            app.config.update {
+                val current = it.settings.livePathSplit
+                if (abs(current - next) < 0.01f) it
+                else it.copy(settings = it.settings.copy(livePathSplit = next))
+            }
+        }
+    }
+
+    /**
+     * Street tiles for the live path only. Reports keep [pathTiles].
+     * One fix is enough to show the neighborhood. The line still needs a second point.
+     * A coarse key skips a fetch while the walk has barely moved.
+     */
+    fun refreshLivePathTiles(samples: List<GpsSample>, online: Boolean) {
+        if (!online || samples.isEmpty()) {
+            livePathTileJob?.cancel()
+            livePathTileJob = null
+            livePathTileKey = null
+            if (_livePathTiles.value.isNotEmpty()) _livePathTiles.value = emptyList()
+            return
+        }
+        val end = samples.last()
+        val key = "${samples.size / 4}:${(end.lat * 1000.0).roundToInt()}:${(end.lon * 1000.0).roundToInt()}"
+        if (key == livePathTileKey) return
+        livePathTileKey = key
+        livePathTileJob?.cancel()
+        livePathTileJob = viewModelScope.launch(Dispatchers.Default) {
+            val tiles = runCatching {
+                PathTiles.load(app, samples, onlineLookup = true)
+            }.getOrDefault(emptyList())
+            if (isActive && livePathTileKey == key) _livePathTiles.value = tiles
+        }
+    }
+
+    /**
+     * Tiles for the area the user is looking at. The pictures already on screen stay
+     * until the new ones arrive. The same tile set is not fetched again.
+     */
+    fun refreshLivePathViewport(view: SitPathPlot.Viewport, online: Boolean) {
+        if (!online) {
+            refreshLivePathTiles(emptyList(), false)
+            return
+        }
+        val bounds = view.coveredBounds()
+        val key = "v:" + PathTiles.coverageKey(bounds[0], bounds[1], bounds[2], bounds[3])
+        if (key == "v:off" || key == livePathTileKey) return
+        livePathTileKey = key
+        livePathTileJob?.cancel()
+        livePathTileJob = viewModelScope.launch(Dispatchers.Default) {
+            val tiles = runCatching {
+                PathTiles.loadBounds(
+                    app,
+                    south = bounds[0],
+                    north = bounds[1],
+                    west = bounds[2],
+                    east = bounds[3],
+                    onlineLookup = true,
+                )
+            }.getOrDefault(emptyList())
+            if (isActive && livePathTileKey == key && tiles.isNotEmpty()) _livePathTiles.value = tiles
         }
     }
 
@@ -1964,6 +2108,7 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
         return PathTiles.load(
             app, samples,
             onlineLookup = settings.onlineLookup,
+            forPrint = true,
         )
     }
 
@@ -1991,7 +2136,7 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
             }
             _pathAircraftTiles.value = model.aircraftCards.map { card ->
                 val samples = card.craft.flatMap { it.samples }
-                if (samples.size < 2) {
+                if (samples.isEmpty()) {
                     emptyList()
                 } else {
                     runCatching {

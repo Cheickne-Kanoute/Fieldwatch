@@ -698,6 +698,7 @@ private fun FieldwatchShell(state: FieldwatchUi, vm: FieldwatchViewModel) {
                             listSort = state.settings.listSort,
                             windowSec = state.settings.averageWindowSec,
                             decaySec = state.settings.decaySec,
+                            showLivePath = state.settings.showLivePath,
                             showBar = state.settings.showRssiBar,
                             showFleet = state.settings.showFleetName,
                             showFrequency = state.settings.showFrequency,
@@ -708,6 +709,7 @@ private fun FieldwatchShell(state: FieldwatchUi, vm: FieldwatchViewModel) {
                             onChangeSort = vm::setStrengthSort,
                             onChangeListSort = vm::setListSort,
                             onChangeDecay = vm::setDecaySec,
+                            onToggleLivePath = vm::toggleLivePath,
                             onToggleBar = vm::toggleRssiBar,
                             onToggleFleet = vm::toggleFleetName,
                             onToggleFrequency = vm::toggleFrequency,
@@ -1026,6 +1028,7 @@ private fun ViewPicker(
     listSort: ListSort,
     windowSec: Int,
     decaySec: Int,
+    showLivePath: Boolean,
     showBar: Boolean,
     showFleet: Boolean,
     showFrequency: Boolean,
@@ -1036,6 +1039,7 @@ private fun ViewPicker(
     onChangeSort: (StrengthSort, Int?) -> Unit,
     onChangeListSort: (ListSort) -> Unit,
     onChangeDecay: (Int) -> Unit,
+    onToggleLivePath: () -> Unit,
     onToggleBar: () -> Unit,
     onToggleFleet: () -> Unit,
     onToggleFrequency: () -> Unit,
@@ -1182,6 +1186,12 @@ private fun ViewPicker(
                     }
                 }
             }
+            OptionSwitch(
+                LanguageText.text("display.live.path"),
+                showLivePath,
+                onToggleLivePath,
+                enabled = mode != ViewMode.RADAR,
+            )
             OptionSwitch(LanguageText.text("display.rssi"), showBar, onToggleBar)
             OptionSwitch(LanguageText.text("ui.signature.names"), showFleet, onToggleFleet)
             OptionSwitch(LanguageText.text("ui.frequency.label"), showFrequency, onToggleFrequency)
@@ -1267,15 +1277,33 @@ private fun LiveSessionBar(
 }
 
 @Composable
-private fun OptionSwitch(label: String, checked: Boolean, onToggle: () -> Unit) {
+private fun OptionSwitch(
+    label: String,
+    checked: Boolean,
+    onToggle: () -> Unit,
+    enabled: Boolean = true,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        FieldwatchSwitch(checked, { onToggle() })
+        Text(
+            label,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.38f),
+        )
+        FieldwatchSwitch(
+            checked = checked,
+            onCheckedChange = if (enabled) {
+                { onToggle() }
+            } else {
+                null
+            },
+            enabled = enabled,
+        )
     }
 }
 

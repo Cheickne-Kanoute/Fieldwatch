@@ -10,6 +10,7 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.core.content.ContextCompat
 import app.fieldwatch.domain.Observation
 import app.fieldwatch.domain.RadioKind
@@ -38,9 +39,11 @@ class WifiRadio(
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context?, intent: Intent?) {
-            if (intent?.action != WifiManager.SCAN_RESULTS_AVAILABLE_ACTION) return
-            val updated = intent.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, false)
-            emitResults(fresh = updated || awaitingScan.get())
+            guardResults {
+                if (intent?.action != WifiManager.SCAN_RESULTS_AVAILABLE_ACTION) return@guardResults
+                val updated = intent.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, false)
+                emitResults(fresh = updated || awaitingScan.get())
+            }
         }
     }
 
@@ -49,12 +52,12 @@ class WifiRadio(
             override fun onScanResultsAvailable() {
                 // Only a scan we asked for is "fresh". Spontaneous callbacks are often a
                 // partial or cached set; treating those as fresh ages every other AP off.
-                emitResults(fresh = awaitingScan.get())
+                guardResults { emitResults(fresh = awaitingScan.get()) }
             }
         }
     } else null
 
-    private val poll = Runnable { emitResults(fresh = awaitingScan.get()) }
+    private val poll = Runnable { guardResults { emitResults(fresh = awaitingScan.get()) } }
 
     @SuppressLint("MissingPermission")
     fun start() {
@@ -142,30 +145,61 @@ class WifiRadio(
 
     @SuppressLint("MissingPermission")
     private fun emitResults(fresh: Boolean) {
-        val nowWall = System.currentTimeMillis()
-        val results = runCatching { wifi.scanResults }.getOrDefault(emptyList())
-        if (results.isEmpty()) {
-            if (awaitingScan.get()) {
-                main.removeCallbacks(poll)
-                main.postDelayed(poll, 1_200L)
+        try {
+            val nowWall = System.currentTimeMillis()
+            val results = runCatching { wifi.scanResults }.getOrDefault(emptyList())
+            if (results.isEmpty()) {
+                if (awaitingScan.get()) {
+                    main.removeCallbacks(poll)
+                    main.postDelayed(poll, 1_200L)
+                }
+                return
             }
-            return
+            if (nowWall - lastEmitAt.get() < 350L) return
+            lastEmitAt.set(nowWall)
+            val isFresh = fresh || awaitingScan.get()
+            awaitingScan.set(false)
+            var count = 0
+            val batch = ArrayList<Observation>(results.size)
+            for (result in results) {
+                val obs = try {
+                    if (result.BSSID.isNullOrBlank()) continue
+                    toObservation(result, nowWall, isFresh)
+                } catch (t: Throwable) {
+                    Log.e(TAG, "scan result failed", t)
+                    continue
+                }
+                count++
+                batch += obs
+                try {
+                    onObservation(obs)
+                } catch (t: Throwable) {
+                    Log.e(TAG, "scan result failed", t)
+                }
+            }
+            try {
+                onScanFinished(count, isFresh)
+            } catch (t: Throwable) {
+                Log.e(TAG, "scan finished failed", t)
+            }
+            if (isFresh && batch.isNotEmpty()) {
+                try {
+                    onFreshScan(batch)
+                } catch (t: Throwable) {
+                    Log.e(TAG, "fresh scan failed", t)
+                }
+            }
+        } catch (t: Throwable) {
+            Log.e(TAG, "scan results failed", t)
         }
-        if (nowWall - lastEmitAt.get() < 350L) return
-        lastEmitAt.set(nowWall)
-        val isFresh = fresh || awaitingScan.get()
-        awaitingScan.set(false)
-        var count = 0
-        val batch = ArrayList<Observation>(results.size)
-        results.forEach { result ->
-            if (result.BSSID.isNullOrBlank()) return@forEach
-            count++
-            val obs = toObservation(result, nowWall, isFresh)
-            batch += obs
-            onObservation(obs)
+    }
+
+    private inline fun guardResults(block: () -> Unit) {
+        try {
+            block()
+        } catch (t: Throwable) {
+            Log.e(TAG, "scan results failed", t)
         }
-        onScanFinished(count, isFresh)
-        if (isFresh && batch.isNotEmpty()) onFreshScan(batch)
     }
 
     private fun toObservation(result: ScanResult, nowWall: Long, fresh: Boolean): Observation {
@@ -205,6 +239,7 @@ class WifiRadio(
     }
 
     companion object {
+        private const val TAG = "FieldwatchWifi"
         private const val QUOTA_SCANS = 4
         private const val QUOTA_WINDOW_MS = 120_000L
         const val FAST_INTERVAL_MS = 8_000L

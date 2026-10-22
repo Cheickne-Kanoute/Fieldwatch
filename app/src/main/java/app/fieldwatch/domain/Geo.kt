@@ -1,7 +1,9 @@
 package app.fieldwatch.domain
 
+import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -265,6 +267,102 @@ object Geo {
             i++
         }
         return if (out.size >= 2) out else samples.take(1) + samples.takeLast(1)
+    }
+
+    /**
+     * A bend is kept when the drive leaves the last line by about a road's width.
+     * Side-to-side GPS wobble under this stays off the line, so a straight road
+     * does not turn into a zigzag. Same rule in a sit and out of one.
+     */
+    const val DRIVE_CROSS_M = 12.0
+    const val DRIVE_MAX_ACCURACY_M = 25f
+    const val TRACK_CAP = 2_000
+
+    class DriveApex {
+        var sample: GpsSample? = null
+        fun clear() {
+            sample = null
+        }
+    }
+
+    /** GPS only, and only when the fix is tight enough to belong on the driven line. */
+    fun acceptDriveFix(gps: Boolean, accuracyM: Float?): Boolean {
+        if (!gps) return false
+        if (accuracyM != null && accuracyM > DRIVE_MAX_ACCURACY_M) return false
+        return true
+    }
+
+    /** Signed meters of [p] off the line from [a] to [b]. Zero when the line is too short to trust. */
+    fun crossTrackMeters(
+        aLat: Double,
+        aLon: Double,
+        bLat: Double,
+        bLon: Double,
+        pLat: Double,
+        pLon: Double,
+    ): Double {
+        val cosLat = cos(Math.toRadians(aLat)).coerceAtLeast(0.2)
+        val eastB = (bLon - aLon) * 111_320.0 * cosLat
+        val northB = (bLat - aLat) * 111_320.0
+        val eastP = (pLon - aLon) * 111_320.0 * cosLat
+        val northP = (pLat - aLat) * 111_320.0
+        val len = hypot(eastB, northB)
+        if (len < 1.0) return 0.0
+        return (eastB * northP - northB * eastP) / len
+    }
+
+    /**
+     * Corners plus a moving tip. The tip is where the phone is now. A new corner
+     * is the point that left the last line by more than [crossM], which is the
+     * apex of a bend rather than every GPS wobble.
+     * Returns true when the oldest corner was dropped to stay inside [cap].
+     */
+    fun extendDrivePath(
+        path: MutableList<GpsSample>,
+        apex: DriveApex,
+        lat: Double,
+        lon: Double,
+        at: Long,
+        cap: Int = TRACK_CAP,
+        crossM: Double = DRIVE_CROSS_M,
+    ): Boolean {
+        val fix = GpsSample(at, lat, lon)
+        if (path.isEmpty()) {
+            path += fix
+            apex.clear()
+            return false
+        }
+        if (path.size == 1) {
+            path += fix
+            apex.clear()
+            return false
+        }
+        val anchor = path[path.lastIndex - 1]
+        val tip = path.last()
+        val devTip = abs(crossTrackMeters(anchor.lat, anchor.lon, fix.lat, fix.lon, tip.lat, tip.lon))
+        val held = apex.sample
+        val devHeld = if (held == null) {
+            -1.0
+        } else {
+            abs(crossTrackMeters(anchor.lat, anchor.lon, fix.lat, fix.lon, held.lat, held.lon))
+        }
+        val best = if (held != null && devHeld > devTip) held else tip
+        val bestDev = max(devTip, devHeld)
+        if (bestDev > crossM && meters(anchor.lat, anchor.lon, best.lat, best.lon) >= crossM) {
+            path[path.lastIndex] = best
+            path += fix
+            apex.clear()
+            var trimmed = false
+            while (path.size > cap) {
+                path.removeAt(0)
+                trimmed = true
+            }
+            if (trimmed) apex.clear()
+            return trimmed
+        }
+        apex.sample = best
+        path[path.lastIndex] = fix
+        return false
     }
 
     fun append(trail: List<GpsSample>, at: Long, lat: Double, lon: Double, rssi: Int, cap: Int = 48): List<GpsSample> {

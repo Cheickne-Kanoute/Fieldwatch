@@ -6,11 +6,17 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -21,8 +27,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -77,6 +86,11 @@ fun SitPathCanvas(
     modifier: Modifier = Modifier,
     tiles: List<PathTiles.Tile> = emptyList(),
     onOpenRadio: (String) -> Unit = {},
+    /** Live path fills its parent. Reports keep the fixed picture. */
+    expand: Boolean = false,
+    viewport: SitPathPlot.Viewport? = null,
+    /** Pinch, drag, and recenter. Reports leave this null and stay fitted. */
+    onViewport: ((SitPathPlot.Viewport?) -> Unit)? = null,
 ) {
     val track = MaterialTheme.colorScheme.onSurface
     val night = LocalNightMode.current
@@ -92,9 +106,14 @@ fun SitPathCanvas(
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
     var selectedId by remember { mutableStateOf<String?>(null) }
     var selectedGnss by remember { mutableStateOf<String?>(null) }
-    val layout = remember(model, boxSize) {
+    val layout = remember(model, boxSize, viewport) {
         if (boxSize.width < 8 || boxSize.height < 8) null
-        else SitPathPlot.layout(model, boxSize.width.toFloat(), boxSize.height.toFloat())
+        else SitPathPlot.layout(
+            model,
+            boxSize.width.toFloat(),
+            boxSize.height.toFloat(),
+            viewport = viewport,
+        )
     }
     val clusters = remember(layout, model) {
         val lay = layout
@@ -112,42 +131,96 @@ fun SitPathCanvas(
     val markers = remember(layout, model.live, boxSize.width) {
         pathMarkers(layout, model.live, boxSize.width.toFloat(), measurer, labelStyle)
     }
+    val layoutRef = remember { mutableStateOf(layout) }
+    val viewportRef = remember { mutableStateOf(viewport) }
+    val onViewportRef = remember { mutableStateOf(onViewport) }
+    val tapRef = remember { mutableStateOf<(Offset) -> Unit>({ }) }
+    val lastTapMs = remember { mutableLongStateOf(0L) }
+    layoutRef.value = layout
+    viewportRef.value = viewport
+    onViewportRef.value = onViewport
+    val showRecenter = viewport != null && onViewport != null
+    fun handleTap(pos: Offset) {
+        val lay = layout
+        val gnssHit = if (lay == null) emptyList() else gnssAt(model.gnss, lay, pos.x, pos.y)
+        val radio = SitPathPlot.clusterAt(clusters, pos.x, pos.y, markers)
+        val gnssD = gnssHit.minOfOrNull { pin ->
+            val pt = lay!!.project(pin.lat, pin.lon)
+            hypot(pt.x - pos.x, pt.y - pos.y)
+        }
+        val radioD = radio?.let { hypot(it.center.x - pos.x, it.center.y - pos.y) }
+        val pickGnss = gnssHit.isNotEmpty() && (radioD == null || gnssD!! <= radioD)
+        if (pickGnss) {
+            val id = gnssHit.joinToString("|") { gnssId(it) }
+            selectedGnss = if (selectedGnss == id) null else id
+            selectedId = null
+        } else {
+            selectedGnss = null
+            selectedId = when {
+                radio == null -> null
+                selectedId == radio.id -> null
+                else -> radio.id
+            }
+        }
+    }
+    tapRef.value = { handleTap(it) }
+    val frame = if (expand) Modifier.fillMaxSize() else Modifier.fillMaxWidth().height(240.dp)
+    val gestures = if (onViewport == null) {
+        Modifier.pointerInput(clusters, markers, layout, model.gnss) {
+            detectTapGestures { handleTap(it) }
+        }
+    } else {
+        Modifier.pointerInput(Unit) {
+            val slop = viewConfiguration.touchSlop
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                var armed = false
+                var zoomAccum = 1f
+                var panAccum = Offset.Zero
+                var tapAt = down.position
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val pressed = event.changes.filter { it.pressed }
+                    if (pressed.isEmpty()) break
+                    tapAt = pressed.first().position
+                    val zoom = event.calculateZoom()
+                    val pan = event.calculatePan()
+                    val focus = event.calculateCentroid(useCurrent = true)
+                    if (!armed) {
+                        zoomAccum *= zoom
+                        panAccum += pan
+                        val past = abs(1f - zoomAccum) > 0.08f || panAccum.getDistance() > slop
+                        if (past) {
+                            armed = true
+                            moveLiveCamera(zoomAccum, panAccum, focus, layoutRef, viewportRef, onViewportRef)
+                            event.changes.forEach { it.consume() }
+                        }
+                    } else {
+                        moveLiveCamera(zoom, pan, focus, layoutRef, viewportRef, onViewportRef)
+                        event.changes.forEach { it.consume() }
+                    }
+                }
+                if (!armed) {
+                    val now = down.uptimeMillis
+                    if (now - lastTapMs.longValue <= 280L) {
+                        lastTapMs.longValue = 0L
+                        viewportRef.value = null
+                        onViewportRef.value?.invoke(null)
+                    } else {
+                        lastTapMs.longValue = now
+                        tapRef.value(tapAt)
+                    }
+                }
+            }
+        }
+    }
     Box(
-        modifier.then(
-            Modifier
-                .fillMaxWidth()
-                .height(240.dp)
-                .onSizeChanged { boxSize = it },
-        ),
+        modifier.then(frame.onSizeChanged { boxSize = it }),
     ) {
         Canvas(
             Modifier
                 .matchParentSize()
-                .pointerInput(clusters, markers, layout, model.gnss) {
-                    detectTapGestures { pos ->
-                        val lay = layout
-                        val gnssHit = if (lay == null) emptyList() else gnssAt(model.gnss, lay, pos.x, pos.y)
-                        val radio = SitPathPlot.clusterAt(clusters, pos.x, pos.y, markers)
-                        val gnssD = gnssHit.minOfOrNull { pin ->
-                            val pt = lay!!.project(pin.lat, pin.lon)
-                            hypot(pt.x - pos.x, pt.y - pos.y)
-                        }
-                        val radioD = radio?.let { hypot(it.center.x - pos.x, it.center.y - pos.y) }
-                        val pickGnss = gnssHit.isNotEmpty() && (radioD == null || gnssD!! <= radioD)
-                        if (pickGnss) {
-                            val id = gnssHit.joinToString("|") { gnssId(it) }
-                            selectedGnss = if (selectedGnss == id) null else id
-                            selectedId = null
-                        } else {
-                            selectedGnss = null
-                            selectedId = when {
-                                radio == null -> null
-                                selectedId == radio.id -> null
-                                else -> radio.id
-                            }
-                        }
-                    }
-                },
+                .then(gestures),
         ) {
             val lay = layout ?: return@Canvas
             clipRect(lay.plotLeft, lay.plotTop, lay.plotRight, lay.plotBottom) {
@@ -317,14 +390,28 @@ fun SitPathCanvas(
             Column(
                 Modifier
                     .align(if (onRight) Alignment.TopEnd else Alignment.TopStart)
-                    .padding(8.dp)
+                    .padding(
+                        start = 8.dp,
+                        top = if (showRecenter && onRight) 40.dp else 8.dp,
+                        end = 8.dp,
+                        bottom = 8.dp,
+                    )
                     .widthIn(max = 248.dp)
                     .background(surface, RoundedCornerShape(8.dp))
                     .border(1.dp, outline, RoundedCornerShape(8.dp))
                     .padding(8.dp),
             ) {
                 Text(
-                    if (selected.members.size == 1) LanguageText.text("ui.1.alert.here") else "${selected.members.size} alerts here",
+                    if (model.live) {
+                        LanguageText.text(
+                            "ui.radios.here",
+                            mapOf("n" to selected.members.size.toString()),
+                        )
+                    } else if (selected.members.size == 1) {
+                        LanguageText.text("ui.1.alert.here")
+                    } else {
+                        "${selected.members.size} alerts here"
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = muted,
                 )
@@ -365,7 +452,40 @@ fun SitPathCanvas(
                 }
             }
         }
+        if (showRecenter) {
+            TextButton(
+                onClick = { onViewport?.invoke(null) },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp),
+            ) {
+                Text(LanguageText.text("display.recenter"))
+            }
+        }
     }
+}
+
+private fun moveLiveCamera(
+    zoom: Float,
+    pan: Offset,
+    focus: Offset,
+    layoutRef: MutableState<SitPathPlot.Layout?>,
+    viewportRef: MutableState<SitPathPlot.Viewport?>,
+    onViewportRef: MutableState<((SitPathPlot.Viewport?) -> Unit)?>,
+) {
+    val lay = layoutRef.value ?: return
+    if ((zoom == 1f || zoom <= 0f) && pan == Offset.Zero) return
+    var next = viewportRef.value ?: SitPathPlot.viewportOf(lay)
+    if (zoom > 0f && zoom != 1f && focus != Offset.Unspecified) {
+        val (lat, lon) = lay.unproject(focus.x, focus.y)
+        next = next.zoomAbout(zoom, lat, lon)
+    }
+    if (pan != Offset.Zero) {
+        val mpp = lay.metersPerPx
+        next = next.panMeters(-pan.x * mpp, pan.y * mpp)
+    }
+    viewportRef.value = next
+    onViewportRef.value?.invoke(next)
 }
 
 internal val AircraftAmber = Color(0xFFC47A00)

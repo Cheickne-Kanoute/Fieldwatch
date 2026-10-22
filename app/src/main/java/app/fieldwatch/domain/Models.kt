@@ -679,6 +679,10 @@ data class AppSettings(
     val averageWindowSec: Int = 30,
     val listSort: ListSort = ListSort.STRENGTH,
     val showRssiBar: Boolean = true,
+    /** Map of this phone's walk above the live list. Off until chosen. Radar leaves the saved value and does not show the map. */
+    val showLivePath: Boolean = false,
+    /** Share of the live list area given to the path. Dragging clamps it. */
+    val livePathSplit: Float = 0.5f,
     val showFleetName: Boolean = true,
     val showFrequency: Boolean = true,
     val showSeenTimes: Boolean = true,
@@ -807,6 +811,9 @@ fun AppSettings.offerLiveTourOnce(): AppSettings {
     if (liveTourRev >= LIVE_TOUR_REV) return this
     return copy(liveTourDone = false, liveTourRev = LIVE_TOUR_REV)
 }
+
+/** The path band sits over a list. Radar has no list, so the switch stays as saved and the band stays off. */
+fun AppSettings.livePathOnScreen(): Boolean = showLivePath && viewMode != ViewMode.RADAR
 
 data class DetectionPolicy(
     val ssidKeywords: Boolean = true,

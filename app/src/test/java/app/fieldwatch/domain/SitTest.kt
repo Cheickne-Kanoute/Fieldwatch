@@ -732,20 +732,35 @@ class SitTest {
     }
 
     @Test
-    fun pathSubsamplesShortMoves() {
+    fun aSitPathKeepsATurnAndDropsSideWobble() {
         val session = SitSession.start(
-            name = "walk",
+            name = "drive",
             now = 1_000L,
             heard = emptyList(),
             fleets = fleets,
             watchDeviceKeys = emptySet(),
             watchedFleetIds = emptySet(),
         )
-        session.recordPath(40.0, -74.0, 1_000L)
-        session.recordPath(40.00001, -74.0, 2_000L)
-        assertEquals(1, session.operatorPath.size)
-        session.recordPath(40.001, -74.0, 8_000L)
+        var lat = 40.0
+        var lon = -74.0
+        session.recordPath(lat, lon, 1_000L)
+        for (i in 1..8) {
+            val east = if (i % 2 == 0) 6.0 else -6.0
+            val step = driveOffset(lat, lon, 15.0, east)
+            lat = step.first
+            lon = step.second
+            session.recordPath(lat, lon, 1_000L + i * 1_000L)
+        }
         assertEquals(2, session.operatorPath.size)
+        val turned = driveOffset(lat, lon, 0.0, 40.0)
+        session.recordPath(turned.first, turned.second, 20_000L)
+        assertTrue(session.operatorPath.size >= 3)
+    }
+
+    private fun driveOffset(lat: Double, lon: Double, northM: Double, eastM: Double): Pair<Double, Double> {
+        val dLat = northM / 111_320.0
+        val dLon = eastM / (111_320.0 * kotlin.math.cos(Math.toRadians(lat)).coerceAtLeast(0.2))
+        return (lat + dLat) to (lon + dLon)
     }
 
     private fun radio(

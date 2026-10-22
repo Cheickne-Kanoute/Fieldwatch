@@ -491,6 +491,11 @@ class LanguagePackTest {
             val parsed = LanguagePack.parse(File(dir, "${bundled.tag}.json").readBytes())
             val preview = (parsed as LanguageParse.Ok).preview
             assertEquals(bundled.name, preview.language)
+            assertTrue("${bundled.tag} display.live.path", preview.accepted.containsKey("display.live.path"))
+            assertTrue("${bundled.tag} display.recenter", preview.accepted.containsKey("display.recenter"))
+            assertTrue("${bundled.tag} ui.radios.here", preview.accepted.containsKey("ui.radios.here"))
+            assertTrue("${bundled.tag} ui.move.path", preview.accepted.containsKey("ui.move.path"))
+            assertTrue("${bundled.tag} ui.waiting.gps.fix", preview.accepted.containsKey("ui.waiting.gps.fix"))
             for ((key, value) in preview.accepted) {
                 val english = EnglishCopy.text(key)
                 assertTrue("${bundled.tag} $key over cap", value.length <= EnglishCopy.cap(key))

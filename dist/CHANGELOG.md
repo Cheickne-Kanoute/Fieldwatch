@@ -4,6 +4,14 @@ Newest first. This is Fieldwatch (`app.fieldwatch`). Each build below is what Se
 
 Fieldwatch continues the Spectre 1.2.14 field build under a new name, application id, and the MIT License. It does not replace Spectre on a phone.
 
+## 1.1.28 — 22 October 2026
+
+- Show live path is on Display, the first switch, above RSSI bars. It starts off. Turn it on and a north-up map of this phone sits across the top of Live, with the list still under it. Drag the bar between the map and the list. While View is Radar the switch stays dimmed and does not turn off.
+- The line starts where you are when the map opens and draws as soon as you move. A bend is kept when the drive leaves the last line by about 12 meters. Side-to-side GPS wobble stays off the line. With no sit, the line is the later of when you turned the switch on and 15 minutes ago. An open sit draws from the start of the sit, walking or driving. Dots are watchlist alerts. Pinch or drag holds the view. Recenter, or a double-tap, follows you again.
+- Reports → Path uses that same line.
+- Turning Location on while Fieldwatch is open pauses Wi-Fi and Bluetooth for a moment, then starts them again. A bad scan result is skipped instead of closing the app.
+- Debrief and Compare path figures draw the street tiles solid. The disclaimer and the path caption use the body text.
+
 ## 1.1.27 — 16 October 2026
 
 - Places remembers a stable tracker this phone hears at two or more places in the last 7 days, and a return after a quiet stretch. The lines are on that radio’s page and in the sit report, with where this phone was. A stop from another day includes the date. Online place names adds the street. Filters can limit Live to the ones you can hear now. A radio that changes its address is skipped. Ordinary Wi-Fi and Bluetooth stay off. There is no beep and no TAK marker. Each radio keeps the latest 8 stops. A ninth confirmed stop drops the oldest.

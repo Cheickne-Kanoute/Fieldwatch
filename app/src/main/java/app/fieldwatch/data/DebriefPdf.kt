@@ -141,8 +141,8 @@ object DebriefPdf {
         out += spacer(6f)
         out += sectionHead("", LanguageText.text("ui.disclaimer.label"), alert = false)
         doc.disclaimer.split("\n\n").forEach { para ->
-            chunkText(para.trim().ifBlank { " " }, CONTENT_W, 9f, muted = true).forEach { sl ->
-                out += textBlock(sl)
+            chunkText(para.trim().ifBlank { " " }, CONTENT_W, 9.5f, muted = false).forEach { sl ->
+                out += bodyBlock(sl, alert = false)
             }
             out += spacer(6f)
         }
@@ -390,7 +390,7 @@ object DebriefPdf {
         val legend = legendRows(fig)
         val headerH = 20f + legend.size * 13f + 6f
         val (plotW, plotH) = figurePlotSize()
-        val cap = layout(fig.caption, CONTENT_W - 24, 8f, muted = true)
+        val cap = layout(fig.caption, CONTENT_W - 24, 10f, muted = false)
         val scaleH = 20f
         val h = headerH + plotH + 14f + scaleH + 8f + cap.height + 12f
         return Block(h) { canvas, y ->
@@ -470,7 +470,6 @@ object DebriefPdf {
             val tilePaint = Paint().apply {
                 isFilterBitmap = true
                 isAntiAlias = true
-                alpha = 210
             }
             tiles.forEach { tile ->
                 val nw = lay.project(tile.north, tile.west)

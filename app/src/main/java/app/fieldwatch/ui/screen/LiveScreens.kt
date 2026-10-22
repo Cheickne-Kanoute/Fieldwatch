@@ -7,12 +7,14 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,7 +66,11 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.isActive
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -86,8 +92,12 @@ import app.fieldwatch.domain.ClassOutline
 import app.fieldwatch.domain.ClassSlice
 import app.fieldwatch.domain.FastPair
 import app.fieldwatch.domain.OutlineSnap
+import app.fieldwatch.domain.GpsSample
 import app.fieldwatch.domain.ListLine
 import app.fieldwatch.domain.MacUtil
+import app.fieldwatch.domain.RadioBookmarks
+import app.fieldwatch.domain.SitPathPlot
+import app.fieldwatch.domain.livePathOnScreen
 import app.fieldwatch.domain.ScanStatus
 import app.fieldwatch.domain.ListSort
 import app.fieldwatch.domain.Palette
@@ -109,6 +119,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.fieldwatch.ui.component.PresenceTrack
+import app.fieldwatch.ui.component.SitPathCanvas
 import app.fieldwatch.ui.component.RssiBar
 import app.fieldwatch.ui.component.Sparkline
 import app.fieldwatch.ui.component.TrendMark
@@ -118,6 +129,7 @@ import app.fieldwatch.ui.theme.LocalNightMode
 import app.fieldwatch.ui.theme.PhosphorActive
 import app.fieldwatch.ui.theme.nightIf
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 @Composable
@@ -355,23 +367,204 @@ fun LivePane(
             )
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            when (state.settings.viewMode) {
-                ViewMode.RADAR -> RadarView(live, vm, sort, windowMs, onOpen, emptyHint = liveEmpty(state, RADAR_EMPTY), showFleet = showFleet, demoMode = demoMode, flashKeys = flashKeys, alertedKeys = alertedKeys)
-                ViewMode.LIST -> RankedList(live, vm, onOpen, sparklines = false, sort = sort, windowMs = windowMs, showBar = showBar, layoutEpoch = state.settings.scanControlsExpanded, emptyHint = liveEmpty(state, LIST_EMPTY), showNewAge = state.filter.arrivalsOnly, showFleet = showFleet, showFrequency = showFrequency, showSeenTimes = showSeenTimes, flashKeys = flashKeys, alertedKeys = alertedKeys, pinEnd = pinEnd, titleLine = titleLine, subtitleLine = subtitleLine, demoMode = demoMode)
-                ViewMode.TIMELINE -> TimelineView(live, vm, onOpen, showFleet = showFleet, showFrequency = showFrequency, showSeenTimes = showSeenTimes, flashKeys = flashKeys, alertedKeys = alertedKeys, titleLine = titleLine, subtitleLine = subtitleLine, demoMode = demoMode)
-                ViewMode.HYBRID -> RankedList(live, vm, onOpen, sparklines = true, sort = sort, windowMs = windowMs, showBar = showBar, layoutEpoch = state.settings.scanControlsExpanded, emptyHint = liveEmpty(state, LIST_EMPTY), showNewAge = state.filter.arrivalsOnly, showFleet = showFleet, showFrequency = showFrequency, showSeenTimes = showSeenTimes, flashKeys = flashKeys, alertedKeys = alertedKeys, pinEnd = pinEnd, titleLine = titleLine, subtitleLine = subtitleLine, demoMode = demoMode)
-                ViewMode.BY_CLASS -> ClassOutlineView(
-                    live, vm, state, onOpen,
-                    sort = sort, windowMs = windowMs, showBar = showBar,
-                    emptyHint = liveEmpty(state, CLASS_EMPTY),
-                    showNewAge = state.filter.arrivalsOnly, showFleet = showFleet,
-                    showFrequency = showFrequency, showSeenTimes = showSeenTimes,
-                    flashKeys = flashKeys, alertedKeys = alertedKeys, titleLine = titleLine, subtitleLine = subtitleLine,
-                    demoMode = demoMode,
+            if (state.settings.livePathOnScreen()) {
+                LivePathSplit(
+                    state, vm, live, onOpen,
+                    sort, windowMs, showBar, showFleet, showFrequency, showSeenTimes,
+                    titleLine, subtitleLine, demoMode, flashKeys, alertedKeys, pinEnd,
+                )
+            } else {
+                LiveMode(
+                    state, vm, live, onOpen,
+                    sort, windowMs, showBar, showFleet, showFrequency, showSeenTimes,
+                    titleLine, subtitleLine, demoMode, flashKeys, alertedKeys, pinEnd,
                 )
             }
         }
     }
+}
+
+@Composable
+private fun LiveMode(
+    state: FieldwatchUi,
+    vm: FieldwatchViewModel,
+    live: List<Sighting>,
+    onOpen: (Sighting) -> Unit,
+    sort: StrengthSort,
+    windowMs: Long,
+    showBar: Boolean,
+    showFleet: Boolean,
+    showFrequency: Boolean,
+    showSeenTimes: Boolean,
+    titleLine: ListLine,
+    subtitleLine: ListLine,
+    demoMode: Boolean,
+    flashKeys: Set<String>,
+    alertedKeys: Set<String>,
+    pinEnd: Boolean,
+) {
+    when (state.settings.viewMode) {
+        ViewMode.RADAR -> RadarView(live, vm, sort, windowMs, onOpen, emptyHint = liveEmpty(state, RADAR_EMPTY), showFleet = showFleet, demoMode = demoMode, flashKeys = flashKeys, alertedKeys = alertedKeys)
+        ViewMode.LIST -> RankedList(live, vm, onOpen, sparklines = false, sort = sort, windowMs = windowMs, showBar = showBar, layoutEpoch = state.settings.scanControlsExpanded, emptyHint = liveEmpty(state, LIST_EMPTY), showNewAge = state.filter.arrivalsOnly, showFleet = showFleet, showFrequency = showFrequency, showSeenTimes = showSeenTimes, flashKeys = flashKeys, alertedKeys = alertedKeys, pinEnd = pinEnd, titleLine = titleLine, subtitleLine = subtitleLine, demoMode = demoMode)
+        ViewMode.TIMELINE -> TimelineView(live, vm, onOpen, showFleet = showFleet, showFrequency = showFrequency, showSeenTimes = showSeenTimes, flashKeys = flashKeys, alertedKeys = alertedKeys, titleLine = titleLine, subtitleLine = subtitleLine, demoMode = demoMode)
+        ViewMode.HYBRID -> RankedList(live, vm, onOpen, sparklines = true, sort = sort, windowMs = windowMs, showBar = showBar, layoutEpoch = state.settings.scanControlsExpanded, emptyHint = liveEmpty(state, LIST_EMPTY), showNewAge = state.filter.arrivalsOnly, showFleet = showFleet, showFrequency = showFrequency, showSeenTimes = showSeenTimes, flashKeys = flashKeys, alertedKeys = alertedKeys, pinEnd = pinEnd, titleLine = titleLine, subtitleLine = subtitleLine, demoMode = demoMode)
+        ViewMode.BY_CLASS -> ClassOutlineView(
+            live, vm, state, onOpen,
+            sort = sort, windowMs = windowMs, showBar = showBar,
+            emptyHint = liveEmpty(state, CLASS_EMPTY),
+            showNewAge = state.filter.arrivalsOnly, showFleet = showFleet,
+            showFrequency = showFrequency, showSeenTimes = showSeenTimes,
+            flashKeys = flashKeys, alertedKeys = alertedKeys, titleLine = titleLine, subtitleLine = subtitleLine,
+            demoMode = demoMode,
+        )
+    }
+}
+
+@Composable
+private fun LivePathSplit(
+    state: FieldwatchUi,
+    vm: FieldwatchViewModel,
+    live: List<Sighting>,
+    onOpen: (Sighting) -> Unit,
+    sort: StrengthSort,
+    windowMs: Long,
+    showBar: Boolean,
+    showFleet: Boolean,
+    showFrequency: Boolean,
+    showSeenTimes: Boolean,
+    titleLine: ListLine,
+    subtitleLine: ListLine,
+    demoMode: Boolean,
+    flashKeys: Set<String>,
+    alertedKeys: Set<String>,
+    pinEnd: Boolean,
+) {
+    val splitState = remember {
+        mutableFloatStateOf(state.settings.livePathSplit.coerceIn(0.22f, 0.78f))
+    }
+    val columnHeight = remember { mutableFloatStateOf(0f) }
+    var viewport by remember { mutableStateOf<SitPathPlot.Viewport?>(null) }
+    val tiles by vm.livePathTiles.collectAsStateWithLifecycle()
+    val names = remember(state.watchlist) { RadioBookmarks.labels(state.watchlist) }
+    val model = remember(
+        state.operatorPath,
+        state.livePathRadios,
+        state.livePathSince,
+        state.fleets,
+        names,
+    ) {
+        SitPathPlot.Model(
+            samples = state.operatorPath,
+            dots = SitPathPlot.liveDots(
+                state.livePathRadios,
+                state.fleets,
+                names,
+                since = state.livePathSince,
+            ),
+            lengthM = 0.0,
+            spanM = 0.0,
+            title = "",
+            live = true,
+        )
+    }
+    val online = state.settings.onlineLookup
+    val tileKey = remember(state.operatorPath, online) { livePathTileKey(state.operatorPath, online) }
+    LaunchedEffect(tileKey, viewport) {
+        val held = viewport
+        if (held == null) {
+            vm.refreshLivePathTiles(state.operatorPath, online)
+        } else {
+            delay(350)
+            vm.refreshLivePathViewport(held, online)
+        }
+    }
+    val split = splitState.floatValue
+    Column(
+        Modifier
+            .fillMaxSize()
+            .onSizeChanged { columnHeight.floatValue = it.height.toFloat() },
+    ) {
+        Box(
+            Modifier
+                .weight(split)
+                .fillMaxWidth()
+                .clipToBounds(),
+        ) {
+            if (state.operatorPath.isEmpty() && model.dots.isEmpty()) {
+                Text(
+                    if (state.settings.tagLocation) {
+                        LanguageText.text("ui.waiting.gps.fix")
+                    } else {
+                        LanguageText.text("ui.turn.tag.detections.gps.2")
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(16.dp),
+                )
+            } else {
+                SitPathCanvas(
+                    model,
+                    modifier = Modifier.fillMaxSize(),
+                    tiles = tiles,
+                    onOpenRadio = { key ->
+                        val row = live.firstOrNull { it.key == key }
+                            ?: state.devices.firstOrNull { it.key == key }
+                            ?: state.livePathRadios.firstOrNull { it.key == key }
+                        row?.let(onOpen)
+                    },
+                    expand = true,
+                    viewport = viewport,
+                    onViewport = { viewport = it },
+                )
+            }
+        }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(22.dp)
+                .semantics { contentDescription = LanguageText.text("ui.move.path") }
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures(
+                        onDragEnd = { vm.setLivePathSplit(splitState.floatValue) },
+                        onVerticalDrag = { change, dragAmount ->
+                            change.consume()
+                            val usable = (columnHeight.floatValue - 22.dp.toPx()).coerceAtLeast(1f)
+                            splitState.floatValue = (splitState.floatValue + dragAmount / usable)
+                                .coerceIn(0.22f, 0.78f)
+                        },
+                    )
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.outline),
+            )
+            Box(
+                Modifier
+                    .width(36.dp)
+                    .height(4.dp)
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant, RoundedCornerShape(2.dp)),
+            )
+        }
+        Box(Modifier.weight((1f - split).coerceAtLeast(0.22f)).fillMaxWidth()) {
+            LiveMode(
+                state, vm, live, onOpen,
+                sort, windowMs, showBar, showFleet, showFrequency, showSeenTimes,
+                titleLine, subtitleLine, demoMode, flashKeys, alertedKeys, pinEnd,
+            )
+        }
+    }
+}
+
+private fun livePathTileKey(samples: List<GpsSample>, online: Boolean): String {
+    if (!online || samples.isEmpty()) return "off"
+    val end = samples.last()
+    return "${samples.size / 4}:${(end.lat * 1000.0).roundToInt()}:${(end.lon * 1000.0).roundToInt()}"
 }
 
 @Composable

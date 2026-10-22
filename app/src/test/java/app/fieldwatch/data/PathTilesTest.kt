@@ -1,5 +1,7 @@
 package app.fieldwatch.data
 
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -18,6 +20,27 @@ class PathTilesTest {
         val yM = latSpan * 110_540.0
         val xM = lonSpan * 111_320.0 * kotlin.math.cos(Math.toRadians(28.785))
         assertTrue(xM / yM in 1.5..1.9)
+    }
+
+    @Test
+    fun coverageKeyChangesWhenTheViewLeavesItsTiles() {
+        val here = PathTiles.coverageKey(28.78, 28.79, -81.38, -81.37)
+        val away = PathTiles.coverageKey(29.10, 29.11, -81.10, -81.09)
+        assertNotEquals("off", here)
+        assertNotEquals(here, away)
+        assertEquals(here, PathTiles.coverageKey(28.78, 28.79, -81.38, -81.37))
+    }
+
+    @Test
+    fun aPrintedWalkUsesTheNextZoom() {
+        val south = 28.780
+        val north = 28.784
+        val west = -81.370
+        val east = -81.366
+        val screen = PathTiles.plannedZoom(south, north, west, east)
+        val print = PathTiles.plannedZoom(south, north, west, east, forPrint = true)
+        assertEquals((screen + 2).coerceAtMost(19), print)
+        assertTrue(print <= 19)
     }
 
     @Test

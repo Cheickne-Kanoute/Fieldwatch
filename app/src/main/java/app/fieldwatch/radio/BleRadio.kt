@@ -43,40 +43,46 @@ class BleRadio(
 
     private val callback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
-            val now = System.currentTimeMillis()
-            recordHit(now)
-            lastCallbackAt.set(now)
-            failStreak = 0
-            lastError = null
-            hint = ""
-            emit(result)
-        }
-
-        override fun onBatchScanResults(results: MutableList<ScanResult>) {
-            if (results.isNotEmpty()) {
+            guardCallback {
                 val now = System.currentTimeMillis()
-                repeat(results.size) { recordHit(now) }
+                recordHit(now)
                 lastCallbackAt.set(now)
                 failStreak = 0
                 lastError = null
                 hint = ""
+                emit(result)
             }
-            results.forEach { emit(it) }
+        }
+
+        override fun onBatchScanResults(results: MutableList<ScanResult>) {
+            guardCallback {
+                if (results.isNotEmpty()) {
+                    val now = System.currentTimeMillis()
+                    repeat(results.size) { recordHit(now) }
+                    lastCallbackAt.set(now)
+                    failStreak = 0
+                    lastError = null
+                    hint = ""
+                }
+                results.forEach { emit(it) }
+            }
         }
 
         override fun onScanFailed(errorCode: Int) {
-            if (errorCode == ScanCallback.SCAN_FAILED_ALREADY_STARTED) {
-                running.set(true)
-                return
+            guardCallback {
+                if (errorCode == ScanCallback.SCAN_FAILED_ALREADY_STARTED) {
+                    running.set(true)
+                    return@guardCallback
+                }
+                running.set(false)
+                failStreak = (failStreak + 1).coerceAtMost(5)
+                val backoff = (4_000L * (1L shl (failStreak - 1))).coerceAtMost(30_000L)
+                nextRetryAt.set(System.currentTimeMillis() + backoff)
+                lastError = "BLE scan failed ($errorCode)"
+                hint = "BLE retrying"
+                demoted = true
+                onError(lastError!!)
             }
-            running.set(false)
-            failStreak = (failStreak + 1).coerceAtMost(5)
-            val backoff = (4_000L * (1L shl (failStreak - 1))).coerceAtMost(30_000L)
-            nextRetryAt.set(System.currentTimeMillis() + backoff)
-            lastError = "BLE scan failed ($errorCode)"
-            hint = "BLE retrying"
-            demoted = true
-            onError(lastError!!)
         }
     }
 
@@ -232,7 +238,15 @@ class BleRadio(
         try {
             onObservation(toObservation(result))
         } catch (t: Throwable) {
-            Log.e("FieldwatchBle", "scan result failed", t)
+            Log.e(TAG, "scan result failed", t)
+        }
+    }
+
+    private inline fun guardCallback(block: () -> Unit) {
+        try {
+            block()
+        } catch (t: Throwable) {
+            Log.e(TAG, "scan callback failed", t)
         }
     }
 
@@ -273,3 +287,5 @@ class BleRadio(
 }
 
 private fun ByteArray.toHex(): String = joinToString("") { "%02X".format(it) }
+
+private const val TAG = "FieldwatchBle"

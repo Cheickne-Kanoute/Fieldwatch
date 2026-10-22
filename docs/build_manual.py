@@ -479,8 +479,8 @@ def draw_cover(c, doc):
         y -= 16
     c.setFillColor(MUTED)
     c.setFont("Helvetica", 9)
-    c.drawString(48, 108, "Version 1.1.27")
-    c.drawString(48, 94, "16 October 2026")
+    c.drawString(48, 108, "Version 1.1.28")
+    c.drawString(48, 94, "22 October 2026")
     c.drawString(48, 80, "Package  app.fieldwatch   ·   Android 10+ (API 29)   ·   Target API 35")
     c.setStrokeColor(colors.HexColor("#2A3340"))
     c.setLineWidth(0.6)
@@ -520,7 +520,7 @@ def draw_body(c, doc):
     c.line(48, 40, PAGE_W - 48, 40)
     c.setFillColor(MUTED)
     c.setFont("Helvetica", 8)
-    c.drawString(48, 28, "v1.1.27  ·  Off Grid Pete LLC")
+    c.drawString(48, 28, "v1.1.28  ·  Off Grid Pete LLC")
     draw_ig_mark(c, 148, 30, 5.2, MUTED)
     c.setFillColor(MUTED)
     c.setFont("Helvetica", 8)
@@ -1069,7 +1069,7 @@ def story():
                 ["Signatures", "The pattern catalog — which radios get a name. Tap a class to open its signatures, then a row to edit. Bookmark a signature to alert when that family appears. Hide a family on Filters."],
                 ["Reports", "Named sits, Path, Debrief, Sit export, Compare, AI Export, Signature candidates, Log export. Start and End sit live here."],
                 ["Settings", "A list of topics. Tap a row for that page. The row shows the current choice. Back returns to the list. Appearance (Night mode, Keep screen on, Privacy mode), Language, Scanning, Watchlist, Named radios, Location, GNSS interference, TAK / CoT, Logging, Signatures, Settings backup. Show Live tour and Diagnostics stay on the list. Row layout is Live → Display, not here. Language is the section after §5.7."],
-                ["Tune (top right on Live)", "The sliders icon. Opens <b>Display</b> over Live: View (Radar, Strength list, Timeline, Hybrid, By class), Sort, Brief hold, Title line, Subtitle line, then switches for RSSI bars, signature names, Frequency, first/last. This is how you change the picture — appearance, sorting, and which fields each row shows. Tap Tune again, or tap the dimmed list, to close it. Not on Settings. §5.3."],
+                ["Tune (top right on Live)", "The sliders icon. Opens <b>Display</b> over Live: View (Radar, Strength list, Timeline, Hybrid, By class), Sort, Brief hold, Title line, Subtitle line, then switches. <b>Show live path</b> is the first switch, above RSSI bars. It is off until you turn it on (§5.3.4). Then signature names, Frequency, and first/last. This is how you change the picture — appearance, sorting, and which fields each row shows. Tap Tune again, or tap the dimmed list, to close it. Not on Settings. §5.3."],
             ],
             [1.7 * inch, 4.8 * inch],
         ),
@@ -1083,14 +1083,15 @@ def story():
         ),
         figure_wrap(
             "fig-display.png",
-            "Display. Tap the tune icon (top right on Live) to open it.",
-            "View, Sort, Brief hold, Title line, Subtitle line, and the extra-fact switches all live here. "
+            "Display. Show live path is the first switch, above RSSI bars. It is on in this shot. It starts off.",
+            "View, Sort, Brief hold, Title line, Subtitle line, and the switches all live here. "
+            "<b>Show live path</b> is the first switch, above RSSI bars, and it starts off. "
             "Tap Tune again or tap the dimmed radios to close it. Walk through the chrome once:",
         ),
         numbered([
             "Confirm the header is counting. Wi-Fi, Bluetooth, and the signatures icon each have a number, and they should be green. Green includes the wait between Wi-Fi scans. Dim gray means that radio is switched off. Red means Location is off, or Android is refusing that radio. A GPS mark with no number appears only while the GNSS interference check is on (§5.9). If both radio counts stay at 0 and the icons are dim or red, turn on Location, Wi-Fi, and Bluetooth, then wait ~30 s for the first Wi-Fi batch. §5.1.",
             "You should be on Live, in By class. Tap a class, then a signature, then a radio. Each row is one radio. The circle is the class. A question mark means Fieldwatch has no name for it yet. That circle is what you scan for. Wi-Fi access points and Bluetooth LE advertisers are still two kinds of radio (§1.1). On the list they are a small Wi-Fi or Bluetooth icon at the start of the second line, not letters in the title. The first line is the address. The second line is the icon, then the name and type, then rand or gone. Bars, signature names, frequency, and first and last seen start on. The vendor is on the detail page, not on the list. The number on the right is loudness at this phone, in dBm. −50 is louder than −90. It is not a distance.",
-            "Tap the tune icon (top right). That is <b>Display</b>: how the list looks for this job. Pick a View first (By class, Strength list, Hybrid, Timeline, or Classic radar). Then Sort, Brief hold, Title line, Subtitle line, and the extra-fact switches. Close it when the list looks the way you want — tap Tune again or tap the dimmed radios behind the panel. In a crowded plaza, set Subtitle to None and turn the extras off — you still have every radio; you just see less of each. §5.3.",
+            "Tap the tune icon (top right). That is <b>Display</b>: how the list looks for this job. Pick a View first (By class, Strength list, Hybrid, Timeline, or Classic radar). Then Sort, Brief hold, Title line, Subtitle line, and the switches. <b>Show live path</b> is the first switch. Leave it off until you want the map over the list (§5.3.4). Close it when the list looks the way you want — tap Tune again or tap the dimmed radios behind the panel. In a crowded plaza, set Subtitle to None and turn the extras off — you still have every radio; you just see less of each. §5.3.",
             "Tap a row. That is device detail: a saved custom name is the large title; advertised name smaller; Observer notes (cyan) under the name; “What this looks like,” Extra attention if any, Signature family, signal, decode, optional Decoded fields on BLE when that signature has a map (§9.6), bookmark (watch this MAC), Hunt on BLE, Create signature from device. Custom name / notes edit is hidden on a random / privacy BLE MAC. Back returns to the Live display.",
             "Work the other four tabs once: Filters (try BLE only, then All traffic), Signatures (Class A–Z, tap a class), Reports (Sits, Path, Debrief, Compare, Log), Settings (tap Appearance — Night mode, Privacy mode, Keep screen on — and Show Live tour on the list if you want the overlay again).",
             "Do not expect every gadget in the room to appear. Phones on café Wi-Fi without hotspot, cellular-only cameras, and sleeping tags will not. That is a phone limit, not a broken install. Chapter 12 is what to do once the list makes sense.",
@@ -1358,6 +1359,7 @@ def story():
                 ["Fewer radios on the Live display", "Filters (chapter 8)"],
                 ["Change the picture (Radar / list / By class)", "Live display → Tune, top right (§4.4, §5.3)"],
                 ["Less text on each row", "Live display → Tune → Display (§5.3)"],
+                ["See the road while the list stays up", "Live → Tune → Show live path (§5.3.4). Reports → Path is the full page (§5.6.1)."],
                 ["Stop seeing a family on the Live display", "Filters → Hide these (class) or Hide selected (one family)"],
                 ["Hide MAC tails on the screen", "Settings → Privacy mode"],
                 ["See whether Wi-Fi, Bluetooth, signatures, or GPS is healthy", "The icons in the top bar. Green, gray, dim gray, and red. §5.1."],
@@ -1378,9 +1380,10 @@ def story():
         ),
         figure_wrap(
             "fig-display.png",
-            "Fig. 3 — Display. Tune (top right on Live) opens this panel over the list.",
+            "Fig. 3 — Display. Show live path is the first switch, above RSSI bars. It is on in this shot. It starts off.",
             "View is the first dropdown. That is Radar vs Strength list vs Timeline vs Hybrid vs By class. "
-            "Sort, Brief hold, Title line, and Subtitle line follow; on/off items are switches. "
+            "Sort, Brief hold, Title line, and Subtitle line follow. "
+            "<b>Show live path</b> is the first switch, above RSSI bars, and it starts off. "
             "Radar labels are not Title/Subtitle — they stay a short signature name or type guess.",
         ),
         callout(
@@ -1432,6 +1435,7 @@ def story():
         ),
         P("Extra facts — turn on only what the job needs", "h3"),
         bullets([
+            "<b>Show live path</b> — Switch, off by default. A north-up map of this phone across the top of Live. The list stays underneath. Dimmed while View is Radar. §5.3.4.",
             "<b>RSSI bars</b> — Switch, on by default. Track plus fill from last-heard strength (the same last packet as the number, not the 30 s average).",
             "<b>Signature names</b> — Switch, on by default. Independent of bars. List, hybrid, and timeline show up to three chips when a device matches more than one signature. Radar uses only the first match as the blip label. Detail lists every match. Off still matches; it only hides the chips.",
             "<b>Frequency</b> — Switch, on by default. Channel and MHz sit under the RSSI on the right so a long name does not cut them off (for example <font face='Courier'>ch6 · 2437MHz</font>). BLE advertisements usually have no frequency.",
@@ -1539,6 +1543,63 @@ def story():
             "following test was not run. §11.4, §12.2.",
             "body_left",
         ),
+        P("5.3.4 Show live path", "h3"),
+        figure_wrap(
+            "fig-live-path.png",
+            "Fig. 3 — Show live path. The map sits across the top of Live. Start is the beginning of the line. Now is this phone. Drag the bar under the map. The list stays underneath.",
+            "The switch is on Display, directly above <b>RSSI bars</b>. It starts off. "
+            "Turn it on and a north-up map sits across the top of Live, with the list still "
+            "under it. By class, Strength list, Timeline, and Hybrid all keep that list. "
+            "Drag the bar between the map and the list. "
+            "The split stays where you leave it, from about a fifth of the screen to about "
+            "three quarters. This is not a sixth view. Radar has no list under it, so while "
+            "View is Radar the switch stays on the panel, dimmed, and will not change. "
+            "Leaving Radar brings the map back if the switch was already on. "
+            "Choosing Radar does not turn the switch off.",
+        ),
+        P(
+            "The line is this phone. The black dot is the start. The blue dot is you, labeled "
+            "<b>Now</b>. The line starts where you are when the map opens, when you turn the "
+            "switch on, or when a sit ends. It draws as soon as you move. You do not wait for "
+            "a bend. A bend is kept when the drive leaves the last line by about 12 meters, "
+            "about the width of a road. Side-to-side GPS wobble stays off the line, so a "
+            "straight road stays straight. A network location, and a GPS fix worse than about "
+            "25 meters, stay off the line. A hop faster than about 150 km/h is dropped. "
+            "Standing still is the blue dot, not a scribble. Before the first fix the band "
+            "says <b>Waiting for a GPS fix.</b> Tag detections with GPS has to be on, or the "
+            "band tells you to turn that on."
+        ),
+        P(
+            "With no sit open, the line and the dots are the later of when you turned "
+            "<b>Show live path</b> on and 15 minutes ago. Nothing from before the switch is "
+            "drawn. Once the switch has been on longer than 15 minutes, you see the last "
+            "15 minutes, including a straight stretch of that road. An open sit draws that "
+            "sit, from the start of the sit until you end it. A sit can be a walk or a drive. "
+            "Ending the sit, with the switch still on, starts the 15-minute window again from "
+            "where you are. The band updates about once a second."
+        ),
+        P(
+            "Dots on this map are watchlist alerts only: a MAC with Alert on, or a watched "
+            "signature. Extra attention alone does not put a dot here. A burst you hid stays "
+            "off. The list under the map is still the filtered Live list, and Filters still "
+            "decide who is on that list. Tap a dot to open that radio. A stack says "
+            "<b>Radios here: N</b>. Thick green on the line is a stay (about 40 m), the same "
+            "mark Reports → Path uses. Time of day sits along the path. Aircraft tracks and "
+            "the GNSS diamond stay on Reports → Path. They are not drawn on this band."
+        ),
+        P(
+            "One GPS fix is enough to show the neighborhood and the blue dot. "
+            "Settings → <b>Online place names and maps</b> (on by default) loads street tiles "
+            "when the phone is online. Off, or no network: the line on a plain background, "
+            "with no error dialog. Pinch or drag holds the view and stops following you. "
+            "Tiles then load for the area on screen. <b>Recenter</b>, or a double-tap, fits "
+            "the whole path again and follows you. Recenter stays hidden while the map is "
+            "already following. The path is recorded while Tag detections with GPS is on, "
+            "even with this switch off. The switch only shows it. "
+            "Live → <b>Start over</b>, while Moving with you is on, clears that path. "
+            "Reports → Path is the full page for a sit, the letter figure, and an advertised "
+            "aircraft. §5.6.1."
+        ),
         P("5.4 Status indicators", "h2"),
         bullets([
             "<b>Class glyph</b> in the circle: signature class of the first match (Finder tags, Phones / PCs, Audio, …). Unmatched radios show a question mark. The same glyphs sit on Filters class chips and on By class headers.",
@@ -1549,6 +1610,7 @@ def story():
             "<b>&gt;&gt; &gt; = &lt; &lt;&lt;</b>: RSSI trend from recent packets (much stronger / stronger / steady / weaker / much weaker). Green approaching, red fading. Blank until a few samples exist.",
             "<b>New only · N hidden</b>: Live display hint while New detections only is on. Mark seen / Reset seen sit above the tabs.",
             "<b>Follow · path N m</b>: Live display hint while Moving with you is on. Start over (above the tabs) clears the GPS path and trails.",
+            "<b>Show live path</b>: the map band on Live while that Display switch is on and View is not Radar. Blue dot is you. §5.3.4.",
             "<b>new Ns</b>: age since first seen, when New detections only is on.",
             "<b>rand</b>: locally administered / randomized address bit is set.",
             "<b>gone</b> (list) or a dim blip (radar): last packet older than the longer of Stale after (default 45 s) and Brief hold. Held Wi-Fi APs and BLE recycle do not count as gone.",
@@ -1862,20 +1924,23 @@ def story():
         P("5.6.1 Path", "h3"),
         figure_wrap(
             "fig-path.png",
-            "Fig. 6 — Reports → Path. One GPS point, length 0. North is up. Map tiles are off in this shot.",
+            "Fig. 6 — Reports → Path. Saved sit Trip to Lake House. 25333 m path, 16110 m span, 12 alerts, 5 GNSS. North is up. Street tiles are on.",
             "Reports → Path is its own page: a north-up plot of <b>this phone</b> for the sit you selected "
             "(open sit, a saved sit, or last 15 minutes). "
             "Tag detections with GPS must have been on, and the window needs a GPS fix, "
             "or the page says so. One fix still draws, on a short scale, so the point is easy to see. "
-            "The header in this figure is 0 m path and 0 m span: one point, no distance yet. "
-            "A longer walk fills the plot. Start sit for a longer track than Live’s last 15 minutes. "
+            "The header in this figure is a saved sit, Trip to Lake House: 25333 m path, 16110 m span, "
+            "12 alerts, and 5 GNSS detections. Street tiles are on. The head is labeled End. "
+            "Red diamonds are where this phone was during a GNSS detection. "
+            "A longer walk or drive fills the plot the same way. Start sit for a longer track than Live’s last 15 minutes. "
             "Privacy mode still draws the line; coordinate text is masked. "
             "An aircraft card title that is a UAS id is shown as Aircraft.",
         ),
         P(
             "<b>Watch it live.</b> Leave the Path page in front while you walk or drive. The plot redraws "
-            "about every three seconds — not every GPS fix. A new point is stored when this phone "
-            "has moved about 10 m, or about five seconds have passed. The snake steps; it does not crawl. "
+            "about every three seconds — not every GPS fix. The line is the same driven trace as "
+            "Show live path (§5.3.4): a bend is kept when you leave the last line by about 12 meters, "
+            "and side-to-side GPS wobble stays off it. "
             "Last 15 minutes (no sit running): a sliding 15-minute window. The tail drops off; the head "
             "is labeled Now. An open sit: the line grows from Start to Now for that window. "
             "While a sit is running, Path follows it (saved sits and Last 15 minutes are disabled until End sit). "
@@ -2083,7 +2148,7 @@ def story():
             "<b>Places</b> — On by default, under Tag detections with GPS. A tracker that keeps its address is listed on its page and in the sit report when this phone hears it at two or more places in the last 7 days. Each radio keeps the latest 8 stops. A ninth confirmed stop drops the oldest. Hearing it many times at one stop is still one stop. A single jumped fix does not erase an older stop. A return after about 20 quiet minutes is listed on its page for a day. Times are when this phone heard it, with the date when the stop is not today. Each stop includes where this phone was. Online place names adds the street. A radio that changes its address is skipped. Ordinary Wi-Fi and Bluetooth stay off. A radio heard the whole way between stops stays with Moving with you and is left out of this list. No beep and no TAK marker. Not part of Export settings. Full write-up: §5.10.",
             "<b>GNSS interference</b> — Calibrate this phone once before the check will turn on. The result stays on this phone and is not part of Export settings. Full write-up: §5.9.",
             "<b>TAK / CoT feed</b> — Off by default. UDP Cursor-on-Target to ATAK / WinTAK / iTAK. Destination chips: This phone (127.0.0.1:10011), LAN multicast (239.2.3.1:6969), Custom. UDP only — a TAK server’s TCP 8087 is not this feed. Heard-here pins sit at operator GPS at the loudest hear (closest approach) and are labeled (here). Advertised lat/lon (stock Remote ID) sit on the aircraft; sticky UAS ID keeps one moving marker; a decoded operator location is a second pin. The callsign says takeoff, the pilot, or a fixed point. Location heading and speed go in the ATAK track when present. Wi-Fi Remote ID (vendor IE FA:0B:BC) can pin the aircraft the same way as BLE FFFA on Android 11+. A radio that leaves keeps its name for How long a spot stays (1 hour unless you change it). This phone’s marker still refreshes about every 2 minutes. Turning the feed off, or Privacy mode on, takes those radio spots off the map. Settings shows last send. What to send chips: Extra attention (on), Payload location (on), Watchlist (off), All signatures (off). GNSS is Off, While alerting, Red line, or Any hit. A GNSS hit also puts a pin or an ellipse on the map where this phone was. A short hit is a pin. A longer hit is an ellipse from the start to the last place it was heard, half as wide as it is long. How long that mark stays is 1 hour, 6 hours, 24 hours, or until deleted. Floods is Off or On and only adds a line to this phone’s marker. The mark, the ellipse, and the hold are §5.8.13. Floods are §5.8.12. Privacy mode pauses the feed. Full configuration: §5.8. Sit: §12.15.",
-            "<b>Online place names and maps</b> — On by default. One switch. Debrief, Places, and AI Export reverse-geocode GPS stamps (system geocoder). Reports → Path loads OpenStreetMap tiles under the trace (no Fieldwatch cloud, no API key). Offline, no geocoder, or no tiles: Debrief and Places keep the coordinates and Path stays the north-up plot — no error dialog. Privacy mode does not hide that map, and it masks coordinates and leaves streets off. Turn off to keep streets and map tiles out of reports, Places, and Path together. Generate buttons are on Reports (§5.6, §5.6.1).",
+            "<b>Online place names and maps</b> — On by default. One switch. Debrief, Places, and AI Export reverse-geocode GPS stamps (system geocoder). Reports → Path and Show live path load OpenStreetMap tiles under the trace (no Fieldwatch cloud, no API key). Offline, no geocoder, or no tiles: Debrief and Places keep the coordinates, and both maps stay the north-up plot — no error dialog. Privacy mode does not hide that map, and it masks coordinates and leaves streets off. Turn off to keep streets and map tiles out of reports, Places, Path, and the live band together. Generate buttons are on Reports (§5.6, §5.6.1). The live band is §5.3.4.",
             "<b>Logging</b> — Write to disk, rotate size, Stale after slider (when a radio is marked gone). The rotating file is JSON lines. Format (CSV, JSON lines, GPX, KML, WiGLE), radios (Both / Wi-Fi / BLE), Share, Save, the line and disk counts, and Reset / clear log are on Reports → Log Export.",
             "<b>Allow background usage</b> — Switch. Opens Fieldwatch’s Battery page; turn on Allow background usage so the OS may run the scan when Fieldwatch is not in front. Follows that Android setting. Not Keep screen on.",
             "<b>Unrestricted battery</b> — Switch. Opens the Battery page. Select Unrestricted (not Optimized). Some phones (Samsung among them) do not open onto that choice — tap Allow background usage (the words, not the switch) to click through and select Unrestricted. Fieldwatch follows that grant when you return.",
@@ -5027,7 +5092,8 @@ def story():
                 ["ATAK overlay (Remote ID / Extra attention)", "§5.8 configure, §12.15 sit, §12.16 hear RID. Settings → TAK / CoT feed. Extra attention + Payload location. BLE FFFA and Wi-Fi FA:0B:BC. Same Wi-Fi LAN. Privacy mode off."],
                 ["Long sit / parked vehicle", "Balanced or Saver. Timeline. RSSI floor −80 if unreadable. Logging on. Watchlist, not a stare."],
                 ["Drive, then arrive home", "Moving with you is BLE only — house APs stay off. If a bag tag still does not show, the path was too short or GPS only stamped at the destination."],
-                ["Watch the path grow", "Reports → Path, stay on that tab. Open sit grows Start → Now; last 15 minutes is a sliding snake (tail drops off). An open sit also draws an advertised aircraft track as a white dotted line when the sit has one. The last position is a class icon. The operator is a person icon. Black dot is the start. Blue dot is you, at the last point. MAC alerts and signature alerts are drawn once. A decoded latitude and longitude uses the last advertised position. Anything else is a class icon at the strongest hear. A count is several in one place. A lone class icon has no number box; tap it for that one radio. A red diamond is a GNSS detection where this phone was. The note under the map has the time and what changed. Redraws about every 3 s. §5.6.1."],
+                ["See the road and the list together", "Live → Tune → Show live path. The map sits over By class, the list, Timeline, or Hybrid. The line starts as soon as you move. Dots are watchlist alerts. Radar leaves the switch dimmed. §5.3.4."],
+                ["Watch the path grow", "Reports → Path, stay on that tab, when you want the full page. Show live path (§5.3.4) is the band on Live if the list should stay up. Open sit grows Start → Now; last 15 minutes is a sliding snake (tail drops off). An open sit also draws an advertised aircraft track as a white dotted line when the sit has one. The last position is a class icon. The operator is a person icon. Black dot is the start. Blue dot is you, at the last point. MAC alerts and signature alerts are drawn once. A decoded latitude and longitude uses the last advertised position. Anything else is a class icon at the strongest hear. A count is several in one place. A lone class icon has no number box; tap it for that one radio. A red diamond is a GNSS detection where this phone was. The note under the map has the time and what changed. Redraws about every 3 s. §5.6.1."],
                 ["Long drive (several km)", "Start sit for a 6000-radio window (unnamed BLE drops first when full). Tap Debrief every 10–15 min or at stops and keep the shares (§11.4.1). Live RAM is still ~400. Debrief lists skip unmatched RAND BLE by default; Sit export has the roster. Log export is the hear-by-hear tape. Path on Reports can stay in front for the live trace."],
                 ["List too fast to tap", "Pause. Then detail. Resume. Or Display → Subtitle None so more of the list fits without Pause."],
                 ["Fit the row to the job", "§5.3. Display is look (Title/Subtitle, extras). Filters are who. Plaza: Subtitle None. Copy MAC: Title → MAC. Channel sit: Frequency on."],
@@ -5516,7 +5582,8 @@ def story():
             ["Payload location", "TAK What-to-send chip, on by default when you turn the feed on. Selects radios with sticky advertised lat/lon. Required for stock Remote ID (no Extra attention mark). BLE FFFA and Wi-Fi FA:0B:BC both qualify."],
             ["Reports", "Bottom tab. Sits stay on this page. Using… names the sit for Path, Debrief, Sit export, and Compare. Those four open their own pages, marked by a green bar. Log Export and Signature candidates are under them. Clear log is on Log Export. AI Export is on Debrief, and again on Compare. GPS, place names, and logging on/off stay on Settings. §5.6."],
             ["Sit (named)", "Optional window of watching, started from Reports → Start sit. Path, Debrief, Compare this-sit, Sit export, and AI Export use that start/end instead of the last 15 minutes in RAM. Cap 6000 unique radios. Extra attention / payload / bookmarks / watched signatures stay when full; unnamed BLE drops first. Checkpoints to app storage about every 10 s. One at a time; keep 10 closed. Live list stays ~400. Not DF. §5.6."],
-            ["Path", "Reports page. North-up plot of this phone for the selected sit (or last 15 minutes). One fix draws as a single point and a length of 0. Leave the page in front to watch an open sit grow, or the last-15-minute snake move; the plot redraws about every three seconds. Black dot is the start. Blue dot is you, at the last point. MAC alerts and signature alerts are drawn once. A decoded latitude and longitude uses the last advertised position. Anything else is a class icon at the strongest RSSI. A count is several in one place. A lone class icon has no number box; tap it for that one radio. Extra attention alone does not plot unless that signature is bookmarked. The list puts the Wi-Fi or BLE icon next to the MAC. Observer notes sit on a MAC-alert row. Thick green = stay. Time ticks. Head labeled Now while live, End on a saved sit. On an open or saved sit, an advertised aircraft track within 2 km is a white dotted line on that plot. The letter figure draws the same track in black dots, with a class icon at the last position and a person icon for the operator. The last position is a class icon. Tap it for that one radio. A count means it shares that spot. One stored fix is that icon, with no line. The operator is a person icon. A farther aircraft with a UAS id gets its own map, up to three. Last 15 minutes stays this phone. OSM tiles when Online place names and maps is on and the phone is online; offline: the trace only. Privacy mode does not hide those tiles. The Debrief and Compare path figures use those same MAC alerts and signature alerts. A decoded position is the last advertised fix. An advertised aircraft on that figure is the drone class icon in the Path key, with the live status, UAS id, last position, motion, and the operator position. Extra attention on that figure is red, a MAC alert is blue, and another signature alert is green. §5.6.1."],
+            ["Show live path", "Display switch, off by default, above RSSI bars. A north-up map of this phone across the top of Live, with the list still underneath on By class, Strength list, Timeline, and Hybrid. Radar dims the switch and does not turn it off. The line starts where you are when the map opens and draws as soon as you move. A bend is kept when the drive leaves the last line by about 12 meters. Side-to-side GPS wobble stays off the line. With no sit, the line is the later of when the switch turned on and 15 minutes ago. An open sit draws from the start of the sit. Dots are watchlist alerts. Pinch or drag holds the view. Recenter, or a double-tap, follows you again. Not the Reports page. §5.3.4."],
+            ["Path", "Reports page. North-up plot of this phone for the selected sit (or last 15 minutes). The line is the same driven trace as Show live path (§5.3.4). One fix draws as a single point and a length of 0. Leave the page in front to watch an open sit grow, or the last-15-minute snake move; the plot redraws about every three seconds. Black dot is the start. Blue dot is you, at the last point. MAC alerts and signature alerts are drawn once. A decoded latitude and longitude uses the last advertised position. Anything else is a class icon at the strongest RSSI. A count is several in one place. A lone class icon has no number box; tap it for that one radio. Extra attention alone does not plot unless that signature is bookmarked. The list puts the Wi-Fi or BLE icon next to the MAC. Observer notes sit on a MAC-alert row. Thick green = stay. Time ticks. Head labeled Now while live, End on a saved sit. On an open or saved sit, an advertised aircraft track within 2 km is a white dotted line on that plot. The letter figure draws the same track in black dots, with a class icon at the last position and a person icon for the operator. The last position is a class icon. Tap it for that one radio. A count means it shares that spot. One stored fix is that icon, with no line. The operator is a person icon. A farther aircraft with a UAS id gets its own map, up to three. Last 15 minutes stays this phone. OSM tiles when Online place names and maps is on and the phone is online; offline: the trace only. Privacy mode does not hide those tiles. The Debrief and Compare path figures use those same MAC alerts and signature alerts. A decoded position is the last advertised fix. An advertised aircraft on that figure is the drone class icon in the Path key, with the live status, UAS id, last position, motion, and the operator position. Extra attention on that figure is red, a MAC alert is blue, and another signature alert is green. §5.6.1."],
             ["Sit export", "Reports page. One row per unique radio in the selected sit (or last 15 minutes). CSV / JSON lines include matched signatures and Extra attention families. Logging can be off. GPX, KML, and GeoJSON include the operator path as a track. The ATAK data package is a zip for ATAK: path, hear-points, an advertised aircraft and operator pin, and a GNSS pin. Log Export does not have those two formats. Not the rotating log. Privacy mode does not mask the file. §5.6.2."],
             ["Log export", "Reports → Log Export. Share/Save of the rotating session file (JSON lines on disk; CSV / GPX / KML / WiGLE at export). One line per hear while logging was on. Needs Write to disk. Reset / clear log is on this page. Clearing the log does not delete sits. §5.6.3, §11.6."],
             ["Observer notes", "Optional 280-character field on a Named radio (same KIND+MAC as the custom name). Cyan block on detail; cyan notes chip on Live next to Extra attention “!”. Debrief lists them after Where you were; Compare after Windows. Path lists the note only if that radio is bookmarked. AI Export lists heard radios with the note. Not catalog Notes and not Extra attention gold. BLE privacy addresses hide the pencil. Settings backup includes the note. §5.5, §5.6."],
@@ -5536,11 +5603,11 @@ def story():
             ["Marauder / Deauther", "Catalog signature (on). MarauderAP / Deauther default names. Extra attention. DIY boards match too."],
             ["Porkchop", "Catalog signature (on). SSID/name PORKCHOP; BACON fake-AP vendor IE 50:52:4B. Extra attention. Cardputer / CYD firmware, not every ESP32."],
             ["Moving with you", "Filter: loud BLE (about −75 dBm or stronger on the trail) with a GPS trail along your path, still being heard. Wi-Fi access points are excluded — hear-time GPS on a loud AP looks like co-travel. “Still here” is not a fixed radius: allowed distance = the larger of 50 m or (recent speed × 15 s), plus 25 m of GPS slack. Walking holds a house-length; highway hold is a handful of advertisements so a car tag does not blink off between packets. Passing BLE still fails the trail-moved gates. Needs live tagging (not stale last-known) and ~45 m of path. Bag/car tag yes; a second iPhone usually no (BLE MAC rotation). The switch starts a BLE follow test (clears Keep signature matches only / Show only / Keep named only / Keep watched only; Hide these stays). The preset replaces the whole filter. Live display → Start over clears path and trails. Debrief still writes the same co-travel assessment for the last 15 minutes even if this filter is off and even if the Live display is not on the list. §8.5."],
-            ["Start over", "Live display button while Moving with you is on. Clears the operator GPS path and radio GPS trails. List and log stay. Path meter returns to 0 m."],
+            ["Start over", "Live display button while Moving with you is on. Clears the operator GPS path and radio GPS trails. The Show live path line clears with it. List and log stay. Path meter returns to 0 m. §5.3.4."],
             ["Header icons", "The counts under FIELDWATCH, on Live, Filters, Signatures, Reports, and Settings. Not on a radio’s detail page, and not on Hunt. Wi-Fi count, Bluetooth count, signature count (the hub icon), and a GPS mark with no number while the GNSS interference check is on. The number uses the same color as its icon. Green is healthy, including the wait between Wi-Fi scans, a planned Bluetooth rest, and a signature count of 0. Gray is the scan stopped, or GPS warming up, paused by the phone, or graded Poor. Dim gray is Wi-Fi or Bluetooth switched off. Red is Location off, Android refusing Wi-Fi, Bluetooth retrying, or a GPS hit. Words after the icons name the wait or the problem: Wi-Fi scanning, Wi-Fi next Ns, Wi-Fi waiting on OS, BLE retrying, Bluetooth is off, BLE unavailable, BLE cycling, BLE parked · restarting. The line is blank when nothing is waiting. Counts are what the phone is hearing. Filters do not change them. Night mode folds the colors into the red display. §5.1, §7.1, §7.2, §5.9, §9."],
             ["Live display", "The first bottom tab (labeled Live on the phone). The on-screen picture of radios: radar, list, timeline, hybrid, or By class. Filters change who appears here; Tune (Display) changes the view and how each row looks. Not “live vs recorded” — Debrief, the log, and the TAK feed are separate. §4.4, §5.1–5.3."],
             ["By class", "Live display view (Display → By class). Outline of the filtered set: every class A–Z by name → signatures A–Z → radios → detail. Unmatched last. Show all (default) keeps empty classes; Collapse empty hides zeros. Those chips scroll with the list. Class headers use the same glyphs as Live display rows (unmatched = ?). Counts are radios, not packets. Radio rows follow Display (bars, chips, Frequency, first/last). Dual-chip radios sit in each class they matched. A watchlist hit opens that class and signature so the row can flash, and the jump keeps those headers on screen when the radio is close enough. Not a Report. §6.5."],
-            ["Display (Live display)", "Tune (sliders icon, top right of Live). How the list looks for this mission: View, Sort, Brief hold, Title line, Subtitle line, bars, signature names, Frequency, first/last. View is Radar, Strength list, Timeline, Hybrid, or By class. The circle on each row is a class glyph, not radio kind — that is the Wi-Fi / Bluetooth icon on the subtitle. Filters hide radios; Display hides fields. Not on Settings. §4.4, §5.3, §6.5."],
+            ["Display (Live display)", "Tune (sliders icon, top right of Live). How the list looks for this mission: View, Sort, Brief hold, Title line, Subtitle line, Show live path, bars, signature names, Frequency, first/last. View is Radar, Strength list, Timeline, Hybrid, or By class. Show live path is off until you turn it on (§5.3.4). The circle on each row is a class glyph, not radio kind — that is the Wi-Fi / Bluetooth icon on the subtitle. Filters hide radios; Display hides fields. Not on Settings. §4.4, §5.3, §6.5."],
             ["Sort (Display)", "Order of the list, hybrid, and timeline. Strongest signal; Strongest averaged over 30 s (the default); Newest heard; Newest alert; Newest arrival; New at bottom; Name A–Z (Title line); Signatures first. Does not hide radios. Radar still plots by RSSI radius. §5.3."],
             ["Preset (Filters)", "Chip at the top of Filters. A tap replaces the whole filter, not Display. Short stock set: All traffic, Wi-Fi only, BLE only, Strong signal, Moving with you, Watched only — plus chips you saved. Class Show only (Cameras, Drones, Finder tags, …) is the chips further down; Save current as… if you want that sit as a preset. Show-only presets imply Keep signature matches only (switch dimmed). Long-press any chip to delete it. Stock chips you remove stay gone until Restore default signatures &amp; presets. Reset filter clears this tab; it is not undo. §8.4."],
             ["Signature class", "Bucket on every signature: Finder tags, Retail beacons, Signage, Wearables, Surveillance, Drones, Pentest, Public safety, Vehicle, Glasses, Audio, Cameras, Thermostats, Access control, Health, Home IoT, ISP / routers, Mesh, Phones / PCs, Other. Public safety is Axon / WatchGuard Video and public-safety vehicle APs (Cradlepoint, AirLink, Compex, Novatel, Utility Inc). Those radios are used in law enforcement; they are not exclusive to it — government, municipal, and other corporate fleets likely run some of the same kit. Health is clinic / home-medical BLE (Honeywell Xenon HC scanners, Omron cuffs, Withings scales, Dexcom). Cameras is consumer / action cameras, not poles (Surveillance) and not Axon. Access control is door locks and readers (August / Schlage and ASSA ABLOY / SALTO / dormakaba / Paxton), not cameras. Glasses is Meta / Snap. Audio is AirPods / Sony / Bose / JBL / Sonos. Color is the Live display chip; class is the filter. Custom rows default to Other. An old Body-worn class folded into Wearables. The Locks class label is now Access control; the stored value is still LOCK. §8.3, §9.5."],
@@ -5569,13 +5636,13 @@ def story():
             ["Show all radios", "Debrief page switch, off by default. Off: Debrief and Compare lead with counts and list Extra attention, a custom name, Marked mine, a bookmark, or a Compare decoded value that changed. On lists every radio. PDF draws the counts as bars. Text has the same numbers. §5.6."],
             ["Debrief (PDF)", "Same sit report as Debrief (text), letter-size typeset PDF. Same window, same unmatched-RAND hide, same counts. Disclaimer, FIELDWATCH header, numbered sections, full-width path figure, amber co-travel / Extra attention callouts, takeaway. Long trip: tap more than once (§11.4.1). Share as application/pdf."],
             ["Compare sits", "Reports page. This sit (open, selected, or last 15 minutes) vs a second saved sit. Presence counts for only in this sit, only in the second, and in both, split Wi-Fi and BLE, then by signature. A radio line when it is Extra attention, named, marked Mine, bookmarked, or its decoded value changed. Show all radios prints every kind + MAC. Text, PDF, and AI Export. Observer notes after Windows. Not a radio fix. §5.6."],
-            ["Online place names and maps", "Settings switch, on by default. Debrief, Places, and AI Export reverse-geocode GPS stamps via the system geocoder when online. Reports → Path loads OpenStreetMap tiles under the trace (fill the plot, clip, extra map around the route). Offline or no tiles: coordinates only, Path is the north-up trace — no error dialog. Privacy mode does not hide that map. It masks coordinates and leaves streets off. Turn off to keep streets and maps out together."],
+            ["Online place names and maps", "Settings switch, on by default. Debrief, Places, and AI Export reverse-geocode GPS stamps via the system geocoder when online. Reports → Path and Show live path load OpenStreetMap tiles under the trace. Offline or no tiles: coordinates only, and both maps stay the north-up trace — no error dialog. Privacy mode does not hide that map. It masks coordinates and leaves streets off. Turn off to keep streets and maps out together. §5.3.4, §5.6.1."],
             ["New at bottom", "Display → Sort. First-seen order, oldest at top; new radios append; gone radios drop. List follows the bottom unless you scroll up."],
             ["unnamed LE", "BLE Advertised name / Name + type when there is no advertised name and no useful decode. On the subtitle the Bluetooth icon already marks LE, so the body is unnamed (not “unnamed LE” twice). Title Advertised name still shows unnamed LE. The title is the MAC unless you change it."],
             ["AI Export", "Three buttons. Reports sit: onboard Debrief + compact rates / Extra attention / Observer notes (addendum, not a roster). Reports Compare: overlap + exclusive Extra attention / Named / Observer notes. Device detail: that one radio (dump + registry decode). All paste into a chat, all open with the experimental disclaimer, all are hypotheses — not identity. Treat as sensitive."],
             ["Signature color (stock)", "Built-in rows share a palette by class: red pentest, amber cameras/ALPR/UniFi Protect/DJI, purple phones/Find My, cyan wearable trackers, green mesh, orange glasses and audio, teal public safety and vehicle, silver home IoT/ISP Wi-Fi (including UniFi AP)/retail signage/Unknown. Unmatched radios use RSSI color (≥−55 green, −55 to −70 amber, −70 to −85 orange, else red). Change any row. §9.5."],
             ["UniFi AP", "Wi-Fi-only catalog signature (ISP / routers). Factory SSIDs UniFi* / UAP-* / UBNT* plus Ubiquiti IEEE OUIs on the BSSID or a vendor IE. Virtual BSSIDs miss the MAC OUI but still hit on a Ubiquiti vendor IE. A separate UniFi row is name-only on either radio. UniFi Protect cameras stay Surveillance. §9.5, Appendix B."],
-            ["Tag detections with GPS", "Settings switch, on by default. Current GPS/network updates while scanning; stamps each hear (detail, Moving with you, Places, Debrief, log lat/lon, heard-here TAK pins). Last-known older than 30 s ignored. Operator phone at hear-time, not the other radio. Advertised TAK pins (Remote ID) do not need this. High-accuracy Location or the path stays 0. §5.7, §5.8."],
+            ["Tag detections with GPS", "Settings switch, on by default. Current GPS/network updates while scanning; stamps each hear (detail, Moving with you, Places, Debrief, log lat/lon, heard-here TAK pins) and records the driven line for Show live path and Reports → Path. Last-known older than 30 s ignored. Operator phone at hear-time, not the other radio. Advertised TAK pins (Remote ID) do not need this. High-accuracy Location or the path stays 0. §5.3.4, §5.7, §5.8."],
             ["Places", "Settings switch, on by default. A stable tracker heard at two or more places in the last 7 days, and a return after a quiet stretch. Lines on the radio page and in the sit report, with where this phone was. Each radio keeps the latest 8 stops. A ninth confirmed stop drops the oldest. Many hears at one stop are still one stop. A single jumped fix does not erase an older stop. A stop from another day includes the date. Online place names adds the street. Filters → Seen at more than one place limits Live to the ones you can hear now. A changing address is skipped. Ordinary Wi-Fi and Bluetooth stay off. No beep, no TAK marker. Not in Export settings. §5.5, §5.7, §5.10, §8."],
             ["Share as text", "Device-detail button. Plain dump of the open radio (identity, signal, decode, session). Not the sit report and not the rotating log."],
             ["Voice (watchlist)", "Settings → Voice on watched signature, on by default. What to say (signature watches): Class, Signature, or Class + signature. Default Class + signature. A named radio speaks its watch name instead, including a custom name from Named radios. Independent of Beep. Not Hunt. Overlapping speech is dropped. On-device TTS. Test alert plays the signature mix. Jump works with voice alone. §5.7, §10.2.1."],
@@ -6025,9 +6092,9 @@ def story():
                 ["X", "@OGridPete"],
                 ["Document", "User Manual and Technical Documentation"],
                 ["Application ID", "app.fieldwatch"],
-                ["Software version", "1.1.27 (versionCode 37), field build of 16 October 2026"],
-                ["Document version", "1.1.27"],
-                ["Document date", "16 October 2026"],
+                ["Software version", "1.1.28 (versionCode 38), field build of 22 October 2026"],
+                ["Document version", "1.1.28"],
+                ["Document date", "22 October 2026"],
                 ["License", "MIT License (see LICENSE); third-party: NOTICE"],
                 ["Platform", "Android 10+ (minSdk 29), targetSdk 35"],
                 ["Classification", "Unclassified. Operationally sensitive if filled with site logs."],

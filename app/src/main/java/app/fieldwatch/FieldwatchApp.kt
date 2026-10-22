@@ -100,7 +100,9 @@ class FieldwatchApp : Application() {
     private var speedAt: Long = 0L
     private val pathLock = Any()
     private val operatorPath = ArrayList<GpsSample>(64)
+    private val driveApex = Geo.DriveApex()
     private var pathLengthM = 0.0
+    @Volatile
     private var locating = false
     private val gpsListener = LocationListener { loc -> onProviderFix(loc, gps = true) }
     private val netListener = LocationListener { loc -> onProviderFix(loc, gps = false) }
@@ -278,12 +280,16 @@ class FieldwatchApp : Application() {
     fun systemLocationOn(): Boolean {
         val lm = getSystemService(LOCATION_SERVICE) as LocationManager
         return if (android.os.Build.VERSION.SDK_INT >= 28) {
-            lm.isLocationEnabled
+            runCatching { lm.isLocationEnabled }.getOrDefault(false)
         } else {
             runCatching { lm.isProviderEnabled(LocationManager.GPS_PROVIDER) }.getOrDefault(false) ||
                 runCatching { lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) }.getOrDefault(false)
         }
     }
+
+    fun locationTagWanted(): Boolean = config.settings.tagLocation && hasFineLocation()
+
+    fun locationUpdatesActive(): Boolean = locating
 
     fun gpsFixAgeMs(now: Long): Long? {
         val at = lastFixAt
@@ -297,8 +303,18 @@ class FieldwatchApp : Application() {
         ) == android.content.pm.PackageManager.PERMISSION_GRANTED
 
     fun syncLocationUpdates() {
-        if (config.settings.tagLocation && hasFineLocation()) startLocationUpdates()
+        if (locationTagWanted()) startLocationUpdates()
         else stopLocationUpdates()
+    }
+
+    /**
+     * Drop any listener registered while Location was off, then attach again.
+     * [startLocationUpdates] leaves [locating] false when both providers were off,
+     * and a later shade toggle used to return early and never tag a fix.
+     */
+    fun resubscribeLocationUpdates() {
+        stopLocationUpdates()
+        syncLocationUpdates()
     }
 
     fun startLocationUpdates() {
@@ -306,17 +322,22 @@ class FieldwatchApp : Application() {
         val lm = getSystemService(LOCATION_SERVICE) as LocationManager
         seedLastKnown(lm)
         val looper = Looper.getMainLooper()
+        var requested = false
         runCatching {
             if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2_000L, 8f, gpsListener, looper)
+                // Once a second, with no distance floor. A 2 s / 8 m request
+                // left the live path as straight chords between sparse fixes.
+                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f, gpsListener, looper)
+                requested = true
             }
         }
         runCatching {
             if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
                 lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 4_000L, 15f, netListener, looper)
+                requested = true
             }
         }
-        locating = true
+        locating = requested
     }
 
     fun stopLocationUpdates() {
@@ -342,7 +363,7 @@ class FieldwatchApp : Application() {
     }
 
     private fun onProviderFix(loc: android.location.Location, gps: Boolean) {
-        acceptFix(loc)
+        acceptFix(loc, gps)
         if (::gnss.isInitialized) gnss.onTaggedFix(loc, gps)
     }
 
@@ -359,10 +380,10 @@ class FieldwatchApp : Application() {
             .mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }
             .filter { now - it.time < 30_000L && (!it.hasAccuracy() || it.accuracy <= 75f) }
         val best = cands.minByOrNull { if (it.hasAccuracy()) it.accuracy else 75f } ?: return
-        acceptFix(best)
+        acceptFix(best, gps = best.provider == LocationManager.GPS_PROVIDER)
     }
 
-    private fun acceptFix(loc: Location) {
+    private fun acceptFix(loc: Location, gps: Boolean) {
         if (loc.hasAccuracy() && loc.accuracy > 75f) return
         val age = System.currentTimeMillis() - loc.time
         if (age > 30_000L) return
@@ -375,6 +396,8 @@ class FieldwatchApp : Application() {
                 speedAt = System.currentTimeMillis()
             }
         }
+        val accuracy = if (loc.hasAccuracy()) loc.accuracy else null
+        if (!Geo.acceptDriveFix(gps, accuracy)) return
         recordOperatorFix(loc.latitude, loc.longitude, loc.time)
     }
 
@@ -391,18 +414,8 @@ class FieldwatchApp : Application() {
             if (last != null && !Geo.hopPlausible(last, lat, lon, at)) {
                 return
             }
-            if (last != null && Geo.meters(last.lat, last.lon, lat, lon) < 15.0) {
-                operatorPath[operatorPath.lastIndex] = GpsSample(at, lat, lon)
-            } else {
-                if (last != null) {
-                    pathLengthM += Geo.meters(last.lat, last.lon, lat, lon)
-                }
-                operatorPath += GpsSample(at, lat, lon)
-                if (operatorPath.size > 80) {
-                    operatorPath.removeAt(0)
-                    pathLengthM = Geo.pathLengthM(operatorPath)
-                }
-            }
+            Geo.extendDrivePath(operatorPath, driveApex, lat, lon, at, cap = Geo.TRACK_CAP)
+            pathLengthM = Geo.pathLengthM(operatorPath)
         }
         if (::sits.isInitialized) sits.recordPath(lat, lon, at)
     }
@@ -414,6 +427,7 @@ class FieldwatchApp : Application() {
     fun resetFollowSession() {
         synchronized(pathLock) {
             operatorPath.clear()
+            driveApex.clear()
             pathLengthM = 0.0
         }
         devices.clearGpsTrails()

@@ -7,6 +7,7 @@ import app.fieldwatch.domain.FloodBurst
 import app.fieldwatch.domain.Geo
 import app.fieldwatch.domain.GnssMark
 import app.fieldwatch.domain.GpsSample
+import app.fieldwatch.domain.OpenLivePath
 import app.fieldwatch.domain.PlaceMemory
 import app.fieldwatch.domain.RadioBookmarks
 import app.fieldwatch.domain.Sit
@@ -269,6 +270,21 @@ class SitStore(
             if (count >= 2 && spanCacheM >= PlaceMemory.SEPARATION_M) return null
             return session.summary.name.trim().ifBlank { null }
         }
+    }
+
+    /** The open sit only. A selected closed sit stays on Reports and does not drive the live map. */
+    fun openLivePath(
+        alertKeys: Set<String>,
+        watchedFleetIds: Set<String>,
+        hiddenKeys: Set<String>,
+    ): OpenLivePath? = synchronized(lock) {
+        val session = open ?: return null
+        val since = session.summary.startAt
+        OpenLivePath(
+            startAt = since,
+            samples = session.operatorPath,
+            radios = session.alertsSince(since, alertKeys, watchedFleetIds, hiddenKeys),
+        )
     }
 
     fun debriefSource(now: Long = System.currentTimeMillis()): SitDebrief? {

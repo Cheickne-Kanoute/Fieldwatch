@@ -83,7 +83,87 @@ object SitPathPlot {
         val plotRight: Float = 0f,
         val plotBottom: Float = 0f,
         val samples: List<GpsSample> = emptyList(),
+        /** Meters per screen pixel. 1 when a caller built a layout without a fit. */
+        val metersPerPx: Float = 1f,
+        /** Inverse of [project]. Latitude, then longitude. */
+        val unproject: (Float, Float) -> Pair<Double, Double> = { _, _ -> 0.0 to 0.0 },
     )
+
+    /**
+     * Held live view. East and north stay separate so the first pinch on a tall
+     * walk does not square the window. A null viewport follows the whole walk.
+     */
+    data class Viewport(
+        val centerLat: Double,
+        val centerLon: Double,
+        val halfEastM: Float,
+        val halfNorthM: Float,
+    ) {
+        fun clamped(): Viewport {
+            val east = halfEastM.coerceIn(MIN_HALF_M, MAX_HALF_M)
+            val north = halfNorthM.coerceIn(MIN_HALF_M, MAX_HALF_M)
+            return if (east == halfEastM && north == halfNorthM) this
+            else copy(halfEastM = east, halfNorthM = north)
+        }
+
+        /** [factor] above 1 zooms in. The focus point stays put. */
+        fun zoomAbout(factor: Float, focusLat: Double, focusLon: Double): Viewport {
+            if (factor <= 0f || factor == 1f) return this
+            val wanted = 1f / factor
+            val minScale = max(MIN_HALF_M / halfEastM, MIN_HALF_M / halfNorthM)
+            val maxScale = min(MAX_HALF_M / halfEastM, MAX_HALF_M / halfNorthM)
+            val scale = wanted.coerceIn(minScale, maxScale)
+            val newEast = halfEastM * scale
+            val newNorth = halfNorthM * scale
+            val applied = halfEastM / newEast
+            return copy(
+                centerLat = focusLat + (centerLat - focusLat) / applied,
+                centerLon = focusLon + (centerLon - focusLon) / applied,
+                halfEastM = newEast,
+                halfNorthM = newNorth,
+            )
+        }
+
+        /**
+         * South, north, west, east of this view, padded a little past the screen.
+         * A short extra drag stays on tiles that are already loaded.
+         */
+        fun coveredBounds(): DoubleArray {
+            val v = clamped()
+            val cos0 = cos(Math.toRadians(v.centerLat)).coerceAtLeast(0.2)
+            val dLat = v.halfNorthM * 1.2 / 110_540.0
+            val dLon = v.halfEastM * 1.2 / (111_320.0 * cos0)
+            return doubleArrayOf(
+                v.centerLat - dLat,
+                v.centerLat + dLat,
+                v.centerLon - dLon,
+                v.centerLon + dLon,
+            )
+        }
+
+        /** Finger right passes a negative [eastM]. Finger down passes a positive [northM]. */
+        fun panMeters(eastM: Float, northM: Float): Viewport {
+            val cos0 = cos(Math.toRadians(centerLat)).coerceAtLeast(0.2)
+            val dLon = eastM / (111_320.0 * cos0)
+            val dLat = northM / 110_540.0
+            return copy(centerLat = centerLat + dLat, centerLon = centerLon + dLon)
+        }
+
+        companion object {
+            const val MIN_HALF_M = 25f
+            const val MAX_HALF_M = 80_000f
+        }
+    }
+
+    /** The geographic window currently drawn, so the next pinch does not jump. */
+    fun viewportOf(layout: Layout): Viewport {
+        val cx = (layout.plotLeft + layout.plotRight) / 2f
+        val cy = (layout.plotTop + layout.plotBottom) / 2f
+        val (lat, lon) = layout.unproject(cx, cy)
+        val halfEast = (layout.plotRight - layout.plotLeft) / 2f * layout.metersPerPx
+        val halfNorth = (layout.plotBottom - layout.plotTop) / 2f * layout.metersPerPx
+        return Viewport(lat, lon, halfEast, halfNorth).clamped()
+    }
 
     data class Mark(
         val lat: Double,
@@ -289,35 +369,55 @@ object SitPathPlot {
         height: Float,
         pad: Float = 16f,
         scaleBarReserve: Float = 44f,
+        viewport: Viewport? = null,
     ): Layout? {
         if (width <= pad * 2 || height <= pad * 2 + scaleBarReserve) return null
         val phone = Geo.despikePath(model.samples).let { cleaned ->
             if (cleaned.size >= 2) cleaned else model.samples
         }
+        val held = viewport?.clamped()
         val pts = phone + model.frameSamples
-        if (pts.isEmpty()) return null
-        val lat0 = pts.map { it.lat }.average()
-        val lon0 = pts.map { it.lon }.average()
+        if (held == null && pts.isEmpty() && model.dots.isEmpty()) return null
+        val lat0: Double
+        val lon0: Double
+        if (held != null) {
+            lat0 = held.centerLat
+            lon0 = held.centerLon
+        } else if (pts.isNotEmpty()) {
+            lat0 = pts.map { it.lat }.average()
+            lon0 = pts.map { it.lon }.average()
+        } else {
+            lat0 = model.dots.map { it.lat }.average()
+            lon0 = model.dots.map { it.lon }.average()
+        }
         val cos0 = cos(Math.toRadians(lat0)).coerceAtLeast(0.2)
         fun mx(lat: Double, lon: Double) = ((lon - lon0) * 111_320.0 * cos0).toFloat()
         fun my(lat: Double, lon: Double) = ((lat - lat0) * 110_540.0).toFloat()
-        val raw = pts.map { mx(it.lat, it.lon) to my(it.lat, it.lon) }
-        var minX = raw.minOf { it.first }
-        var maxX = raw.maxOf { it.first }
-        var minY = raw.minOf { it.second }
-        var maxY = raw.maxOf { it.second }
-        model.dots.forEach { d ->
-            val x = mx(d.lat, d.lon)
-            val y = my(d.lat, d.lon)
-            minX = min(minX, x); maxX = max(maxX, x)
-            minY = min(minY, y); maxY = max(maxY, y)
-        }
-        run {
-            val midX = (minX + maxX) / 2f
-            val midY = (minY + maxY) / 2f
+        val minX: Float
+        val maxX: Float
+        val minY: Float
+        val maxY: Float
+        if (held != null) {
+            minX = -held.halfEastM
+            maxX = held.halfEastM
+            minY = -held.halfNorthM
+            maxY = held.halfNorthM
+        } else {
+            var loX = Float.POSITIVE_INFINITY
+            var hiX = Float.NEGATIVE_INFINITY
+            var loY = Float.POSITIVE_INFINITY
+            var hiY = Float.NEGATIVE_INFINITY
+            fun take(x: Float, y: Float) {
+                loX = min(loX, x); hiX = max(hiX, x)
+                loY = min(loY, y); hiY = max(hiY, y)
+            }
+            pts.forEach { take(mx(it.lat, it.lon), my(it.lat, it.lon)) }
+            model.dots.forEach { d -> take(mx(d.lat, d.lon), my(d.lat, d.lon)) }
+            val midX = (loX + hiX) / 2f
+            val midY = (loY + hiY) / 2f
             val floor = if (model.minHalfSpanM > 0f) model.minHalfSpanM else MIN_HALF_SPAN_M
-            val hx = ((maxX - minX) / 2f).coerceAtLeast(floor) * 1.22f
-            val hy = ((maxY - minY) / 2f).coerceAtLeast(floor) * 1.22f
+            val hx = ((hiX - loX) / 2f).coerceAtLeast(floor) * 1.22f
+            val hy = ((hiY - loY) / 2f).coerceAtLeast(floor) * 1.22f
             minX = midX - hx
             maxX = midX + hx
             minY = midY - hy
@@ -351,6 +451,14 @@ object SitPathPlot {
             plotRight = width - pad,
             plotBottom = height - pad - scaleBarReserve,
             samples = phone,
+            metersPerPx = 1f / scale,
+            unproject = { x, y ->
+                val east = minX + (x - ox) / scale
+                val north = maxY - (y - oy) / scale
+                val lat = lat0 + north / 110_540.0
+                val lon = lon0 + east / (111_320.0 * cos0)
+                lat to lon
+            },
         )
     }
 
@@ -487,10 +595,152 @@ object SitPathPlot {
         )
     }
 
-    fun loudestFix(d: Sighting): GpsSample? {
-        loudestFix(d.gpsTrail)?.let { return it }
-        val lat = d.latitude ?: return null
-        val lon = d.longitude ?: return null
-        return GpsSample(d.lastSeen, lat, lon, d.rssi)
+    fun loudestFix(d: Sighting, since: Long = Long.MIN_VALUE): GpsSample? {
+        val trail = if (since == Long.MIN_VALUE) d.gpsTrail else d.gpsTrail.filter { it.at >= since }
+        loudestFix(trail)?.let { return it }
+        if (d.lastSeen < since) return null
+        val lat = d.latitude
+        val lon = d.longitude
+        if (lat != null && lon != null) return GpsSample(d.lastSeen, lat, lon, d.rssi)
+        val last = d.gpsTrail.lastOrNull() ?: return null
+        return GpsSample(d.lastSeen, last.lat, last.lon, d.rssi)
+    }
+
+    /**
+     * No sit: the later of when Show live path turned on and 15 minutes ago.
+     * An open sit replaces that with the sit start. [sitStartAt] null means no sit.
+     */
+    fun livePathSince(now: Long, armedAt: Long, sitStartAt: Long? = null): Long {
+        if (sitStartAt != null) return sitStartAt
+        return maxOf(armedAt, now - DebriefPrompt.WINDOW_MS)
+    }
+
+    /**
+     * Walk samples from [since] on. [mark] is where the phone was when this
+     * live-path window opened. The driven line keeps its earlier corner and only
+     * moves the tip, so the window would otherwise hold the dot and no line until
+     * the next bend. Once [mark] ages out, the stroke still starts where the
+     * current segment crosses [since], so a straight road keeps its last stretch.
+     */
+    fun livePathSamples(
+        path: List<GpsSample>,
+        since: Long,
+        mark: GpsSample? = null,
+    ): List<GpsSample> {
+        if (since == Long.MIN_VALUE) return path
+        val kept = path.filter { it.at >= since }
+        val tip = path.lastOrNull()
+        val origin = mark?.takeIf { it.at >= since }
+            ?: return if (mark == null) kept else withWindowEdge(path, since, kept, tip)
+        val line = ArrayList<GpsSample>(kept.size + 2)
+        line += origin
+        for (sample in kept) {
+            if (sample.at < origin.at) continue
+            addUnlessSamePlace(line, sample)
+        }
+        if (tip != null && tip.at >= since) addUnlessSamePlace(line, tip)
+        return singleDotIfStill(line, tip, since)
+    }
+
+    /** A mark older than [since] still anchors the visible end of a straight segment. */
+    private fun withWindowEdge(
+        path: List<GpsSample>,
+        since: Long,
+        kept: List<GpsSample>,
+        tip: GpsSample?,
+    ): List<GpsSample> {
+        val edge = windowEdge(path, since) ?: return kept
+        val line = ArrayList<GpsSample>(kept.size + 1)
+        line += edge
+        for (sample in kept) addUnlessSamePlace(line, sample)
+        return singleDotIfStill(line, tip, since)
+    }
+
+    /** Position on the segment that crosses [since]. Null when the path already starts there. */
+    private fun windowEdge(path: List<GpsSample>, since: Long): GpsSample? {
+        var prior: GpsSample? = null
+        for (sample in path) {
+            if (sample.at < since) {
+                prior = sample
+                continue
+            }
+            val from = prior ?: return null
+            if (sample.at == since) return null
+            val span = (sample.at - from.at).toDouble()
+            if (span <= 0.0) return null
+            val fraction = ((since - from.at).toDouble() / span).coerceIn(0.0, 1.0)
+            return GpsSample(
+                since,
+                from.lat + (sample.lat - from.lat) * fraction,
+                from.lon + (sample.lon - from.lon) * fraction,
+            )
+        }
+        return null
+    }
+
+    private fun addUnlessSamePlace(line: MutableList<GpsSample>, sample: GpsSample) {
+        val end = line.last()
+        if (sample.lat == end.lat && sample.lon == end.lon) return
+        line += sample
+    }
+
+    /** A phone that has not moved is the current dot, not a zero-length stroke. */
+    private fun singleDotIfStill(line: List<GpsSample>, tip: GpsSample?, since: Long): List<GpsSample> {
+        if (line.isEmpty()) return line
+        val here = line.first()
+        if (line.any { it.lat != here.lat || it.lon != here.lon }) return line
+        val dot = tip?.takeIf { it.at >= since && it.lat == here.lat && it.lon == here.lon }
+        return listOf(dot ?: line.last())
+    }
+
+    /**
+     * Watchlist alerts heard at or after [since]. A hidden burst stays off the map.
+     * Extra attention alone does not qualify.
+     */
+    fun livePathRadios(
+        devices: List<Sighting>,
+        since: Long,
+        alertKeys: Set<String>,
+        watchedFleetIds: Set<String>,
+        hiddenKeys: Set<String> = emptySet(),
+    ): List<Sighting> = devices.filter { device ->
+        device.key !in hiddenKeys &&
+            device.lastSeen >= since &&
+            (device.key in alertKeys || device.fleetIds.any { it in watchedFleetIds })
+    }
+
+    /**
+     * One dot per radio, at its advertised fix or its loudest hear inside [since].
+     * Callers pass the radios that belong on the map. No report alert cap.
+     */
+    fun liveDots(
+        devices: List<Sighting>,
+        fleets: List<Fleet>,
+        customNames: Map<String, String> = emptyMap(),
+        since: Long = Long.MIN_VALUE,
+    ): List<Dot> {
+        val points = ArrayList<Dot>(devices.size)
+        for (d in devices) {
+            val pin = advertisedFix(d)
+            val fix = pin ?: loudestFix(d, since) ?: continue
+            val fleet = d.fleetIds.firstNotNullOfOrNull { id -> fleets.firstOrNull { it.id == id } }
+            points += Dot(
+                key = d.key,
+                lat = fix.lat,
+                lon = fix.lon,
+                label = d.reportName(customNames).ifBlank { d.mac },
+                extraAttention = d.attentionNotes(fleets).isNotEmpty(),
+                named = d.key in customNames,
+                kind = d.kind,
+                mac = d.mac,
+                fleetNames = d.fleetIds.mapNotNull { id -> fleets.firstOrNull { it.id == id }?.name },
+                rssiMin = d.rssiMin,
+                rssiMax = d.rssiMax,
+                classKind = fleet?.kind,
+                accentArgb = fleet?.let { Palette.color(it.colorIndex) } ?: 0,
+                advertised = pin != null,
+            )
+        }
+        return points
     }
 }

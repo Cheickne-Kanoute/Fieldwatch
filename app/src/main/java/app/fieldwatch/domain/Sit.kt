@@ -16,8 +16,6 @@ object Sit {
     const val PATH_CAP = 2000
     const val CLOSED_CAP = 10
     const val TRAIL_CAP = 40
-    const val PATH_MIN_M = 10.0
-    const val PATH_MIN_MS = 5_000L
     const val FLUSH_MS = 10_000L
     const val FORMAT = "fieldwatch-sit"
     const val FORMAT_VERSION = 1
@@ -248,6 +246,13 @@ data class SitUi(
     val notice: String? = null,
 )
 
+/** Open sit, for the live map. Radios are already limited to watchlist alerts heard since [startAt]. */
+data class OpenLivePath(
+    val startAt: Long,
+    val samples: List<GpsSample>,
+    val radios: List<Sighting>,
+)
+
 data class SitDebrief(
     val name: String,
     val startAt: Long,
@@ -279,6 +284,7 @@ class SitSession(
         radios.forEach { put(it.key, it) }
     }
     private val path = ArrayList<GpsSample>(path.size + 16).apply { addAll(path) }
+    private val pathApex = Geo.DriveApex()
     private val floods = ArrayList<FloodBurst>(floods.size + 4).apply { addAll(floods) }
     private val gnss = ArrayList<GnssMark>(gnss.size + 4).apply { addAll(gnss) }
     var dirty: Boolean = false
@@ -292,6 +298,23 @@ class SitSession(
 
     fun markClean() {
         dirty = false
+    }
+
+    /** Watchlist alerts whose last hear is at or after [since]. Hidden keys stay off. */
+    fun alertsSince(
+        since: Long,
+        alertKeys: Set<String>,
+        watchedFleetIds: Set<String>,
+        hiddenKeys: Set<String>,
+    ): List<Sighting> {
+        val out = ArrayList<Sighting>()
+        for (radio in radios.values) {
+            if (radio.key in hiddenKeys) continue
+            if (radio.lastSeen < since) continue
+            if (radio.key !in alertKeys && radio.fleetIds.none { it in watchedFleetIds }) continue
+            out += radio.toSighting()
+        }
+        return out
     }
 
     fun snapshot(fleets: List<Fleet> = emptyList()): SitFile {
@@ -416,21 +439,8 @@ class SitSession(
     fun recordPath(lat: Double, lon: Double, at: Long): Boolean {
         if (!open) return false
         val last = path.lastOrNull()
-        if (last != null) {
-            if (!Geo.hopPlausible(last, lat, lon, at)) return false
-            val d = Geo.meters(last.lat, last.lon, lat, lon)
-            val dt = at - last.at
-            if (d < Sit.PATH_MIN_M && dt < Sit.PATH_MIN_MS) {
-                path[path.lastIndex] = GpsSample(at, lat, lon)
-                dirty = true
-                return true
-            }
-        }
-        path += GpsSample(at, lat, lon)
-        if (path.size > Sit.PATH_CAP) {
-            val drop = path.size - Sit.PATH_CAP
-            repeat(drop) { path.removeAt(0) }
-        }
+        if (last != null && !Geo.hopPlausible(last, lat, lon, at)) return false
+        Geo.extendDrivePath(path, pathApex, lat, lon, at, cap = Sit.PATH_CAP)
         dirty = true
         return true
     }

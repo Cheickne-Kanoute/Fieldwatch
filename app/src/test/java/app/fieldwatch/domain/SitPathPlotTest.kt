@@ -668,4 +668,303 @@ class SitPathPlotTest {
         assertTrue(pin.keyLine().contains("Signal changed."))
         assertFalse(pin.keyLine().contains("28.7800"))
     }
+
+    @Test
+    fun liveDotsUsesTheLouderHear() {
+        val dots = SitPathPlot.liveDots(
+            listOf(
+                radioAt(
+                    "loud",
+                    trail = listOf(
+                        GpsSample(1L, 28.780, -81.370, rssi = -45),
+                        GpsSample(2L, 28.790, -81.370, rssi = -80),
+                    ),
+                ),
+            ),
+            emptyList(),
+        )
+        assertEquals(1, dots.size)
+        assertEquals(28.780, dots[0].lat, 1e-9)
+        assertEquals(-81.370, dots[0].lon, 1e-9)
+        assertFalse(dots[0].advertised)
+    }
+
+    @Test
+    fun liveDotsPrefersTheAdvertisedFix() {
+        val dots = SitPathPlot.liveDots(
+            listOf(
+                radioAt(
+                    "rid",
+                    trail = listOf(GpsSample(1L, 28.780, -81.370, rssi = -40)),
+                    payloadLat = 28.900,
+                    payloadLon = -81.500,
+                ),
+            ),
+            emptyList(),
+        )
+        assertEquals(28.900, dots.single().lat, 1e-6)
+        assertEquals(-81.500, dots.single().lon, 1e-6)
+        assertTrue(dots.single().advertised)
+    }
+
+    @Test
+    fun liveDotsOmitsARadioWithNoFix() {
+        val dots = SitPathPlot.liveDots(
+            listOf(
+                radioAt("none"),
+                radioAt("here", latitude = 28.78, longitude = -81.37),
+            ),
+            emptyList(),
+        )
+        assertEquals(listOf("here"), dots.map { it.key })
+        assertFalse(dots.single().advertised)
+    }
+
+    @Test
+    fun zoomAboutHalvesTheWindowAndKeepsTheFocus() {
+        val view = SitPathPlot.Viewport(28.7800, -81.3700, 400f, 800f)
+        val focusLat = 28.7810
+        val focusLon = -81.3690
+        val zoomed = view.zoomAbout(2f, focusLat, focusLon)
+        assertEquals(200f, zoomed.halfEastM, 0.01f)
+        assertEquals(400f, zoomed.halfNorthM, 0.01f)
+        assertEquals(eastFraction(view, focusLon), eastFraction(zoomed, focusLon), 0.001)
+        assertEquals(northFraction(view, focusLat), northFraction(zoomed, focusLat), 0.001)
+    }
+
+    @Test
+    fun coveredBoundsHoldTheCenterAndReachPastTheScreen() {
+        val view = SitPathPlot.Viewport(28.78, -81.37, 400f, 800f)
+        val box = view.coveredBounds()
+        val south = box[0]
+        val north = box[1]
+        val west = box[2]
+        val east = box[3]
+        assertTrue(south < view.centerLat && view.centerLat < north)
+        assertTrue(west < view.centerLon && view.centerLon < east)
+        val northEdge = view.centerLat + view.halfNorthM / 110_540.0
+        assertTrue(north > northEdge)
+    }
+
+    @Test
+    fun panNorthMovesTheCenterNorth() {
+        val view = SitPathPlot.Viewport(28.78, -81.37, 400f, 800f)
+        val moved = view.panMeters(0f, 100f)
+        assertTrue(moved.centerLat > view.centerLat)
+        assertEquals(view.centerLon, moved.centerLon, 1e-12)
+        assertEquals(view.halfEastM, moved.halfEastM, 0.01f)
+    }
+
+    @Test
+    fun heldViewportKeepsTheCenter() {
+        val model = SitPathPlot.Model(
+            samples = listOf(
+                GpsSample(1L, 28.7800, -81.3700),
+                GpsSample(2L, 28.7850, -81.3700),
+            ),
+            dots = emptyList(),
+            lengthM = 550.0,
+            spanM = 550.0,
+            title = "tall",
+        )
+        val fitted = SitPathPlot.layout(model, 400f, 300f)!!
+        val held = SitPathPlot.viewportOf(fitted)
+        val again = SitPathPlot.layout(model, 400f, 300f, viewport = held)!!
+        val midX = (again.plotLeft + again.plotRight) / 2f
+        val midY = (again.plotTop + again.plotBottom) / 2f
+        val center = again.project(held.centerLat, held.centerLon)
+        assertTrue(kotlin.math.abs(center.x - midX) < 2f)
+        assertTrue(kotlin.math.abs(center.y - midY) < 2f)
+        val before = fitted.project(28.7850, -81.3700)
+        val after = again.project(28.7850, -81.3700)
+        assertTrue(kotlin.math.abs(before.x - after.x) < 2f)
+        assertTrue(kotlin.math.abs(before.y - after.y) < 2f)
+    }
+
+    @Test
+    fun liveDotsIgnoresALouderHearFromBeforeTheWindow() {
+        val dots = SitPathPlot.liveDots(
+            listOf(
+                radioAt(
+                    "loud",
+                    trail = listOf(
+                        GpsSample(1L, 28.780, -81.370, rssi = -45),
+                        GpsSample(2L, 28.790, -81.370, rssi = -80),
+                    ),
+                ).copy(lastSeen = 2L),
+            ),
+            emptyList(),
+            since = 2L,
+        )
+        assertEquals(28.790, dots.single().lat, 1e-9)
+        assertEquals(-81.370, dots.single().lon, 1e-9)
+    }
+
+    @Test
+    fun liveDotsUsesTheCurrentHearWhenTheTrailPointIsOlder() {
+        val dots = SitPathPlot.liveDots(
+            listOf(
+                radioAt(
+                    "same",
+                    trail = listOf(GpsSample(1L, 28.780, -81.370, rssi = -40)),
+                    latitude = 28.781,
+                    longitude = -81.371,
+                ).copy(lastSeen = 50L),
+            ),
+            emptyList(),
+            since = 40L,
+        )
+        assertEquals(28.781, dots.single().lat, 1e-9)
+        assertEquals(-81.371, dots.single().lon, 1e-9)
+    }
+
+    @Test
+    fun livePathSinceUsesTheSitOrTheLaterOfArmAndFifteenMinutes() {
+        val now = 1_000_000L
+        val fifteen = DebriefPrompt.WINDOW_MS
+        assertEquals(now - 1_000L, SitPathPlot.livePathSince(now, now - 1_000L, null))
+        assertEquals(now - fifteen, SitPathPlot.livePathSince(now, now - fifteen - 5_000L, null))
+        assertEquals(50L, SitPathPlot.livePathSince(now, now - 1_000L, 50L))
+    }
+
+    @Test
+    fun livePathSamplesDropPointsBeforeTheWindow() {
+        val path = listOf(
+            GpsSample(1L, 28.78, -81.37),
+            GpsSample(20L, 28.79, -81.37),
+        )
+        assertEquals(listOf(20L), SitPathPlot.livePathSamples(path, 10L).map { it.at })
+    }
+
+    @Test
+    fun livePathSamplesDrawFromWhereTheSwitchTurnedOn() {
+        val corner = GpsSample(1_000L, 28.7800, -81.3700)
+        val tip = GpsSample(20_000L, 28.7810, -81.3700)
+        val mark = GpsSample(15_000L, 28.7804, -81.3700)
+        val line = SitPathPlot.livePathSamples(listOf(corner, tip), since = 15_000L, mark = mark)
+        assertEquals(listOf(15_000L, 20_000L), line.map { it.at })
+    }
+
+    @Test
+    fun livePathSamplesStayADotUntilThePhoneMoves() {
+        val tip = GpsSample(20_000L, 28.7800, -81.3700)
+        val mark = GpsSample(15_000L, 28.7800, -81.3700)
+        val line = SitPathPlot.livePathSamples(listOf(tip), since = 15_000L, mark = mark)
+        assertEquals(listOf(20_000L), line.map { it.at })
+    }
+
+    @Test
+    fun livePathSamplesKeepTheLastStretchOfAStraightRoad() {
+        val anchor = GpsSample(0L, 28.7800, -81.3700)
+        val tip = GpsSample(30_000L, 28.7900, -81.3700)
+        val mark = GpsSample(1_000L, 28.7801, -81.3700)
+        val line = SitPathPlot.livePathSamples(listOf(anchor, tip), since = 15_000L, mark = mark)
+        assertEquals(listOf(15_000L, 30_000L), line.map { it.at })
+        assertEquals(28.7850, line.first().lat, 1e-9)
+        assertEquals(28.7900, line.last().lat, 1e-9)
+    }
+
+    @Test
+    fun livePathSamplesKeepATurnInsideTheWindow() {
+        val anchor = GpsSample(0L, 28.7800, -81.3700)
+        val corner = GpsSample(20_000L, 28.7860, -81.3700)
+        val tip = GpsSample(30_000L, 28.7860, -81.3680)
+        val mark = GpsSample(1_000L, 28.7802, -81.3700)
+        val line = SitPathPlot.livePathSamples(listOf(anchor, corner, tip), since = 10_000L, mark = mark)
+        assertEquals(listOf(10_000L, 20_000L, 30_000L), line.map { it.at })
+    }
+
+    @Test
+    fun livePathRadiosKeepAWatchlistAlertHeardInTheWindow() {
+        val heard = radioAt("BLE:AA").copy(lastSeen = 100L, fleetIds = setOf("fleet-a"))
+        val old = radioAt("BLE:BB").copy(lastSeen = 10L, fleetIds = setOf("fleet-a"))
+        val plain = radioAt("BLE:CC").copy(lastSeen = 100L)
+        val hidden = radioAt("BLE:DD").copy(lastSeen = 100L, fleetIds = setOf("fleet-a"))
+        val mac = radioAt("BLE:EE").copy(lastSeen = 100L)
+        val kept = SitPathPlot.livePathRadios(
+            listOf(heard, old, plain, hidden, mac),
+            since = 50L,
+            alertKeys = setOf("BLE:EE"),
+            watchedFleetIds = setOf("fleet-a"),
+            hiddenKeys = setOf("BLE:DD"),
+        )
+        assertEquals(listOf("BLE:AA", "BLE:EE"), kept.map { it.key })
+    }
+
+    @Test
+    fun dotsAloneStillLayOut() {
+        val dot = SitPathPlot.Dot(
+            key = "BLE:AA",
+            lat = 28.78,
+            lon = -81.37,
+            label = "AA",
+            extraAttention = false,
+            named = false,
+        )
+        val layout = SitPathPlot.layout(
+            SitPathPlot.Model(emptyList(), listOf(dot), 0.0, 0.0, ""),
+            400f,
+            300f,
+        )
+        assertNotNull(layout)
+        assertEquals(1, layout!!.dots.size)
+    }
+
+    @Test
+    fun livePathStaysOffOnRadar() {
+        val stock = AppSettings()
+        assertFalse(stock.showLivePath)
+        assertFalse(stock.copy(showLivePath = true, viewMode = ViewMode.RADAR).livePathOnScreen())
+        assertTrue(stock.copy(showLivePath = true, viewMode = ViewMode.BY_CLASS).livePathOnScreen())
+        assertFalse(stock.copy(showLivePath = false, viewMode = ViewMode.LIST).livePathOnScreen())
+    }
+
+    private fun eastFraction(view: SitPathPlot.Viewport, lon: Double): Double {
+        val cos0 = kotlin.math.cos(Math.toRadians(view.centerLat)).coerceAtLeast(0.2)
+        val east = (lon - view.centerLon) * 111_320.0 * cos0
+        return east / view.halfEastM
+    }
+
+    private fun northFraction(view: SitPathPlot.Viewport, lat: Double): Double {
+        val north = (lat - view.centerLat) * 110_540.0
+        return north / view.halfNorthM
+    }
+
+    private fun radioAt(
+        key: String,
+        trail: List<GpsSample> = emptyList(),
+        latitude: Double? = null,
+        longitude: Double? = null,
+        payloadLat: Double? = null,
+        payloadLon: Double? = null,
+    ) = Sighting(
+        key = key,
+        kind = RadioKind.BLE,
+        mac = "AA:BB:CC:DD:EE:10",
+        name = key,
+        rssi = -40,
+        rssiMin = -40,
+        rssiMax = -40,
+        channel = 0,
+        frequencyMhz = 0,
+        vendor = null,
+        randomized = false,
+        hiddenSsid = false,
+        serviceUuids = emptyList(),
+        manufacturerId = null,
+        manufacturerDataHex = "",
+        rawHex = "",
+        extras = "",
+        firstSeen = 1L,
+        lastSeen = 1L,
+        hitCount = 1,
+        fleetIds = emptySet(),
+        rssiHistory = emptyList(),
+        presence = emptyList(),
+        latitude = latitude,
+        longitude = longitude,
+        gpsTrail = trail,
+        payloadLat = payloadLat,
+        payloadLon = payloadLon,
+    )
 }
