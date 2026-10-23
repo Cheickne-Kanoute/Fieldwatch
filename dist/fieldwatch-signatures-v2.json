@@ -3,7 +3,7 @@
     "formatVersion": 1,
     "exportedAt": "",
     "appVersion": "stock",
-    "catalogVersion": 96,
+    "catalogVersion": 97,
     "fleets": [
         {
             "id": "fleet-actiontec",
@@ -8636,6 +8636,31 @@
             "attentionNote": "",
             "builtIn": true,
             "kind": "ISP"
+        },
+        {
+            "id": "fleet-bitchat",
+            "name": "Bitchat",
+            "enabled": true,
+            "matchAny": true,
+            "colorIndex": 0,
+            "rules": [
+                {
+                    "kind": "SERVICE_UUID",
+                    "text": "f47b5e2d-4a9e-4c5a-9b3f-8e1d2c3a4b5c",
+                    "companyId": 0,
+                    "dataPrefixHex": "",
+                    "radio": null,
+                    "enabled": true
+                }
+            ],
+            "minPeers": 0,
+            "peerWindowSec": 60,
+            "clusterByOui": false,
+            "sequentialMac": false,
+            "notes": "Bitchat BLE mesh chat between nearby phones. Matches the mainnet service advertisement, so a renamed phone still matches. Pattern match, not that person.",
+            "attentionNote": "",
+            "builtIn": true,
+            "kind": "MESH"
         },
         {
             "id": "fleet-bliptrack",

@@ -1183,6 +1183,12 @@ class ConfigStore(context: Context) {
             }
             version = CATALOG_V96
         }
+        if (version < CATALOG_V97) {
+            val have = fleets.map { it.id }.toSet()
+            val extras = ADDED_IN_V97.mapNotNull { catalog[it] }.filter { it.id !in have }
+            if (extras.isNotEmpty()) fleets = (fleets + extras).sortedBy { it.name.lowercase() }
+            version = CATALOG_V97
+        }
         if (!settings.darkTheme) settings = settings.copy(darkTheme = true)
         if (settings.scanControlsExpanded) settings = settings.copy(scanControlsExpanded = false)
         presets = presets.filterNot { it.isBuiltIn() && it.id in hiddenPresetIds }
@@ -1229,7 +1235,7 @@ class ConfigStore(context: Context) {
 
     companion object {
         /** Stock catalog generation. Settings footer and the GitHub pack use this. */
-        const val CATALOG_VERSION = 96
+        const val CATALOG_VERSION = 97
         private const val CATALOG_V2 = 2
         private const val CATALOG_V3 = 3
         private const val CATALOG_V4 = 4
@@ -1324,7 +1330,8 @@ class ConfigStore(context: Context) {
         private const val CATALOG_V93 = 93
         private const val CATALOG_V94 = 94
         private const val CATALOG_V95 = 95
-        private const val CATALOG_V96 = CATALOG_VERSION
+        private const val CATALOG_V96 = 96
+        private const val CATALOG_V97 = CATALOG_VERSION
         private val GENERIC_GATT_UUIDS = setOf("180A", "180D", "180F")
         private val POLICY_FLEET_IDS = setOf(
             "fleet-flock-cameras",
@@ -1689,6 +1696,9 @@ class ConfigStore(context: Context) {
         )
         private val ADDED_IN_V94 = listOf(
             "fleet-polar",
+        )
+        private val ADDED_IN_V97 = listOf(
+            "fleet-bitchat",
         )
     }
 }

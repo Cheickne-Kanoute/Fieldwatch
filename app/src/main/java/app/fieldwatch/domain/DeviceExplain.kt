@@ -697,6 +697,8 @@ object DeviceExplain {
                     Hint("camera", "a Rhombus cloud camera", "Matched signature $raw.", 7)
                 n == "meshcore" ->
                     Hint("mesh", "a MeshCore LoRa companion radio", "Matched signature $raw.", 7)
+                n == "bitchat" ->
+                    Hint("mesh", "a Bitchat BLE mesh chat", "Matched signature $raw.", 7)
                 "gotenna" in n ->
                     Hint("mesh", "a goTenna Mesh or Pro radio", "Matched signature $raw.", 7)
                 n == "sensecap" ->

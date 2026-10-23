@@ -272,6 +272,7 @@ object DefaultCatalog {
         meshtastic(),
         helium(),
         meshCore(),
+        bitchat(),
         goTenna(),
         senseCap(),
         rakWisGate(),
@@ -2506,6 +2507,20 @@ object DefaultCatalog {
         rules = listOf(
             bleName("MeshCore"),
             bleGlob("MeshCore*"),
+        ),
+    )
+
+    private fun bitchat() = Fleet(
+        id = "fleet-bitchat",
+        name = "Bitchat",
+        enabled = true,
+        colorIndex = Hue.MESH,
+        kind = SignatureClass.MESH,
+        matchAny = true,
+        notes = "Bitchat BLE mesh chat between nearby phones. Matches the mainnet service advertisement, so a renamed phone still matches. Pattern match, not that person.",
+        builtIn = true,
+        rules = listOf(
+            uuid("f47b5e2d-4a9e-4c5a-9b3f-8e1d2c3a4b5c"),
         ),
     )
 

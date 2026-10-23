@@ -4,6 +4,10 @@ Newest first. This is Fieldwatch (`app.fieldwatch`). Each build below is what Se
 
 Fieldwatch continues the Spectre 1.2.14 field build under a new name, application id, and the MIT License. It does not replace Spectre on a phone.
 
+## Unreleased
+
+- Bitchat is a Mesh signature. It matches the BLE service advertisement. It does not beep. Settings → Update stock catalog from GitHub adds it. Catalog 97.
+
 ## 1.1.31 — 23 October 2026
 
 - The Wi-Fi, Bluetooth, and signature counts in the top bar each keep room for 888, so the line does not shift as the numbers change.
