@@ -8,6 +8,16 @@ package app.fieldwatch.domain
  * [OP_LAT] / [OP_LON] are the Remote ID operator location and are never the pin.
  * [opKind] is takeoff, live GPS, or a fixed point. Null means this packet did not say.
  */
+/**
+ * One advertisement, not the facts kept from earlier packets.
+ * Phone coordinates are this hear only. A missing fix stays null.
+ */
+data class HeardFix(
+    val facts: RadioFacts,
+    val phoneLat: Double? = null,
+    val phoneLon: Double? = null,
+)
+
 data class PayloadLocation(
     val lat: Double? = null,
     val lon: Double? = null,
@@ -120,7 +130,7 @@ data class PayloadLocation(
             aircraft = device.payloadAircraft,
         )
 
-        fun applySticky(device: Sighting, fleets: List<Fleet>): Sighting {
+        fun applySticky(device: Sighting, fleets: List<Fleet>, heard: HeardFix? = null): Sighting {
             val decoded = if (device.fleetIds.isEmpty()) {
                 emptyList()
             } else {
@@ -140,10 +150,10 @@ data class PayloadLocation(
                 device.payloadOpAlt == null &&
                 device.payloadUasId == null
             ) {
-                return device
+                return withReadStamp(device, fleets, heard)
             }
             val next = fromBytes.mergeSticky(fromDecoded(decoded)).mergeSticky(fromSighting(device))
-            if (next.lat == device.payloadLat &&
+            val merged = if (next.lat == device.payloadLat &&
                 next.lon == device.payloadLon &&
                 next.alt == device.payloadAlt &&
                 next.opLat == device.payloadOpLat &&
@@ -157,23 +167,76 @@ data class PayloadLocation(
                 next.vspeedMps == device.payloadVspeed &&
                 next.aircraft == device.payloadAircraft
             ) {
+                device
+            } else {
+                device.copy(
+                    payloadLat = next.lat,
+                    payloadLon = next.lon,
+                    payloadAlt = next.alt,
+                    payloadOpLat = next.opLat,
+                    payloadOpLon = next.opLon,
+                    payloadOpKind = next.opKind,
+                    payloadOpAlt = next.opAlt,
+                    payloadUasId = next.uasId,
+                    payloadSelfId = next.selfId,
+                    payloadHeading = next.headingDeg,
+                    payloadSpeed = next.speedMps,
+                    payloadVspeed = next.vspeedMps,
+                    payloadAircraft = next.aircraft,
+                )
+            }
+            return withReadStamp(merged, fleets, heard)
+        }
+
+        /**
+         * Stamp the read time from this advertisement only.
+         * A later Basic ID keeps the previous stamp. A repeat of the same
+         * spot still moves the stamp, so a report can use where the phone was
+         * at the last reading.
+         */
+        private fun withReadStamp(device: Sighting, fleets: List<Fleet>, heard: HeardFix?): Sighting {
+            if (heard == null) return device
+            val packet = packetLocation(device, fleets, heard)
+            val pin = validCoord(packet.lat, packet.lon)
+            val op = validCoord(packet.opLat, packet.opLon)
+            if (!pin && !op) return device
+            val phoneOk = validCoord(heard.phoneLat, heard.phoneLon)
+            val phoneLat = if (phoneOk) heard.phoneLat else null
+            val phoneLon = if (phoneOk) heard.phoneLon else null
+            val at = device.lastSeen
+            val nextAt = if (pin) at else device.payloadAt
+            val nextPhoneLat = if (pin) phoneLat else device.payloadPhoneLat
+            val nextPhoneLon = if (pin) phoneLon else device.payloadPhoneLon
+            val nextOpAt = if (op) at else device.payloadOpAt
+            val nextOpPhoneLat = if (op) phoneLat else device.payloadOpPhoneLat
+            val nextOpPhoneLon = if (op) phoneLon else device.payloadOpPhoneLon
+            if (nextAt == device.payloadAt &&
+                nextPhoneLat == device.payloadPhoneLat &&
+                nextPhoneLon == device.payloadPhoneLon &&
+                nextOpAt == device.payloadOpAt &&
+                nextOpPhoneLat == device.payloadOpPhoneLat &&
+                nextOpPhoneLon == device.payloadOpPhoneLon
+            ) {
                 return device
             }
             return device.copy(
-                payloadLat = next.lat,
-                payloadLon = next.lon,
-                payloadAlt = next.alt,
-                payloadOpLat = next.opLat,
-                payloadOpLon = next.opLon,
-                payloadOpKind = next.opKind,
-                payloadOpAlt = next.opAlt,
-                payloadUasId = next.uasId,
-                payloadSelfId = next.selfId,
-                payloadHeading = next.headingDeg,
-                payloadSpeed = next.speedMps,
-                payloadVspeed = next.vspeedMps,
-                payloadAircraft = next.aircraft,
+                payloadAt = nextAt,
+                payloadPhoneLat = nextPhoneLat,
+                payloadPhoneLon = nextPhoneLon,
+                payloadOpAt = nextOpAt,
+                payloadOpPhoneLat = nextOpPhoneLat,
+                payloadOpPhoneLon = nextOpPhoneLon,
             )
+        }
+
+        /** Location carried by this packet. Sticky facts from earlier packets are not included. */
+        private fun packetLocation(device: Sighting, fleets: List<Fleet>, heard: HeardFix): PayloadLocation {
+            val decoded = if (device.fleetIds.isEmpty()) {
+                emptyList()
+            } else {
+                SignatureFieldDecoder.decodeSighting(device.copy(facts = heard.facts), fleets)
+            }
+            return OpenDroneId.fromFacts(heard.facts).mergeSticky(fromDecoded(decoded))
         }
 
         fun validCoord(lat: Double?, lon: Double?): Boolean {

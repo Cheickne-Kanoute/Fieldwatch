@@ -654,6 +654,345 @@ data class WatchTarget(
     val mine: Boolean = false,
 )
 
+/**
+ * Raster under Show live path, Reports → Path, and the path figure.
+ * Missing JSON is [OSM]. Online place names and maps is the on/off.
+ * OpenStreetMap and the USGS maps need no key. The others take a key
+ * the user keeps on this phone. That key is not part of this setting.
+ */
+@Serializable
+enum class MapBasemap {
+    OSM,
+    USGS_IMAGERY,
+    USGS_TOPO,
+    ESRI_SATELLITE,
+    ESRI_STREETS,
+    ESRI_OUTDOOR,
+    MAPTILER_SATELLITE,
+    MAPTILER_STREETS,
+    MAPTILER_OUTDOOR,
+    STADIA_SATELLITE,
+    STADIA_STREETS,
+    STADIA_TERRAIN,
+    THUNDERFOREST_STREETS,
+    THUNDERFOREST_OUTDOORS,
+    THUNDERFOREST_TRANSPORT,
+    ;
+
+    private data class Spec(
+        val labelKey: String,
+        val cacheName: String,
+        val maxZoom: Int,
+        val service: MapKeyService?,
+        val host: String,
+        val keyQuery: String?,
+        val url: (Int, Int, Int) -> String,
+        val credit: String,
+        val creditPrint: String,
+        val creditUrl: String?,
+        val redirectRoots: List<String>,
+    )
+
+    private val spec: Spec
+        get() = when (this) {
+            OSM -> Spec(
+                labelKey = "map.openstreetmap",
+                cacheName = "osm",
+                maxZoom = 19,
+                service = null,
+                host = "tile.openstreetmap.org",
+                keyQuery = null,
+                url = { z, x, y -> "https://tile.openstreetmap.org/$z/$x/$y.png" },
+                credit = "© OpenStreetMap contributors",
+                creditPrint = "© OpenStreetMap contributors · openstreetmap.org/copyright",
+                creditUrl = "https://www.openstreetmap.org/copyright",
+                redirectRoots = listOf("openstreetmap.org"),
+            )
+            USGS_IMAGERY -> usgs(
+                "map.usgs.imagery",
+                "usgs-imagery",
+                "USGSImageryOnly",
+            )
+            USGS_TOPO -> usgs(
+                "map.usgs.topo",
+                "usgs-topo",
+                "USGSTopo",
+            )
+            ESRI_SATELLITE -> esri(
+                "map.esri.satellite",
+                "esri-satellite",
+                "imagery-labels",
+                "© Esri, Maxar, Earthstar Geographics",
+            )
+            ESRI_STREETS -> esri(
+                "map.esri.streets",
+                "esri-streets",
+                "streets",
+                "© Esri, TomTom, Garmin, OSM",
+            )
+            ESRI_OUTDOOR -> esri(
+                "map.esri.outdoor",
+                "esri-outdoor",
+                "outdoor",
+                "© Esri, TomTom, Garmin, OSM",
+            )
+            MAPTILER_SATELLITE -> maptiler(
+                "map.maptiler.satellite",
+                "maptiler-satellite",
+                "satellite-v4",
+                "jpg",
+                "© MapTiler",
+            )
+            MAPTILER_STREETS -> maptiler(
+                "map.maptiler.streets",
+                "maptiler-streets",
+                "streets-v4",
+                "png",
+                "© MapTiler © OpenStreetMap",
+            )
+            MAPTILER_OUTDOOR -> maptiler(
+                "map.maptiler.outdoor",
+                "maptiler-outdoor",
+                "outdoor-v4",
+                "png",
+                "© MapTiler © OpenStreetMap",
+            )
+            STADIA_SATELLITE -> stadia(
+                "map.stadia.satellite",
+                "stadia-satellite",
+                "alidade_satellite",
+                "jpg",
+                20,
+                "© Stadia Maps, CNES, Airbus DS, OSM",
+            )
+            STADIA_STREETS -> stadia(
+                "map.stadia.streets",
+                "stadia-streets",
+                "alidade_smooth",
+                "png",
+                20,
+                "© Stadia Maps © OpenMapTiles © OSM",
+            )
+            STADIA_TERRAIN -> stadia(
+                "map.stadia.terrain",
+                "stadia-terrain",
+                "stamen_terrain",
+                "png",
+                18,
+                "© Stadia Maps © Stamen Design © OSM",
+            )
+            THUNDERFOREST_STREETS -> thunderforest(
+                "map.thunderforest.streets",
+                "thunderforest-streets",
+                "atlas",
+            )
+            THUNDERFOREST_OUTDOORS -> thunderforest(
+                "map.thunderforest.outdoors",
+                "thunderforest-outdoors",
+                "outdoors",
+            )
+            THUNDERFOREST_TRANSPORT -> thunderforest(
+                "map.thunderforest.transport",
+                "thunderforest-transport",
+                "transport",
+            )
+        }
+
+    val labelKey: String get() = spec.labelKey
+
+    /** One directory per style so a switch does not reuse another map's pictures. */
+    val cacheName: String get() = spec.cacheName
+
+    /** Highest zoom this service actually serves. Screen and print stay at or under it. */
+    val maxZoom: Int get() = spec.maxZoom
+
+    /** Null on OpenStreetMap and the USGS maps. One saved key covers every style of a service. */
+    val service: MapKeyService? get() = spec.service
+
+    val needsKey: Boolean get() = spec.service != null
+
+    val host: String get() = spec.host
+
+    /** Query name for the key. Null when [needsKey] is false. */
+    val keyQuery: String? get() = spec.keyQuery
+
+    /** Hosts a tile redirect may use. The key is not forwarded. */
+    val redirectRoots: List<String> get() = spec.redirectRoots
+
+    /** Picture address with no key. Slippy x/y. USGS and Esri serve z/y/x. */
+    fun tileUrl(z: Int, x: Int, y: Int): String = spec.url(z, x, y)
+
+    internal fun fixedTileUrl(z: Int, x: Int, y: Int): String = tileUrl(z, x, y)
+
+    /** Corner line on the phone. The OpenStreetMap phrase stays this English. */
+    val credit: String get() = spec.credit
+
+    /** Printed line. A PDF has no link, so OpenStreetMap names the license page. */
+    val creditPrint: String get() = spec.creditPrint
+
+    val creditUrl: String? get() = spec.creditUrl
+
+    private fun usgs(labelKey: String, cacheName: String, serviceName: String) = Spec(
+        labelKey = labelKey,
+        cacheName = cacheName,
+        maxZoom = 16,
+        service = null,
+        host = "basemap.nationalmap.gov",
+        keyQuery = null,
+        url = { z, x, y ->
+            "https://basemap.nationalmap.gov/arcgis/rest/services/$serviceName/MapServer/tile/$z/$y/$x"
+        },
+        credit = "U.S. Geological Survey",
+        creditPrint = "U.S. Geological Survey",
+        creditUrl = null,
+        redirectRoots = listOf("nationalmap.gov", "usgs.gov"),
+    )
+
+    private fun esri(labelKey: String, cacheName: String, style: String, credit: String) = Spec(
+        labelKey = labelKey,
+        cacheName = cacheName,
+        maxZoom = 22,
+        service = MapKeyService.ESRI,
+        host = "static-map-tiles-api.arcgis.com",
+        keyQuery = "token",
+        url = { z, x, y ->
+            "https://static-map-tiles-api.arcgis.com/arcgis/rest/services/" +
+                "static-basemap-tiles-service/v1/arcgis/$style/static/tile/$z/$y/$x"
+        },
+        credit = credit,
+        creditPrint = "$credit · static-map-tiles-api.arcgis.com",
+        creditUrl = "https://www.esri.com/en-us/legal/terms/data-attributions",
+        redirectRoots = listOf("arcgis.com", "arcgisonline.com"),
+    )
+
+    private fun maptiler(
+        labelKey: String,
+        cacheName: String,
+        style: String,
+        format: String,
+        credit: String,
+    ) = Spec(
+        labelKey = labelKey,
+        cacheName = cacheName,
+        maxZoom = 22,
+        service = MapKeyService.MAPTILER,
+        host = "api.maptiler.com",
+        keyQuery = "key",
+        url = { z, x, y -> "https://api.maptiler.com/maps/$style/256/$z/$x/$y.$format" },
+        credit = credit,
+        creditPrint = "$credit · maptiler.com/copyright",
+        creditUrl = "https://www.maptiler.com/copyright/",
+        redirectRoots = listOf("maptiler.com"),
+    )
+
+    private fun stadia(
+        labelKey: String,
+        cacheName: String,
+        style: String,
+        format: String,
+        maxZoom: Int,
+        credit: String,
+    ) = Spec(
+        labelKey = labelKey,
+        cacheName = cacheName,
+        maxZoom = maxZoom,
+        service = MapKeyService.STADIA,
+        host = "tiles.stadiamaps.com",
+        keyQuery = "api_key",
+        url = { z, x, y -> "https://tiles.stadiamaps.com/tiles/$style/$z/$x/$y.$format" },
+        credit = credit,
+        creditPrint = "$credit · stadiamaps.com/attribution",
+        creditUrl = "https://stadiamaps.com/attribution/",
+        redirectRoots = listOf("stadiamaps.com"),
+    )
+
+    private fun thunderforest(labelKey: String, cacheName: String, style: String) = Spec(
+        labelKey = labelKey,
+        cacheName = cacheName,
+        maxZoom = 22,
+        service = MapKeyService.THUNDERFOREST,
+        host = "api.thunderforest.com",
+        keyQuery = "apikey",
+        url = { z, x, y -> "https://api.thunderforest.com/$style/$z/$x/$y.png" },
+        credit = "© Thunderforest © OpenStreetMap",
+        creditPrint = "© Thunderforest © OpenStreetMap · thunderforest.com",
+        creditUrl = "https://www.thunderforest.com/",
+        redirectRoots = listOf("thunderforest.com"),
+    )
+}
+
+/**
+ * Lower-left readout on the on-screen maps. This phone now.
+ * Missing JSON is [OFF]. The path figure does not use it.
+ */
+@Serializable
+enum class MapFooter {
+    OFF,
+    GPS,
+    GRID,
+    ;
+
+    val labelKey: String
+        get() = when (this) {
+            OFF -> "ui.off.label"
+            GPS -> "map.position.gps"
+            GRID -> "ui.grid"
+        }
+}
+
+/**
+ * Compass picture on Show live path and Hunt. Two choices, so four pictures.
+ * Tap the button for north-up or direction of travel. Double-tap the map for
+ * the whole path or the close view around this phone. Reports stay north-up.
+ */
+object MapFrame {
+    /** Whole path, north up. */
+    const val NORTH = 0
+    /** Whole path, travel up. */
+    const val TRAVEL = 1
+    /** Close view, travel up. Older saves used this as the only close view. */
+    const val CLOSE = 2
+    /** Close view, north up. */
+    const val CLOSE_NORTH = 3
+
+    /**
+     * Half the short side of the close view, in meters.
+     * Twice the first close window. The short edge sits a little past about 100 m.
+     */
+    val CLOSE_HALF_M: Float = (CoTravel.NEAR_M * 2.4).toFloat()
+
+    /** Tile window around you while the close view follows. Covers a turned wide band. */
+    const val CLOSE_TILE_HALF_M = 280f
+
+    /** -1 is an older file. [mapRotate] then picks north-up or travel, zoomed out. */
+    fun resolved(saved: Int, mapRotate: Boolean): Int =
+        if (saved in NORTH..CLOSE_NORTH) saved else if (mapRotate) TRAVEL else NORTH
+
+    /** Close view around this phone. The whole path is the other zoom. */
+    fun zoomed(frame: Int): Boolean = frame == CLOSE || frame == CLOSE_NORTH
+
+    /** Direction of travel is up. North-up frames stay fixed. */
+    fun turns(frame: Int): Boolean = frame == TRAVEL || frame == CLOSE
+
+    /** Tap. North-up and direction of travel trade places. Zoom stays. */
+    fun bearingToggled(current: Int): Int = when (current) {
+        NORTH -> TRAVEL
+        TRAVEL -> NORTH
+        CLOSE -> CLOSE_NORTH
+        CLOSE_NORTH -> CLOSE
+        else -> NORTH
+    }
+
+    /** Double-tap. The whole path and the close view trade places. Bearing stays. */
+    fun zoomToggled(current: Int): Int = when (current) {
+        NORTH -> CLOSE_NORTH
+        CLOSE_NORTH -> NORTH
+        TRAVEL -> CLOSE
+        CLOSE -> TRAVEL
+        else -> NORTH
+    }
+}
+
 @Serializable
 data class AppSettings(
     /** Kept in settings packs. The UI is always dark; Night mode is the red overlay. */
@@ -680,6 +1019,24 @@ data class AppSettings(
     val placeWatch: Boolean = true,
     /** Reverse-geocode GPS stamps in Debrief when the phone is online. Default on. */
     val onlineLookup: Boolean = true,
+    /** Which raster [onlineLookup] loads. Missing JSON is OpenStreetMap. Turning maps off keeps this. */
+    val mapBasemap: MapBasemap = MapBasemap.OSM,
+    /** Lower left of the on-screen map. Missing JSON is off. */
+    val mapFooter: MapFooter = MapFooter.OFF,
+    /**
+     * Show live path and Hunt follow travel while the map is following.
+     * Missing JSON keeps north up. The compass button is the only control.
+     * Kept so an older file still decodes. [mapFrame] wins once it is set.
+     */
+    val mapRotate: Boolean = false,
+    /**
+     * Compass picture. [MapFrame.NORTH], [MapFrame.TRAVEL], [MapFrame.CLOSE],
+     * or [MapFrame.CLOSE_NORTH]. -1 is an older file: [mapRotate] chooses
+     * north-up or travel, zoomed out.
+     */
+    val mapFrame: Int = -1,
+    /** Kept so an older file still decodes. The double-tap no longer reads it. */
+    val mapHome: Int = MapFrame.NORTH,
     val viewMode: ViewMode = ViewMode.BY_CLASS,
     val strengthSort: StrengthSort = StrengthSort.AVERAGE,
     val averageWindowSec: Int = 30,
@@ -948,6 +1305,16 @@ data class Sighting(
     val payloadTrail: List<PayloadFix> = emptyList(),
     /** Decoded labels a signature asked to show on the live row. Empty for every other radio. */
     val liveDecode: List<LiveDecodeChip> = emptyList(),
+    /** When the last packet that carried an aircraft latitude was read. */
+    val payloadAt: Long? = null,
+    /** Where this phone was at [payloadAt]. Null when that packet had no phone fix. */
+    val payloadPhoneLat: Double? = null,
+    val payloadPhoneLon: Double? = null,
+    /** When the last packet that carried an operator location was read. */
+    val payloadOpAt: Long? = null,
+    /** Where this phone was at [payloadOpAt]. */
+    val payloadOpPhoneLat: Double? = null,
+    val payloadOpPhoneLon: Double? = null,
 ) {
     val displayName: String
         get() = name.ifBlank { if (hiddenSsid) "<hidden>" else mac }

@@ -33,6 +33,12 @@ object SitDiff {
         val payloadTrail: List<PayloadFix> = emptyList(),
         val payloadAircraft: String = "",
         val mine: Boolean = false,
+        val payloadAt: Long? = null,
+        val payloadPhoneLat: Double? = null,
+        val payloadPhoneLon: Double? = null,
+        val payloadOpAt: Long? = null,
+        val payloadOpPhoneLat: Double? = null,
+        val payloadOpPhoneLon: Double? = null,
     )
 
     data class Side(
@@ -104,6 +110,12 @@ object SitDiff {
         payloadTrail = device.payloadTrail,
         payloadAircraft = device.payloadAircraft?.trim().orEmpty(),
         mine = device.key in mineKeys,
+        payloadAt = device.payloadAt,
+        payloadPhoneLat = device.payloadPhoneLat,
+        payloadPhoneLon = device.payloadPhoneLon,
+        payloadOpAt = device.payloadOpAt,
+        payloadOpPhoneLat = device.payloadOpPhoneLat,
+        payloadOpPhoneLon = device.payloadOpPhoneLon,
     )
 
     fun fromSitRadio(
@@ -144,6 +156,12 @@ object SitDiff {
         payloadTrail = row.payloadTrail,
         payloadAircraft = row.payloadAircraft?.trim().orEmpty(),
         mine = row.key in mineKeys,
+        payloadAt = row.payloadAt,
+        payloadPhoneLat = row.payloadPhoneLat,
+        payloadPhoneLon = row.payloadPhoneLon,
+        payloadOpAt = row.payloadOpAt,
+        payloadOpPhoneLat = row.payloadOpPhoneLat,
+        payloadOpPhoneLon = row.payloadOpPhoneLon,
     )
 
     fun report(
@@ -326,6 +344,12 @@ object SitDiff {
                             pilotLon = r.payloadOpLon,
                             aircraft = r.payloadAircraft,
                             opKind = r.payloadOpKind,
+                            fixAt = r.payloadAt,
+                            phoneLat = r.payloadPhoneLat,
+                            phoneLon = r.payloadPhoneLon,
+                            opAt = r.payloadOpAt,
+                            opPhoneLat = r.payloadOpPhoneLat,
+                            opPhoneLon = r.payloadOpPhoneLon,
                         )
                     } else {
                         ""
@@ -388,6 +412,12 @@ object SitDiff {
             key = key,
             mac = mac,
             aircraft = payloadAircraft,
+            fixAt = payloadAt,
+            phoneLat = payloadPhoneLat,
+            phoneLon = payloadPhoneLon,
+            opAt = payloadOpAt,
+            opPhoneLat = payloadOpPhoneLat,
+            opPhoneLon = payloadOpPhoneLon,
         )
     }
 

@@ -58,13 +58,17 @@ import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.fieldwatch.data.PathTiles
 import app.fieldwatch.domain.Geo
+import app.fieldwatch.domain.MapFooter
+import app.fieldwatch.domain.MapFrame
 import app.fieldwatch.domain.SignatureClass
 import app.fieldwatch.domain.SitPathPlot
 import app.fieldwatch.ui.ClassGlyphs
@@ -78,7 +82,20 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.hypot
-import kotlin.math.roundToInt
+
+/** Lower-left map line. Holds the last reading while this phone wanders in place. */
+@Composable
+fun rememberMapFooter(
+    mode: MapFooter,
+    lat: Double?,
+    lon: Double?,
+    demo: Boolean,
+): String? {
+    val hold = remember { arrayOfNulls<Geo.MapFooterHold>(1) }
+    val next = Geo.settleMapFooter(hold[0], mode, lat, lon, demo)
+    hold[0] = next
+    return next?.text
+}
 
 @Composable
 fun SitPathCanvas(
@@ -91,6 +108,16 @@ fun SitPathCanvas(
     viewport: SitPathPlot.Viewport? = null,
     /** Pinch, drag, and recenter. Reports leave this null and stay fitted. */
     onViewport: ((SitPathPlot.Viewport?) -> Unit)? = null,
+    /** Where this phone is now. Blank stays off. The path figure does not pass this. */
+    position: String? = null,
+    /** Degrees clockwise from north. NaN keeps this frame north-up. */
+    courseDeg: Double = Double.NaN,
+    /** [MapFrame]. Reports leave this at north-up and leave the button off. */
+    mapFrame: Int = MapFrame.NORTH,
+    /** Null hides the button and keeps the drawn N. */
+    onRotate: (() -> Unit)? = null,
+    /** Double-tap. The canvas also clears a held view. Reports leave this null. */
+    onToggleClose: (() -> Unit)? = null,
 ) {
     val track = MaterialTheme.colorScheme.onSurface
     val night = LocalNightMode.current
@@ -101,18 +128,36 @@ fun SitPathCanvas(
     val surface = MaterialTheme.colorScheme.surface
     val outline = MaterialTheme.colorScheme.outline
     val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val uriHandler = LocalUriHandler.current
     val labelStyle = TextStyle(fontSize = 10.sp, color = muted)
     val gnssInk = GnssDiamond.nightIf(night)
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
     var selectedId by remember { mutableStateOf<String?>(null) }
     var selectedGnss by remember { mutableStateOf<String?>(null) }
-    val layout = remember(model, boxSize, viewport) {
+    val appliedCourse = if (
+        onRotate != null && MapFrame.turns(mapFrame) && viewport == null && courseDeg.isFinite()
+    ) {
+        courseDeg
+    } else {
+        Double.NaN
+    }
+    val followHalfM = if (
+        onRotate != null && MapFrame.zoomed(mapFrame) && viewport == null
+    ) {
+        MapFrame.CLOSE_HALF_M
+    } else {
+        0f
+    }
+    val layout = remember(model, boxSize, viewport, appliedCourse, followHalfM) {
         if (boxSize.width < 8 || boxSize.height < 8) null
         else SitPathPlot.layout(
             model,
             boxSize.width.toFloat(),
             boxSize.height.toFloat(),
             viewport = viewport,
+            followHalfM = followHalfM,
+            courseDeg = appliedCourse,
         )
     }
     val clusters = remember(layout, model) {
@@ -134,12 +179,25 @@ fun SitPathCanvas(
     val layoutRef = remember { mutableStateOf(layout) }
     val viewportRef = remember { mutableStateOf(viewport) }
     val onViewportRef = remember { mutableStateOf(onViewport) }
+    val onToggleRef = remember { mutableStateOf(onToggleClose) }
     val tapRef = remember { mutableStateOf<(Offset) -> Unit>({ }) }
     val lastTapMs = remember { mutableLongStateOf(0L) }
     layoutRef.value = layout
     viewportRef.value = viewport
     onViewportRef.value = onViewport
+    onToggleRef.value = onToggleClose
     val showRecenter = viewport != null && onViewport != null
+    val compass = onRotate != null
+    val compassLift = 56.dp
+    fun cardTop(onRight: Boolean) = if (
+        (onRight && compass) ||
+        (onRight && showRecenter && !compass) ||
+        (!onRight && showRecenter && compass)
+    ) {
+        compassLift
+    } else {
+        8.dp
+    }
     fun handleTap(pos: Offset) {
         val lay = layout
         val gnssHit = if (lay == null) emptyList() else gnssAt(model.gnss, lay, pos.x, pos.y)
@@ -206,6 +264,7 @@ fun SitPathCanvas(
                         lastTapMs.longValue = 0L
                         viewportRef.value = null
                         onViewportRef.value?.invoke(null)
+                        onToggleRef.value?.invoke()
                     } else {
                         lastTapMs.longValue = now
                         tapRef.value(tapAt)
@@ -225,17 +284,14 @@ fun SitPathCanvas(
             val lay = layout ?: return@Canvas
             clipRect(lay.plotLeft, lay.plotTop, lay.plotRight, lay.plotBottom) {
                 tiles.forEach { tile ->
-                    val nw = lay.project(tile.north, tile.west)
-                    val se = lay.project(tile.south, tile.east)
-                    val left = nw.x.roundToInt()
-                    val top = nw.y.roundToInt()
-                    val w = (se.x - nw.x).roundToInt().coerceAtLeast(1)
-                    val h = (se.y - nw.y).roundToInt().coerceAtLeast(1)
                     runCatching {
-                        drawImage(
+                        drawMapRaster(
                             tile.bitmap.asImageBitmap(),
-                            dstOffset = IntOffset(left, top),
-                            dstSize = IntSize(w, h),
+                            tile.north,
+                            tile.west,
+                            tile.south,
+                            tile.east,
+                            lay.project,
                             alpha = 0.55f,
                         )
                     }
@@ -254,10 +310,11 @@ fun SitPathCanvas(
             }
             if (lay.path.size >= 2) {
                 val trace = if (lay.samples.size >= 2) lay.samples else model.samples
-                val stays = Geo.legs(trace).filter { it.stay }
+                val stays = Geo.realStops(trace)
                 for (i in 1 until lay.path.size) {
-                    val t = trace.getOrNull(i)?.at ?: continue
-                    if (stays.none { t in it.startAt..it.endAt }) continue
+                    val from = trace.getOrNull(i - 1)?.at ?: continue
+                    val to = trace.getOrNull(i)?.at ?: continue
+                    if (!Geo.stopCovers(stays, from, to)) continue
                     drawLine(
                         PhosphorActive.copy(alpha = 0.9f),
                         Offset(lay.path[i - 1].x, lay.path[i - 1].y),
@@ -346,8 +403,52 @@ fun SitPathCanvas(
             drawLine(muted, Offset(barX, barY - 5f), Offset(barX, barY + 5f), strokeWidth = 3f)
             drawLine(muted, Offset(barX + barW, barY - 5f), Offset(barX + barW, barY + 5f), strokeWidth = 3f)
             drawText(measured, topLeft = Offset(barX + barW + 8f, barY - measured.size.height / 2f))
-            val n = measurer.measure("N", labelStyle)
-            drawText(n, topLeft = Offset(size.width - n.size.width - 10f, 8f))
+            if (onRotate == null) {
+                val n = measurer.measure("N", labelStyle)
+                drawText(n, topLeft = Offset(size.width - n.size.width - 10f, 8f))
+            }
+        }
+        val mapCredit = tiles.firstOrNull()?.basemap
+        val layForCredit = layout
+        if (mapCredit != null && layForCredit != null && boxSize.height > 0) {
+            val bottomPad = with(density) { (boxSize.height - layForCredit.plotBottom).toDp() + 2.dp }
+            val endPad = with(density) { (boxSize.width - layForCredit.plotRight).toDp() + 2.dp }
+            val link = mapCredit.creditUrl
+            Text(
+                mapCredit.credit,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = endPad, bottom = bottomPad)
+                    .background(surface.copy(alpha = 0.84f), RoundedCornerShape(2.dp))
+                    .clickable(enabled = link != null) {
+                        if (link != null) runCatching { uriHandler.openUri(link) }
+                    }
+                    .padding(horizontal = 4.dp, vertical = 1.dp),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, lineHeight = 11.sp),
+                color = track,
+                maxLines = 1,
+            )
+        }
+        val here = position
+        if (!here.isNullOrBlank() && layForCredit != null && boxSize.height > 0) {
+            val bottomPad = with(density) { (boxSize.height - layForCredit.plotBottom).toDp() + 2.dp }
+            val startPad = with(density) { layForCredit.plotLeft.toDp() + 2.dp }
+            val half = with(density) {
+                ((layForCredit.plotRight - layForCredit.plotLeft) / 2f).toDp() - 4.dp
+            }.coerceAtLeast(0.dp)
+            Text(
+                here,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = startPad, bottom = bottomPad)
+                    .widthIn(max = half)
+                    .background(surface.copy(alpha = 0.84f), RoundedCornerShape(2.dp))
+                    .padding(horizontal = 4.dp, vertical = 1.dp),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, lineHeight = 11.sp),
+                color = track,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         val gnssCard = model.gnss.filter { gnssId(it) in selectedGnss.orEmpty().split("|") }
         if (gnssCard.isNotEmpty()) {
@@ -356,7 +457,7 @@ fun SitPathCanvas(
             Column(
                 Modifier
                     .align(if (onRight) Alignment.TopEnd else Alignment.TopStart)
-                    .padding(8.dp)
+                    .padding(start = 8.dp, top = cardTop(onRight), end = 8.dp, bottom = 8.dp)
                     .widthIn(max = 248.dp)
                     .background(surface, RoundedCornerShape(8.dp))
                     .border(1.dp, outline, RoundedCornerShape(8.dp))
@@ -392,7 +493,7 @@ fun SitPathCanvas(
                     .align(if (onRight) Alignment.TopEnd else Alignment.TopStart)
                     .padding(
                         start = 8.dp,
-                        top = if (showRecenter && onRight) 40.dp else 8.dp,
+                        top = cardTop(onRight),
                         end = 8.dp,
                         bottom = 8.dp,
                     )
@@ -456,11 +557,19 @@ fun SitPathCanvas(
             TextButton(
                 onClick = { onViewport?.invoke(null) },
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
+                    .align(if (compass) Alignment.TopStart else Alignment.TopEnd)
                     .padding(8.dp),
             ) {
                 Text(LanguageText.text("display.recenter"))
             }
+        }
+        if (onRotate != null) {
+            MapCompassButton(
+                frame = mapFrame,
+                northDeg = if (viewport == null && courseDeg.isFinite()) courseDeg else Double.NaN,
+                onClick = onRotate,
+                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
+            )
         }
     }
 }

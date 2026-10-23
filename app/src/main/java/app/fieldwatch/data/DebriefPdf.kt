@@ -534,6 +534,7 @@ object DebriefPdf {
         }
         canvas.restore()
         canvas.drawRect(plot, stroke)
+        drawMapCredit(canvas, plot, tiles)
         val nP = Paint().apply {
             color = MUTED
             textSize = 8f
@@ -634,7 +635,7 @@ object DebriefPdf {
             drawClassMark(canvas, ox(pts.last().x), oy(pts.last().y))
             return
         }
-        val stays = Geo.legs(cleaned).filter { it.stay }
+        val stays = Geo.realStops(cleaned)
         val stayPaint = Paint().apply {
             color = if (track.secondary) PATH_OTHER else PATH_STAY
             style = Paint.Style.STROKE
@@ -645,8 +646,9 @@ object DebriefPdf {
             if (track.secondary) pathEffect = DashPathEffect(floatArrayOf(8f, 5f), 0f)
         }
         for (i in 1 until pts.size) {
-            val t = cleaned.getOrNull(i)?.at ?: continue
-            if (stays.none { t in it.startAt..it.endAt }) continue
+            val from = cleaned.getOrNull(i - 1)?.at ?: continue
+            val to = cleaned.getOrNull(i)?.at ?: continue
+            if (!Geo.stopCovers(stays, from, to)) continue
             canvas.drawLine(
                 ox(pts[i - 1].x), oy(pts[i - 1].y),
                 ox(pts[i].x), oy(pts[i].y),
@@ -929,6 +931,31 @@ object DebriefPdf {
                 canvas.restore()
             }
         }
+    }
+
+    private fun drawMapCredit(canvas: Canvas, plot: RectF, tiles: List<PathTiles.Tile>) {
+        val line = tiles.firstOrNull()?.basemap?.creditPrint ?: return
+        val text = Paint().apply {
+            color = Color.rgb(32, 32, 32)
+            textSize = 6.5f
+            isAntiAlias = true
+            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
+        }
+        val width = text.measureText(line)
+        val padX = 3f
+        val padY = 1.5f
+        val right = plot.right - 3f
+        val bottom = plot.bottom - 3f
+        val left = (right - width - padX * 2f).coerceAtLeast(plot.left + 2f)
+        val top = bottom - text.textSize - padY * 2f
+        if (right - left < 8f || top < plot.top) return
+        val back = Paint().apply {
+            color = Color.argb(220, 255, 255, 255)
+            style = Paint.Style.FILL
+            isAntiAlias = true
+        }
+        canvas.drawRoundRect(RectF(left, top, right, bottom), 2f, 2f, back)
+        canvas.drawText(line, left + padX, bottom - padY - 1f, text)
     }
 
     private fun drawPathTicks(

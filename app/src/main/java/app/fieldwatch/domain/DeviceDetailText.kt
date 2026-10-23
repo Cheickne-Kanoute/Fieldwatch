@@ -19,6 +19,9 @@ object DeviceDetailText {
         fleets: List<Fleet> = emptyList(),
         mine: Boolean = false,
         placeLines: List<String> = emptyList(),
+        demo: Boolean = false,
+        phoneLat: Double? = null,
+        phoneLon: Double? = null,
     ): String {
         val fmt = SimpleDateFormat("HH:mm:ss", Locale.US)
         val iso = SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", Locale.US)
@@ -180,6 +183,7 @@ object DeviceDetailText {
         }
 
         device.payloadAircraft?.trim()?.takeIf { it.isNotEmpty() }?.let { line("Aircraft", it) }
+        appendAdvertised(device, demo, phoneLat, phoneLon, ::line)
 
         if (fleets.isNotEmpty() && (device.kind == RadioKind.BLE || device.kind == RadioKind.WIFI)) {
             val decoded = SignatureFieldDecoder.decodeSighting(device, fleets)
@@ -256,10 +260,11 @@ object DeviceDetailText {
         line("Last seen", fmt.format(Date(device.lastSeen)))
         line("Hits", device.hitCount.toString())
         placeLines.forEach { out.append(it).append('\n') }
-        Geo.screenCoord(device.latitude, device.longitude, false)?.let {
+        Geo.screenCoord(device.latitude, device.longitude, demo)?.let {
             line("Last fix", it)
             out.append("Last fix is the phone’s GPS at hear-time, not a fix on this radio.\n")
         }
+        Geo.screenGrid(device.latitude, device.longitude, demo)?.let { line("Grid", it) }
         if (device.fleetIds.isNotEmpty()) {
             line("Matched signatures", signatureNames.joinToString("; ").ifBlank {
                 device.fleetIds.joinToString("; ")
@@ -270,6 +275,30 @@ object DeviceDetailText {
         }
         presenceLine(device, now, fmt)?.let { line("Presence (15 min)", it) }
         return out.toString().trimEnd() + "\n"
+    }
+
+    private fun appendAdvertised(
+        device: Sighting,
+        demo: Boolean,
+        phoneLat: Double?,
+        phoneLon: Double?,
+        line: (String, String) -> Unit,
+    ) {
+        if (PayloadLocation.validCoord(device.payloadLat, device.payloadLon)) {
+            line("Aircraft position", Geo.screenCoord(device.payloadLat, device.payloadLon, demo)!!)
+            Geo.screenGrid(device.payloadLat, device.payloadLon, demo)?.let { line("Grid", it) }
+            Geo.liveRange(phoneLat, phoneLon, device.payloadLat, device.payloadLon, demo)?.let {
+                line("From this phone", it)
+            }
+        }
+        if (PayloadLocation.validCoord(device.payloadOpLat, device.payloadOpLon)) {
+            val label = OperatorLoc.label(device.payloadOpKind)
+            line(label, Geo.screenCoord(device.payloadOpLat, device.payloadOpLon, demo)!!)
+            Geo.screenGrid(device.payloadOpLat, device.payloadOpLon, demo)?.let { line("Grid", it) }
+            Geo.liveRange(phoneLat, phoneLon, device.payloadOpLat, device.payloadOpLon, demo)?.let {
+                line("From this phone", it)
+            }
+        }
     }
 
     private fun vendorLine(device: Sighting): String? {

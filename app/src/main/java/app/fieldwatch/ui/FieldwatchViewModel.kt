@@ -16,6 +16,11 @@ import app.fieldwatch.BuildConfig
 import app.fieldwatch.FieldwatchApp
 import app.fieldwatch.domain.AircraftTrail
 import app.fieldwatch.domain.AppSettings
+import app.fieldwatch.domain.MapBasemap
+import app.fieldwatch.domain.MapFrame
+import app.fieldwatch.domain.MapKey
+import app.fieldwatch.domain.MapKeyNotice
+import app.fieldwatch.domain.MapKeyProblem
 import app.fieldwatch.domain.attentionNotes
 import app.fieldwatch.domain.signatureNotes
 import app.fieldwatch.domain.detectionPolicy
@@ -54,6 +59,7 @@ import app.fieldwatch.domain.FilterState
 import app.fieldwatch.domain.Fleet
 import app.fieldwatch.domain.Hunt
 import app.fieldwatch.domain.HuntCue
+import app.fieldwatch.domain.HuntHeat
 import app.fieldwatch.domain.FamilyVerdict
 import app.fieldwatch.domain.LogRadio
 import app.fieldwatch.domain.RadioBookmarks
@@ -193,10 +199,19 @@ data class FieldwatchUi(
     val livePathSince: Long = Long.MIN_VALUE,
     /** Watchlist alerts drawn on the live map. Not the filtered list. */
     val livePathRadios: List<Sighting> = emptyList(),
+    /** This phone now. Null when the latest fix is older than 30 seconds. */
+    val phoneLat: Double? = null,
+    val phoneLon: Double? = null,
+    /** Degrees clockwise from north. NaN until GPS has shown a direction. */
+    val travelDeg: Double = Double.NaN,
 )
 
 class FieldwatchViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as FieldwatchApp
+    val mapKeyRevision: StateFlow<Int> = app.mapKeys.revision
+    private val _mapNotice = MutableStateFlow<MapKeyNotice?>(null)
+    val mapNotice: StateFlow<MapKeyNotice?> = _mapNotice
+    private var silencedMapNotice: MapKeyNotice? = null
     private val filters = FilterEngine()
     private val signatures = SignatureEngine()
     private val selectedKey = MutableStateFlow<String?>(null)
@@ -228,6 +243,10 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
     val livePathTiles: StateFlow<List<PathTiles.Tile>> = _livePathTiles
     private var livePathTileJob: Job? = null
     private var livePathTileKey: String? = null
+    private val _huntTiles = MutableStateFlow<List<PathTiles.Tile>>(emptyList())
+    val huntTiles: StateFlow<List<PathTiles.Tile>> = _huntTiles
+    private var huntTileJob: Job? = null
+    private var huntTileKey: String? = null
     private val _pathAircraftTiles = MutableStateFlow<List<List<PathTiles.Tile>>>(emptyList())
     val pathAircraftTiles: StateFlow<List<List<PathTiles.Tile>>> = _pathAircraftTiles
     @Volatile private var pathRadios: List<Sighting> = emptyList()
@@ -283,6 +302,9 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
     private val huntStartedAt = MutableStateFlow(0L)
     private val huntPeakRssi = MutableStateFlow(-127)
     private val huntSamples = MutableStateFlow<List<RssiSample>>(emptyList())
+    private val huntTrail = MutableStateFlow<List<GpsSample>>(emptyList())
+    /** Radio whose cloud is kept after leaving Hunt. Reset or a new radio replaces it. */
+    private var carriedHuntKey: String? = null
     private val _outlineOpenClasses = MutableStateFlow<Set<String>>(emptySet())
     val outlineOpenClasses: StateFlow<Set<String>> = _outlineOpenClasses
     private val _outlineOpenSigs = MutableStateFlow<Set<String>>(emptySet())
@@ -476,6 +498,7 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
             openPath != null -> openPath.radios
             else -> SitPathPlot.livePathRadios(labeled, pathSince, alertKeys, watchedFleets, hiddenFlood)
         }
+        val phone = app.currentFix()
         FieldwatchUi(
             devices = labeled,
             filtered = filtered,
@@ -509,6 +532,9 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
             operatorPath = pathSamples,
             livePathSince = pathSince,
             livePathRadios = pathRadios,
+            phoneLat = phone?.first,
+            phoneLon = phone?.second,
+            travelDeg = app.travelDeg,
         )
     }.flowOn(Dispatchers.Default)
         .stateIn(
@@ -551,19 +577,23 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
     )
 
     val hunt: StateFlow<HuntUi> = combine(
-        combine(huntKey, huntStartedAt, huntPeakRssi, huntSamples) { key, started, peak, samples ->
-            arrayOf(key, started, peak, samples)
+        combine(huntKey, huntStartedAt, huntPeakRssi, huntSamples, huntTrail) { key, started, peak, samples, trail ->
+            arrayOf(key, started, peak, samples, trail)
         },
         app.devices.devices,
         clock,
-    ) { bits, devices, now ->
+        app.huntPlace,
+    ) { bits, devices, now, place ->
         val key = bits[0] as String?
         val started = bits[1] as Long
         val peak = bits[2] as Int
         @Suppress("UNCHECKED_CAST")
         val samples = bits[3] as List<RssiSample>
+        @Suppress("UNCHECKED_CAST")
+        val trail = bits[4] as List<GpsSample>
         if (key == null) return@combine HuntUi()
         val device = devices.firstOrNull { it.key == key }
+        val fix = place ?: app.huntFix(now)
         HuntUi(
             active = true,
             device = device,
@@ -572,6 +602,9 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
             peakRssi = peak,
             samples = samples,
             lastSeen = device?.lastSeen ?: 0L,
+            trail = trail,
+            hereLat = fix?.first,
+            hereLon = fix?.second,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HuntUi())
 
@@ -652,6 +685,12 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
                 val sample = RssiSample(device.lastSeen, device.rssi)
                 huntSamples.update { (it + sample).takeLast(120) }
                 if (device.rssi > huntPeakRssi.value) huntPeakRssi.value = device.rssi
+                val fix = app.huntFix()
+                if (fix != null) {
+                    huntTrail.update {
+                        HuntHeat.note(it, fix.first, fix.second, device.rssi, device.lastSeen)
+                    }
+                }
             }
         }
         viewModelScope.launch {
@@ -767,25 +806,49 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
         selectedKey.value = device.key
     }
 
-    fun startHunt(device: Sighting) {
+    fun startHunt(device: Sighting, fresh: Boolean = false) {
         val now = System.currentTimeMillis()
+        val resume = HuntHeat.resumes(carriedHuntKey, device.key, fresh)
+        app.beginHuntMotion()
+        if (resume) {
+            if (HuntHeat.level(device.rssi) != null && device.rssi > huntPeakRssi.value) {
+                huntPeakRssi.value = device.rssi
+            }
+            val last = huntSamples.value.lastOrNull()
+            if (last == null || device.lastSeen > last.at) {
+                huntSamples.value = (huntSamples.value + RssiSample(device.lastSeen, device.rssi)).takeLast(120)
+            }
+        }
         huntKey.value = device.key
+        carriedHuntKey = device.key
+        if (resume) return
         huntStartedAt.value = now
         huntPeakRssi.value = device.rssi
         huntSamples.value = listOf(RssiSample(now, device.rssi))
+        val fix = app.huntFix()
+        huntTrail.value = if (fix == null) {
+            emptyList()
+        } else {
+            HuntHeat.note(emptyList(), fix.first, fix.second, device.rssi, now)
+        }
+        huntTileJob?.cancel()
+        huntTileJob = null
+        huntTileKey = null
+        _huntTiles.value = emptyList()
     }
 
     fun resetHunt() {
         val key = huntKey.value ?: return
         val live = app.devices.devices.value.firstOrNull { it.key == key } ?: return
-        startHunt(live)
+        startHunt(live, fresh = true)
     }
 
+    /** Sensors stop. The cloud stays until Reset, or until a different radio is hunted. */
     fun stopHunt() {
+        app.endHuntMotion()
         huntKey.value = null
-        huntSamples.value = emptyList()
-        huntPeakRssi.value = -127
-        huntStartedAt.value = 0L
+        huntTileJob?.cancel()
+        huntTileJob = null
     }
 
     fun huntTick(beepOn: Boolean, vibrateOn: Boolean) {
@@ -889,6 +952,40 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    /** Compass button. North-up or direction of travel. Zoom stays. No Settings row. */
+    fun cycleMapFrame() {
+        viewModelScope.launch {
+            app.config.update { config ->
+                val settings = config.settings
+                val current = MapFrame.resolved(settings.mapFrame, settings.mapRotate)
+                val next = MapFrame.bearingToggled(current)
+                config.copy(
+                    settings = settings.copy(
+                        mapFrame = next,
+                        mapRotate = MapFrame.turns(next),
+                    ),
+                )
+            }
+        }
+    }
+
+    /** Double-tap. Whole path or the close view around this phone. Bearing stays. */
+    fun toggleMapClose() {
+        viewModelScope.launch {
+            app.config.update { config ->
+                val settings = config.settings
+                val current = MapFrame.resolved(settings.mapFrame, settings.mapRotate)
+                val next = MapFrame.zoomToggled(current)
+                config.copy(
+                    settings = settings.copy(
+                        mapFrame = next,
+                        mapRotate = MapFrame.turns(next),
+                    ),
+                )
+            }
+        }
+    }
+
     /** Persist the divider after the finger lifts. Skip a write that did not really move. */
     fun setLivePathSplit(fraction: Float) {
         val next = fraction.coerceIn(0.22f, 0.78f)
@@ -906,7 +1003,7 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
      * One fix is enough to show the neighborhood. The line still needs a second point.
      * A coarse key skips a fetch while the walk has barely moved.
      */
-    fun refreshLivePathTiles(samples: List<GpsSample>, online: Boolean) {
+    fun refreshLivePathTiles(samples: List<GpsSample>, online: Boolean, basemap: MapBasemap) {
         if (!online || samples.isEmpty()) {
             livePathTileJob?.cancel()
             livePathTileJob = null
@@ -914,16 +1011,27 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
             if (_livePathTiles.value.isNotEmpty()) _livePathTiles.value = emptyList()
             return
         }
+        if (missingMapKey(basemap)) {
+            livePathTileJob?.cancel()
+            livePathTileJob = null
+            livePathTileKey = "missing:${basemap.name}:${app.mapKeys.revision.value}"
+            _livePathTiles.value = emptyList()
+            noteMapTiles(basemap, MapKeyProblem.MISSING)
+            return
+        }
         val end = samples.last()
-        val key = "${samples.size / 4}:${(end.lat * 1000.0).roundToInt()}:${(end.lon * 1000.0).roundToInt()}"
+        val key = tileRequestKey(basemap, "${samples.size / 4}:${(end.lat * 1000.0).roundToInt()}:${(end.lon * 1000.0).roundToInt()}")
         if (key == livePathTileKey) return
         livePathTileKey = key
         livePathTileJob?.cancel()
         livePathTileJob = viewModelScope.launch(Dispatchers.Default) {
-            val tiles = runCatching {
-                PathTiles.load(app, samples, onlineLookup = true)
-            }.getOrDefault(emptyList())
-            if (isActive && livePathTileKey == key) _livePathTiles.value = tiles
+            val batch = runCatching {
+                PathTiles.load(app, samples, onlineLookup = true, basemap = basemap, mapKey = keyFor(basemap))
+            }.getOrDefault(PathTiles.Batch(problem = if (basemap.needsKey) MapKeyProblem.FAILED else MapKeyProblem.NONE))
+            if (isActive && livePathTileKey == key) {
+                noteMapTiles(basemap, batch.problem)
+                _livePathTiles.value = batch.tiles
+            }
         }
     }
 
@@ -931,18 +1039,23 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
      * Tiles for the area the user is looking at. The pictures already on screen stay
      * until the new ones arrive. The same tile set is not fetched again.
      */
-    fun refreshLivePathViewport(view: SitPathPlot.Viewport, online: Boolean) {
+    fun refreshLivePathViewport(view: SitPathPlot.Viewport, online: Boolean, basemap: MapBasemap) {
         if (!online) {
-            refreshLivePathTiles(emptyList(), false)
+            refreshLivePathTiles(emptyList(), false, basemap)
+            return
+        }
+        if (missingMapKey(basemap)) {
+            refreshLivePathTiles(emptyList(), false, basemap)
+            noteMapTiles(basemap, MapKeyProblem.MISSING)
             return
         }
         val bounds = view.coveredBounds()
-        val key = "v:" + PathTiles.coverageKey(bounds[0], bounds[1], bounds[2], bounds[3])
-        if (key == "v:off" || key == livePathTileKey) return
+        val key = tileRequestKey(basemap, "v:" + PathTiles.coverageKey(bounds[0], bounds[1], bounds[2], bounds[3], basemap))
+        if (key.endsWith(":off") || key == livePathTileKey) return
         livePathTileKey = key
         livePathTileJob?.cancel()
         livePathTileJob = viewModelScope.launch(Dispatchers.Default) {
-            val tiles = runCatching {
+            val batch = runCatching {
                 PathTiles.loadBounds(
                     app,
                     south = bounds[0],
@@ -950,10 +1063,148 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
                     west = bounds[2],
                     east = bounds[3],
                     onlineLookup = true,
+                    basemap = basemap,
+                    mapKey = keyFor(basemap),
                 )
-            }.getOrDefault(emptyList())
-            if (isActive && livePathTileKey == key && tiles.isNotEmpty()) _livePathTiles.value = tiles
+            }.getOrDefault(PathTiles.Batch(problem = if (basemap.needsKey) MapKeyProblem.FAILED else MapKeyProblem.NONE))
+            if (isActive && livePathTileKey == key) {
+                noteMapTiles(basemap, batch.problem)
+                val shown = _livePathTiles.value.firstOrNull()?.basemap
+                if (batch.tiles.isNotEmpty() || shown != basemap) _livePathTiles.value = batch.tiles
+            }
         }
+    }
+
+    /** Street tiles under the Hunt cloud. A held view uses [refreshHuntViewport]. */
+    fun refreshHuntTiles(samples: List<GpsSample>, online: Boolean, basemap: MapBasemap) {
+        if (!online || samples.isEmpty()) {
+            huntTileJob?.cancel()
+            huntTileJob = null
+            huntTileKey = null
+            if (_huntTiles.value.isNotEmpty()) _huntTiles.value = emptyList()
+            return
+        }
+        if (missingMapKey(basemap)) {
+            huntTileJob?.cancel()
+            huntTileJob = null
+            huntTileKey = "missing:${basemap.name}:${app.mapKeys.revision.value}"
+            _huntTiles.value = emptyList()
+            noteMapTiles(basemap, MapKeyProblem.MISSING)
+            return
+        }
+        val end = samples.last()
+        val key = tileRequestKey(basemap, "${samples.size / 4}:${(end.lat * 1000.0).roundToInt()}:${(end.lon * 1000.0).roundToInt()}")
+        if (key == huntTileKey) return
+        huntTileKey = key
+        huntTileJob?.cancel()
+        huntTileJob = viewModelScope.launch(Dispatchers.Default) {
+            val batch = runCatching {
+                PathTiles.load(app, samples, onlineLookup = true, basemap = basemap, mapKey = keyFor(basemap))
+            }.getOrDefault(PathTiles.Batch(problem = if (basemap.needsKey) MapKeyProblem.FAILED else MapKeyProblem.NONE))
+            if (isActive && huntTileKey == key) {
+                noteMapTiles(basemap, batch.problem)
+                _huntTiles.value = batch.tiles
+            }
+        }
+    }
+
+    fun refreshHuntViewport(view: SitPathPlot.Viewport, online: Boolean, basemap: MapBasemap) {
+        if (!online) {
+            refreshHuntTiles(emptyList(), false, basemap)
+            return
+        }
+        if (missingMapKey(basemap)) {
+            refreshHuntTiles(emptyList(), false, basemap)
+            noteMapTiles(basemap, MapKeyProblem.MISSING)
+            return
+        }
+        val bounds = view.coveredBounds()
+        val key = tileRequestKey(basemap, "v:" + PathTiles.coverageKey(bounds[0], bounds[1], bounds[2], bounds[3], basemap))
+        if (key.endsWith(":off") || key == huntTileKey) return
+        huntTileKey = key
+        huntTileJob?.cancel()
+        huntTileJob = viewModelScope.launch(Dispatchers.Default) {
+            val batch = runCatching {
+                PathTiles.loadBounds(
+                    app,
+                    south = bounds[0],
+                    north = bounds[1],
+                    west = bounds[2],
+                    east = bounds[3],
+                    onlineLookup = true,
+                    basemap = basemap,
+                    mapKey = keyFor(basemap),
+                )
+            }.getOrDefault(PathTiles.Batch(problem = if (basemap.needsKey) MapKeyProblem.FAILED else MapKeyProblem.NONE))
+            if (isActive && huntTileKey == key) {
+                noteMapTiles(basemap, batch.problem)
+                val shown = _huntTiles.value.firstOrNull()?.basemap
+                if (batch.tiles.isNotEmpty() || shown != basemap) _huntTiles.value = batch.tiles
+            }
+        }
+    }
+
+    fun mapKey(basemap: MapBasemap): String {
+        val service = basemap.service ?: return ""
+        return app.mapKeys.read(service).orEmpty()
+    }
+
+    /** Picks the map. A keyed map with nothing saved asks for the key. */
+    fun selectMap(choice: MapBasemap) {
+        viewModelScope.launch {
+            val prev = app.config.settings.mapBasemap
+            if (choice != prev) {
+                app.config.update { it.copy(settings = it.settings.copy(mapBasemap = choice)) }
+            }
+            silencedMapNotice = null
+            _mapNotice.value = null
+            if (missingMapKey(choice)) noteMapTiles(choice, MapKeyProblem.MISSING)
+        }
+    }
+
+    /**
+     * Writes a finished key, or says why it was not kept.
+     * A short draft does not replace a key that is already stored.
+     */
+    fun finishMapKey(basemap: MapBasemap, raw: String) {
+        val service = basemap.service ?: return
+        when (MapKey.verdict(raw)) {
+            MapKey.Verdict.OK -> {
+                if (app.mapKeys.save(service, raw)) {
+                    if (silencedMapNotice?.basemap?.service == service) silencedMapNotice = null
+                    if (_mapNotice.value?.basemap?.service == service) _mapNotice.value = null
+                } else {
+                    noteMapTiles(basemap, MapKeyProblem.DENIED)
+                }
+            }
+            MapKey.Verdict.EMPTY -> {
+                app.mapKeys.clear(service)
+                noteMapTiles(basemap, MapKeyProblem.MISSING)
+            }
+            MapKey.Verdict.SHORT, MapKey.Verdict.DENIED -> noteMapTiles(basemap, MapKeyProblem.DENIED)
+        }
+    }
+
+    fun dismissMapNotice() {
+        silencedMapNotice = _mapNotice.value
+        _mapNotice.value = null
+    }
+
+    private fun keyFor(basemap: MapBasemap): String? {
+        val service = basemap.service ?: return null
+        return MapKey.accept(app.mapKeys.read(service))
+    }
+
+    private fun missingMapKey(basemap: MapBasemap): Boolean = basemap.needsKey && keyFor(basemap) == null
+
+    private fun tileRequestKey(basemap: MapBasemap, body: String): String =
+        "${app.mapKeys.revision.value}:${basemap.name}:$body"
+
+    private fun noteMapTiles(basemap: MapBasemap, problem: MapKeyProblem) {
+        if (problem == MapKeyProblem.NONE || !basemap.needsKey) return
+        val notice = MapKeyNotice(basemap, problem)
+        if (notice == silencedMapNotice || _mapNotice.value == notice) return
+        _mapNotice.value = notice
     }
 
     fun toggleFleetName() {
@@ -2105,11 +2356,15 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
         val samples = Geo.despikePath(phone).let { if (it.size >= 2) it else phone } + craft
         if (samples.isEmpty()) return emptyList()
         val settings = app.config.settings
-        return PathTiles.load(
+        val batch = PathTiles.load(
             app, samples,
             onlineLookup = settings.onlineLookup,
             forPrint = true,
+            basemap = settings.mapBasemap,
+            mapKey = keyFor(settings.mapBasemap),
         )
+        noteMapTiles(settings.mapBasemap, batch.problem)
+        return batch.tiles
     }
 
     fun refreshSitPath() {
@@ -2125,12 +2380,16 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
             val phone = Geo.despikePath(model.samples).let { if (it.size >= 2) it else model.samples }
             val walk = phone + model.craft.flatMap { it.samples }
             _pathTiles.value = if (walk.isNotEmpty()) {
-                runCatching {
+                val batch = runCatching {
                     PathTiles.load(
                         app, walk,
                         onlineLookup = settings.onlineLookup,
+                        basemap = settings.mapBasemap,
+                        mapKey = keyFor(settings.mapBasemap),
                     )
-                }.getOrDefault(emptyList())
+                }.getOrDefault(PathTiles.Batch(problem = if (settings.mapBasemap.needsKey) MapKeyProblem.FAILED else MapKeyProblem.NONE))
+                noteMapTiles(settings.mapBasemap, batch.problem)
+                batch.tiles
             } else {
                 emptyList()
             }
@@ -2139,12 +2398,16 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
                 if (samples.isEmpty()) {
                     emptyList()
                 } else {
-                    runCatching {
+                    val batch = runCatching {
                         PathTiles.load(
                             app, samples,
                             onlineLookup = settings.onlineLookup,
+                            basemap = settings.mapBasemap,
+                            mapKey = keyFor(settings.mapBasemap),
                         )
-                    }.getOrDefault(emptyList())
+                    }.getOrDefault(PathTiles.Batch(problem = if (settings.mapBasemap.needsKey) MapKeyProblem.FAILED else MapKeyProblem.NONE))
+                    noteMapTiles(settings.mapBasemap, batch.problem)
+                    batch.tiles
                 }
             }
         }
@@ -2511,12 +2774,16 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
                 }
                 publishExport(0.45f, LanguageText.text("ui.building.ai.export.prompt"))
                 val text = withContext(Dispatchers.Default) {
+                    val phone = app.currentFix()
                     val raw = DeviceDetailPrompt.build(
                         device, names, settings, places, attentionNotes = attention,
                         signatureNotes = notes,
                         fleets = app.config.fleets,
                         mine = isMine(device.key),
                         placeLines = placeLines(device, places.namesByCell),
+                        demo = settings.demoMode,
+                        phoneLat = phone?.first,
+                        phoneLon = phone?.second,
                     )
                     val masked = MacUtil.redactPrivateText(
                         raw,
@@ -2564,11 +2831,15 @@ class FieldwatchViewModel(application: Application) : AndroidViewModel(applicati
                 val notes = signatureNotesFor(device)
                 val streets = streetsForDevice(device)
                 val text = withContext(Dispatchers.Default) {
+                    val phone = app.currentFix()
                     val raw = DeviceDetailText.build(
                         device, names, attentionNotes = attention, signatureNotes = notes,
                         fleets = app.config.fleets,
                         mine = isMine(device.key),
                         placeLines = placeLines(device, streets),
+                        demo = settings.demoMode,
+                        phoneLat = phone?.first,
+                        phoneLon = phone?.second,
                     )
                     val masked = MacUtil.redactPrivateText(
                         raw,
@@ -3052,4 +3323,9 @@ data class HuntUi(
     val peakRssi: Int = -127,
     val samples: List<RssiSample> = emptyList(),
     val lastSeen: Long = 0L,
+    /** Where this phone heard the radio during this hunt. */
+    val trail: List<GpsSample> = emptyList(),
+    /** GPS fix for the dot on the cloud. Null when there is no fresh GPS. */
+    val hereLat: Double? = null,
+    val hereLon: Double? = null,
 )

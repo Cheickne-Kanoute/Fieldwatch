@@ -11,6 +11,7 @@ import app.fieldwatch.domain.MacUtil
 import app.fieldwatch.domain.DetectionPolicy
 import app.fieldwatch.domain.FastPair
 import app.fieldwatch.domain.Fleet
+import app.fieldwatch.domain.HeardFix
 import app.fieldwatch.domain.PayloadLocation
 import app.fieldwatch.domain.Rssi
 import app.fieldwatch.domain.withLiveDecode
@@ -58,10 +59,17 @@ class DeviceStore(
     ): List<Sighting> = synchronized(lock) {
         if (observations.isEmpty()) return emptyList()
         val out = ArrayList<Sighting>(observations.size)
+        val heard = HashMap<String, HeardFix>(observations.size)
         for (observation in observations) {
-            out += upsert(observation)
+            val row = upsert(observation)
+            out += row
+            heard[row.key] = HeardFix(
+                facts = observation.facts,
+                phoneLat = observation.latitude,
+                phoneLon = observation.longitude,
+            )
         }
-        relabel(out, fleets)
+        relabel(out, fleets, heard)
         for (i in out.indices) {
             out[i] = live[out[i].key] ?: out[i]
         }
@@ -182,7 +190,11 @@ class DeviceStore(
         return merged
     }
 
-    private fun relabel(touched: Collection<Sighting>, fleets: List<Fleet>) {
+    private fun relabel(
+        touched: Collection<Sighting>,
+        fleets: List<Fleet>,
+        heard: Map<String, HeardFix> = emptyMap(),
+    ) {
         if (fleets !== catalogRef) {
             catalogRef = fleets
             matchStamp.clear()
@@ -206,7 +218,7 @@ class DeviceStore(
             val cur = live[d.key] ?: continue
             val ids = matches[cur.key] ?: emptySet()
             val labeled = if (ids == cur.fleetIds) cur else cur.copy(fleetIds = ids)
-            val next = PayloadLocation.applySticky(labeled, fleets).withLiveDecode(fleets)
+            val next = PayloadLocation.applySticky(labeled, fleets, heard[cur.key]).withLiveDecode(fleets)
             if (next !== cur) live[cur.key] = next
             matchStamp[cur.key] = matchIdentity(next)
         }

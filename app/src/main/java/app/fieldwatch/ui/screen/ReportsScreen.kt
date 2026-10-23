@@ -77,6 +77,7 @@ import app.fieldwatch.domain.SitPathPlot
 import app.fieldwatch.ui.component.AircraftAmber
 import app.fieldwatch.ui.component.FieldwatchDropdownField
 import app.fieldwatch.ui.component.SitPathCanvas
+import app.fieldwatch.ui.component.rememberMapFooter
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.fieldwatch.ui.NestedTabInsets
 import app.fieldwatch.ui.NestedTopBar
@@ -288,6 +289,12 @@ fun ReportsScreen(
                 } else {
                     val pathTiles by vm.pathTiles.collectAsStateWithLifecycle()
                     val aircraftTiles by vm.pathAircraftTiles.collectAsStateWithLifecycle()
+                    val mapPosition = rememberMapFooter(
+                        settings.mapFooter,
+                        state.phoneLat,
+                        state.phoneLon,
+                        settings.demoMode,
+                    )
                     if (!showWalk) {
                         Text(
                             model.emptyHint ?: LanguageText.text("ui.turn.tag.detections.gps"),
@@ -311,7 +318,12 @@ fun ReportsScreen(
                         },
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    SitPathCanvas(model, tiles = pathTiles, onOpenRadio = onOpenPathRadio)
+                    SitPathCanvas(
+                        model,
+                        tiles = pathTiles,
+                        onOpenRadio = onOpenPathRadio,
+                        position = mapPosition,
+                    )
                     Text(
                         LanguageText.text("ui.tap.number.radios.there"),
                         style = MaterialTheme.typography.bodySmall,
@@ -420,6 +432,7 @@ fun ReportsScreen(
                             card,
                             tiles = aircraftTiles.getOrElse(index) { emptyList() },
                             onOpenRadio = onOpenPathRadio,
+                            position = mapPosition,
                         )
                         if (card.dots.isNotEmpty()) {
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {

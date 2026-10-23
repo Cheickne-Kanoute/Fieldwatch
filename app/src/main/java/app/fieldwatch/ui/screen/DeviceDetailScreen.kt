@@ -56,6 +56,8 @@ import app.fieldwatch.domain.CodDecoder
 import app.fieldwatch.domain.FamilyVerdict
 import app.fieldwatch.domain.Geo
 import app.fieldwatch.domain.MacUtil
+import app.fieldwatch.domain.OperatorLoc
+import app.fieldwatch.domain.PayloadLocation
 import app.fieldwatch.domain.DeviceExplain
 import app.fieldwatch.domain.Palette
 import app.fieldwatch.domain.RadioDb
@@ -496,6 +498,30 @@ fun DeviceDetailScreen(
             if (device.kind == RadioKind.BLE || device.kind == RadioKind.WIFI) {
                 val aircraft = device.payloadAircraft?.trim().orEmpty()
                 if (aircraft.isNotEmpty()) Meta(LanguageText.text("ui.aircraft.label"), aircraft)
+                val phoneLat = vm.ui.value.phoneLat
+                val phoneLon = vm.ui.value.phoneLon
+                if (PayloadLocation.validCoord(device.payloadLat, device.payloadLon)) {
+                    Geo.screenCoord(device.payloadLat, device.payloadLon, demoMode)?.let {
+                        Meta(LanguageText.text("ui.aircraft.position"), it)
+                    }
+                    Geo.screenGrid(device.payloadLat, device.payloadLon, demoMode)?.let {
+                        Meta(LanguageText.text("ui.grid"), it)
+                    }
+                    Geo.liveRange(phoneLat, phoneLon, device.payloadLat, device.payloadLon, demoMode)?.let { range ->
+                        Text(range, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                if (PayloadLocation.validCoord(device.payloadOpLat, device.payloadOpLon)) {
+                    Geo.screenCoord(device.payloadOpLat, device.payloadOpLon, demoMode)?.let {
+                        Meta(OperatorLoc.label(device.payloadOpKind), it)
+                    }
+                    Geo.screenGrid(device.payloadOpLat, device.payloadOpLon, demoMode)?.let {
+                        Meta(LanguageText.text("ui.grid"), it)
+                    }
+                    Geo.liveRange(phoneLat, phoneLon, device.payloadOpLat, device.payloadOpLon, demoMode)?.let { range ->
+                        Text(range, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
                 val fleets = vm.ui.value.fleets
                 val decoded = remember(device.key, device.facts, device.fleetIds) {
                     SignatureFieldDecoder.decodeSighting(device, fleets)
@@ -606,6 +632,7 @@ fun DeviceDetailScreen(
                     Text(line, style = MaterialTheme.typography.bodyMedium)
                 }
                 Geo.screenCoord(device.latitude, device.longitude, demoMode)?.let { Meta(LanguageText.text("ui.last.fix"), it) }
+                Geo.screenGrid(device.latitude, device.longitude, demoMode)?.let { Meta(LanguageText.text("ui.grid"), it) }
                 if (device.fleetIds.isNotEmpty()) {
                     Meta(
                         LanguageText.text("ui.matched.signatures"),

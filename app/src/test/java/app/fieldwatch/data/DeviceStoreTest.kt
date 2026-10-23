@@ -140,6 +140,77 @@ class DeviceStoreTest {
     }
 
     @Test
+    fun remoteIdStampsTheReadingAndLeavesAnOlderHearAlone() {
+        val store = DeviceStore()
+        val mac = "AA:BB:CC:DD:EE:19"
+        val other = "AA:BB:CC:DD:EE:1A"
+        val now = System.currentTimeMillis()
+        val location = "0D0012200000000084D717007FE4D3000098083408000000000000"
+        val basic = "0D000212" + "5445535453455249414C31323334353637383930" + "000000"
+        val live = "0D00420176E42711B5FF81CF010000000000000005088B02900E00"
+        fun hear(id: String, payload: String, at: Long, lat: Double?, lon: Double?) =
+            ble(id, name = "", facts = RadioFacts(serviceData = listOf(ServiceDataRecord("FFFA", payload))))
+                .copy(at = at, latitude = lat, longitude = lon)
+
+        store.ingestBatch(
+            listOf(
+                hear(mac, location, now - 5_000, 36.10, -115.10),
+                hear(other, location, now - 5_000, 36.20, -115.20),
+            ),
+            fleets,
+            30,
+        )
+        val first = store.find("BLE:$mac")!!
+        assertEquals(now - 5_000, first.payloadAt)
+        assertEquals(36.10, first.payloadPhoneLat!!, 0.0)
+        assertEquals(-115.10, first.payloadPhoneLon!!, 0.0)
+        assertNull(first.payloadOpAt)
+        val neighbor = store.find("BLE:$other")!!
+        assertEquals(36.20, neighbor.payloadPhoneLat!!, 0.0)
+        assertEquals(-115.20, neighbor.payloadPhoneLon!!, 0.0)
+
+        store.ingestBatch(listOf(hear(mac, basic, now - 4_000, 36.50, -115.50)), fleets, 30)
+        val named = store.find("BLE:$mac")!!
+        assertEquals("Basic ID does not move the aircraft stamp", now - 5_000, named.payloadAt)
+        assertEquals(36.10, named.payloadPhoneLat!!, 0.0)
+        assertEquals(-115.10, named.payloadPhoneLon!!, 0.0)
+        assertEquals(40.0, named.payloadLat!!, 1e-6)
+
+        store.ingestBatch(listOf(hear(mac, location, now - 3_000, 36.30, -115.30)), fleets, 30)
+        val hover = store.find("BLE:$mac")!!
+        assertEquals(40.0, hover.payloadLat!!, 1e-6)
+        assertEquals(now - 3_000, hover.payloadAt)
+        assertEquals(36.30, hover.payloadPhoneLat!!, 0.0)
+        assertEquals(-115.30, hover.payloadPhoneLon!!, 0.0)
+
+        store.ingestBatch(listOf(hear(mac, live, now - 2_000, 36.40, -115.40)), fleets, 30)
+        val pilot = store.find("BLE:$mac")!!
+        assertEquals(OperatorLoc.LIVE, pilot.payloadOpKind)
+        assertEquals(now - 2_000, pilot.payloadOpAt)
+        assertEquals(36.40, pilot.payloadOpPhoneLat!!, 0.0)
+        assertEquals(-115.40, pilot.payloadOpPhoneLon!!, 0.0)
+        assertEquals("operator packet keeps the aircraft stamp", now - 3_000, pilot.payloadAt)
+        assertEquals(36.30, pilot.payloadPhoneLat!!, 0.0)
+        assertEquals(40.0, pilot.payloadLat!!, 1e-6)
+
+        store.ingestBatch(listOf(hear(mac, location, now - 1_000, null, null)), fleets, 30)
+        val lost = store.find("BLE:$mac")!!
+        assertEquals(now - 1_000, lost.payloadAt)
+        assertNull(lost.payloadPhoneLat)
+        assertNull(lost.payloadPhoneLon)
+        assertEquals(now - 2_000, lost.payloadOpAt)
+        assertEquals(36.40, lost.payloadOpPhoneLat!!, 0.0)
+        assertEquals(40.0, lost.payloadLat!!, 1e-6)
+
+        store.refresh(fleets, 30)
+        val held = store.find("BLE:$mac")!!
+        assertEquals(now - 1_000, held.payloadAt)
+        assertNull(held.payloadPhoneLat)
+        assertEquals(now - 2_000, held.payloadOpAt)
+        assertEquals(36.40, held.payloadOpPhoneLat!!, 0.0)
+    }
+
+    @Test
     fun remoteIdUasIdSticksAfterLocationPacket() {
         val store = DeviceStore()
         val mac = "AA:BB:CC:DD:EE:03"

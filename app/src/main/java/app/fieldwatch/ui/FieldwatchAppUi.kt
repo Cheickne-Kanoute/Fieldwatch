@@ -101,6 +101,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -113,6 +114,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import app.fieldwatch.domain.HeaderTone
+import app.fieldwatch.domain.MapKeyProblem
 import app.fieldwatch.domain.ListLine
 import app.fieldwatch.domain.LanguageText
 import app.fieldwatch.domain.bleHeader
@@ -405,6 +407,41 @@ private fun FieldwatchShell(state: FieldwatchUi, vm: FieldwatchViewModel) {
             text = { Text(export.noticeMessage.orEmpty()) },
             confirmButton = {
                 TextButton(onClick = vm::consumeExportNotice) { Text(LanguageText.text("ui.ok.label")) }
+            },
+        )
+    }
+    val mapNotice by vm.mapNotice.collectAsStateWithLifecycle()
+    val shownMapNotice = mapNotice
+    if (shownMapNotice != null) {
+        val problem = shownMapNotice.problem
+        AlertDialog(
+            onDismissRequest = vm::dismissMapNotice,
+            title = {
+                Text(
+                    LanguageText.text(
+                        when (problem) {
+                            MapKeyProblem.MISSING -> "map.key.missing.title"
+                            MapKeyProblem.DENIED -> "map.key.denied.title"
+                            MapKeyProblem.REJECTED -> "map.key.rejected.title"
+                            else -> "map.key.failed.title"
+                        },
+                    ),
+                )
+            },
+            text = {
+                Text(
+                    LanguageText.text(
+                        when (problem) {
+                            MapKeyProblem.MISSING -> "map.key.missing.body"
+                            MapKeyProblem.DENIED -> "map.key.denied.body"
+                            MapKeyProblem.REJECTED -> "map.key.rejected.body"
+                            else -> "map.key.failed.body"
+                        },
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = vm::dismissMapNotice) { Text(LanguageText.text("ui.ok.label")) }
             },
         )
     }
@@ -859,6 +896,7 @@ private fun headerTint(tone: HeaderTone, muted: Color, night: Boolean): Color {
 
 @Composable
 private fun HeaderCount(n: Int, icon: ImageVector, desc: String, tint: Color) {
+    val style = MaterialTheme.typography.labelSmall
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
@@ -869,16 +907,31 @@ private fun HeaderCount(n: Int, icon: ImageVector, desc: String, tint: Color) {
             modifier = Modifier.size(13.dp),
             tint = tint,
         )
-        Text(
-            n.toString(),
-            style = MaterialTheme.typography.labelSmall,
-            fontFamily = FontFamily.Monospace,
-            color = tint,
-            maxLines = 1,
-            softWrap = false,
-        )
+        Box {
+            Text(
+                HEADER_COUNT_SLOT,
+                modifier = Modifier.clearAndSetSemantics {},
+                style = style,
+                fontFamily = FontFamily.Monospace,
+                color = Color.Transparent,
+                maxLines = 1,
+                softWrap = false,
+            )
+            Text(
+                n.toString(),
+                style = style,
+                fontFamily = FontFamily.Monospace,
+                color = tint,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+            )
+        }
     }
 }
+
+/** Three digits. The header counts stay this wide so the line does not shift. */
+private const val HEADER_COUNT_SLOT = "888"
 
 @Composable
 private fun RowScope.FieldwatchNavTab(

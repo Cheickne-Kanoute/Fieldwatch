@@ -4,9 +4,14 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import app.fieldwatch.domain.GpsSample
+import app.fieldwatch.domain.MapBasemap
+import app.fieldwatch.domain.MapKey
+import app.fieldwatch.domain.MapKeyProblem
+import app.fieldwatch.domain.MapTileUrl
 import app.fieldwatch.domain.SitPathPlot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -20,7 +25,7 @@ import kotlin.math.sinh
 import kotlin.math.tan
 
 /**
- * Optional OSM raster under Reports → Path and the letter path figure.
+ * Optional raster under Reports → Path, Show live path, and the letter path figure.
  * Same switch as Online place names and maps. Privacy mode does not hide tiles.
  * Never throws; offline or a failed fetch returns an empty list (plain trace).
  */
@@ -31,6 +36,13 @@ object PathTiles {
         val south: Double,
         val west: Double,
         val east: Double,
+        val basemap: MapBasemap,
+    )
+
+    /** Tiles plus why a keyed map produced none. OpenStreetMap and USGS stay [MapKeyProblem.NONE]. */
+    data class Batch(
+        val tiles: List<Tile> = emptyList(),
+        val problem: MapKeyProblem = MapKeyProblem.NONE,
     )
 
     suspend fun load(
@@ -38,11 +50,13 @@ object PathTiles {
         samples: List<GpsSample>,
         onlineLookup: Boolean,
         forPrint: Boolean = false,
-    ): List<Tile> = withContext(Dispatchers.IO) {
+        basemap: MapBasemap = MapBasemap.OSM,
+        mapKey: String? = null,
+    ): Batch = withContext(Dispatchers.IO) {
         runCatching {
-            if (!onlineLookup) return@withContext emptyList()
-            if (samples.isEmpty()) return@withContext emptyList()
-            if (!PlaceLookup.online(context)) return@withContext emptyList()
+            if (!onlineLookup) return@withContext Batch()
+            if (samples.isEmpty()) return@withContext Batch()
+            if (!PlaceLookup.online(context)) return@withContext Batch()
             val expanded = expandToPlot(
                 samples.minOf { it.lat },
                 samples.maxOf { it.lat },
@@ -56,8 +70,10 @@ object PathTiles {
                 expanded[2],
                 expanded[3],
                 forPrint,
+                basemap,
+                mapKey,
             )
-        }.getOrDefault(emptyList())
+        }.getOrDefault(Batch(problem = if (basemap.needsKey) MapKeyProblem.FAILED else MapKeyProblem.NONE))
     }
 
     /** Tiles for the area on screen. [south]/[north]/[west]/[east] are the padded view. */
@@ -68,17 +84,27 @@ object PathTiles {
         west: Double,
         east: Double,
         onlineLookup: Boolean,
-    ): List<Tile> = withContext(Dispatchers.IO) {
+        basemap: MapBasemap = MapBasemap.OSM,
+        mapKey: String? = null,
+    ): Batch = withContext(Dispatchers.IO) {
         runCatching {
-            if (!onlineLookup) return@withContext emptyList()
-            if (!PlaceLookup.online(context)) return@withContext emptyList()
-            loadBox(context, south, north, west, east)
-        }.getOrDefault(emptyList())
+            if (!onlineLookup) return@withContext Batch()
+            if (!PlaceLookup.online(context)) return@withContext Batch()
+            loadBox(context, south, north, west, east, basemap = basemap, mapKey = mapKey)
+        }.getOrDefault(Batch(problem = if (basemap.needsKey) MapKeyProblem.FAILED else MapKeyProblem.NONE))
     }
 
-    /** Same tile set means the same key. A move that leaves those tiles changes it. */
-    internal fun coverageKey(south: Double, north: Double, west: Double, east: Double): String =
-        tilePlan(south, north, west, east)?.key ?: "off"
+    /** Same tile set means the same key. A move that leaves those tiles, or another map, changes it. */
+    internal fun coverageKey(
+        south: Double,
+        north: Double,
+        west: Double,
+        east: Double,
+        basemap: MapBasemap = MapBasemap.OSM,
+    ): String {
+        val plan = tilePlan(south, north, west, east, basemap = basemap) ?: return "off"
+        return "${basemap.name}:${plan.key}"
+    }
 
     private fun loadBox(
         context: Context,
@@ -87,21 +113,47 @@ object PathTiles {
         west: Double,
         east: Double,
         forPrint: Boolean = false,
-    ): List<Tile> {
-        val plan = tilePlan(south, north, west, east, forPrint) ?: return emptyList()
-        val cache = File(context.cacheDir, "osm").apply { mkdirs() }
+        basemap: MapBasemap = MapBasemap.OSM,
+        mapKey: String? = null,
+    ): Batch {
+        val blocked = blockedKey(basemap, mapKey)
+        if (blocked != null) return Batch(problem = blocked)
+        val plan = tilePlan(south, north, west, east, forPrint, basemap) ?: return Batch()
+        val cache = File(context.cacheDir, basemap.cacheName).apply { mkdirs() }
         val out = ArrayList<Tile>(plan.tiles.size)
+        var rejected = false
+        var failed = false
         for ((x, y) in plan.tiles) {
-            val bmp = tileBitmap(cache, plan.z, x, y) ?: continue
-            out += Tile(
-                bitmap = bmp,
-                north = tileLat(y, plan.z),
-                south = tileLat(y + 1, plan.z),
-                west = tileLon(x, plan.z),
-                east = tileLon(x + 1, plan.z),
-            )
+            when (val fetch = tileBitmap(cache, basemap, plan.z, x, y, mapKey)) {
+                is Fetch.Picture -> out += Tile(
+                    bitmap = fetch.bitmap,
+                    north = tileLat(y, plan.z),
+                    south = tileLat(y + 1, plan.z),
+                    west = tileLon(x, plan.z),
+                    east = tileLon(x + 1, plan.z),
+                    basemap = basemap,
+                )
+                Fetch.Rejected -> rejected = true
+                Fetch.Failed -> failed = true
+            }
         }
-        return out
+        val problem = when {
+            !basemap.needsKey -> MapKeyProblem.NONE
+            rejected -> MapKeyProblem.REJECTED
+            out.isEmpty() && failed -> MapKeyProblem.FAILED
+            else -> MapKeyProblem.NONE
+        }
+        return Batch(out, problem)
+    }
+
+    /** A keyed map with no usable token does not open a connection. */
+    private fun blockedKey(basemap: MapBasemap, mapKey: String?): MapKeyProblem? {
+        if (!basemap.needsKey) return null
+        return when (MapKey.verdict(mapKey.orEmpty())) {
+            MapKey.Verdict.OK -> null
+            MapKey.Verdict.EMPTY, MapKey.Verdict.SHORT -> MapKeyProblem.MISSING
+            MapKey.Verdict.DENIED -> MapKeyProblem.DENIED
+        }
     }
 
     private data class TilePlan(val z: Int, val tiles: List<Pair<Int, Int>>, val key: String)
@@ -113,7 +165,8 @@ object PathTiles {
         west: Double,
         east: Double,
         forPrint: Boolean = false,
-    ): Int = tilePlan(south, north, west, east, forPrint)?.z ?: -1
+        basemap: MapBasemap = MapBasemap.OSM,
+    ): Int = tilePlan(south, north, west, east, forPrint, basemap)?.z ?: -1
 
     private fun tilePlan(
         south: Double,
@@ -121,13 +174,14 @@ object PathTiles {
         west: Double,
         east: Double,
         forPrint: Boolean = false,
+        basemap: MapBasemap = MapBasemap.OSM,
     ): TilePlan? {
         if (!south.isFinite() || !north.isFinite() || !west.isFinite() || !east.isFinite()) return null
         if (north <= south || east <= west) return null
         val midLat = (south + north) / 2.0
         val spanM = app.fieldwatch.domain.Geo.meters(south, west, north, east).coerceAtLeast(40.0)
         val cap = if (forPrint) PRINT_TILE_CAP else SCREEN_TILE_CAP
-        val maxZ = if (forPrint) PRINT_MAX_Z else SCREEN_MAX_Z
+        val maxZ = minOf(if (forPrint) PRINT_MAX_Z else SCREEN_MAX_Z, basemap.maxZoom)
         var z = (zoomFor(spanM, midLat) + if (forPrint) 2 else 0).coerceIn(8, maxZ)
         var tiles = tileBox(south, north, west, east, z)
         while (tiles.size > cap && z > 8) {
@@ -219,31 +273,83 @@ object PathTiles {
         return Math.toDegrees(atan(sinh(t)))
     }
 
-    private fun tileBitmap(cache: File, z: Int, x: Int, y: Int): Bitmap? {
+    private sealed class Fetch {
+        data class Picture(val bitmap: Bitmap) : Fetch()
+        data object Rejected : Fetch()
+        data object Failed : Fetch()
+    }
+
+    private fun tileBitmap(
+        cache: File,
+        basemap: MapBasemap,
+        z: Int,
+        x: Int,
+        y: Int,
+        mapKey: String?,
+    ): Fetch {
         val file = File(cache, "${z}_${x}_$y.png")
         if (file.isFile && file.length() > 64) {
-            return BitmapFactory.decodeFile(file.absolutePath)
+            val cached = BitmapFactory.decodeFile(file.absolutePath)
+            if (cached != null) return Fetch.Picture(cached)
+            file.delete()
         }
-        val url = URL("https://tile.openstreetmap.org/$z/$x/$y.png")
-        val conn = (url.openConnection() as HttpURLConnection).apply {
+        val address = MapTileUrl.build(basemap, z, x, y, mapKey) ?: return Fetch.Failed
+        val token = if (basemap.needsKey) MapKey.accept(mapKey).orEmpty() else ""
+        return fetchTile(address, token, basemap, file, hopsLeft = 2)
+    }
+
+    private fun fetchTile(
+        address: String,
+        token: String,
+        basemap: MapBasemap,
+        file: File,
+        hopsLeft: Int,
+    ): Fetch {
+        val conn = (URL(address).openConnection() as HttpURLConnection).apply {
             connectTimeout = 4000
             readTimeout = 4000
-            instanceFollowRedirects = true
+            instanceFollowRedirects = token.isEmpty()
             setRequestProperty(
                 "User-Agent",
                 "Fieldwatch/${app.fieldwatch.BuildConfig.VERSION_NAME} (https://github.com/OffGridPete/Fieldwatch)",
             )
         }
         return try {
-            if (conn.responseCode != 200) return null
-            val bytes = conn.inputStream.use { it.readBytes() }
-            if (bytes.size < 64) return null
+            val code = conn.responseCode
+            if (token.isNotEmpty() && code in 300..399) {
+                if (hopsLeft <= 0) return Fetch.Failed
+                val loc = conn.getHeaderField("Location") ?: return Fetch.Failed
+                val next = runCatching { URL(URL(address), loc).toString() }.getOrNull() ?: return Fetch.Failed
+                if (!MapTileUrl.allowsRedirect(basemap, next, token)) return Fetch.Failed
+                conn.disconnect()
+                return fetchTile(next, token, basemap, file, hopsLeft - 1)
+            }
+            if (code == 401 || code == 403 || code == 498 || code == 499) {
+                return if (token.isNotEmpty()) Fetch.Rejected else Fetch.Failed
+            }
+            if (code != 200) return Fetch.Failed
+            if (conn.contentLengthLong > MAX_TILE_BYTES) return Fetch.Failed
+            val bytes = conn.inputStream.use { stream ->
+                val buf = ByteArrayOutputStream()
+                val tmp = ByteArray(8192)
+                while (true) {
+                    val n = stream.read(tmp)
+                    if (n < 0) break
+                    if (buf.size() + n > MAX_TILE_BYTES) return Fetch.Failed
+                    buf.write(tmp, 0, n)
+                }
+                buf.toByteArray()
+            }
+            if (bytes.size < 64) return Fetch.Failed
+            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return Fetch.Failed
             runCatching { file.writeBytes(bytes) }
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            Fetch.Picture(bitmap)
         } catch (_: Exception) {
-            null
+            Fetch.Failed
         } finally {
             conn.disconnect()
         }
     }
+
+    private const val MAX_TILE_BYTES = 2_000_000
 }

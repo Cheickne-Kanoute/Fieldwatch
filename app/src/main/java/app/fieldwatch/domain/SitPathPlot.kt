@@ -8,6 +8,7 @@ import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
+import kotlin.math.sin
 
 /** North-up path of this phone. Alert dots are hear-points, unless the radio advertised a position. */
 object SitPathPlot {
@@ -99,18 +100,25 @@ object SitPathPlot {
         val halfEastM: Float,
         val halfNorthM: Float,
     ) {
-        fun clamped(): Viewport {
-            val east = halfEastM.coerceIn(MIN_HALF_M, MAX_HALF_M)
-            val north = halfNorthM.coerceIn(MIN_HALF_M, MAX_HALF_M)
+        fun clamped(minHalfM: Float = MIN_HALF_M): Viewport {
+            val floor = if (minHalfM > 0f) minHalfM else MIN_HALF_M
+            val east = halfEastM.coerceIn(floor, MAX_HALF_M)
+            val north = halfNorthM.coerceIn(floor, MAX_HALF_M)
             return if (east == halfEastM && north == halfNorthM) this
             else copy(halfEastM = east, halfNorthM = north)
         }
 
         /** [factor] above 1 zooms in. The focus point stays put. */
-        fun zoomAbout(factor: Float, focusLat: Double, focusLon: Double): Viewport {
+        fun zoomAbout(
+            factor: Float,
+            focusLat: Double,
+            focusLon: Double,
+            minHalfM: Float = MIN_HALF_M,
+        ): Viewport {
             if (factor <= 0f || factor == 1f) return this
+            val floor = if (minHalfM > 0f) minHalfM else MIN_HALF_M
             val wanted = 1f / factor
-            val minScale = max(MIN_HALF_M / halfEastM, MIN_HALF_M / halfNorthM)
+            val minScale = max(floor / halfEastM, floor / halfNorthM)
             val maxScale = min(MAX_HALF_M / halfEastM, MAX_HALF_M / halfNorthM)
             val scale = wanted.coerceIn(minScale, maxScale)
             val newEast = halfEastM * scale
@@ -370,19 +378,35 @@ object SitPathPlot {
         pad: Float = 16f,
         scaleBarReserve: Float = 44f,
         viewport: Viewport? = null,
+        minHalfM: Float = Viewport.MIN_HALF_M,
+        /**
+         * Close follow. Half the short side, in meters, centered on the last point.
+         * 0 fits the whole picture. A held view ignores this and stays north-up.
+         */
+        followHalfM: Float = 0f,
+        /** Degrees clockwise from north. A held view stays north-up. NaN stays north-up. */
+        courseDeg: Double = Double.NaN,
     ): Layout? {
         if (width <= pad * 2 || height <= pad * 2 + scaleBarReserve) return null
         val phone = Geo.despikePath(model.samples).let { cleaned ->
             if (cleaned.size >= 2) cleaned else model.samples
         }
-        val held = viewport?.clamped()
+        val held = viewport?.clamped(minHalfM)
+        val anchor = if (held == null && followHalfM > 0f) {
+            phone.lastOrNull() ?: model.frameSamples.lastOrNull()
+        } else {
+            null
+        }
         val pts = phone + model.frameSamples
-        if (held == null && pts.isEmpty() && model.dots.isEmpty()) return null
+        if (held == null && anchor == null && pts.isEmpty() && model.dots.isEmpty()) return null
         val lat0: Double
         val lon0: Double
         if (held != null) {
             lat0 = held.centerLat
             lon0 = held.centerLon
+        } else if (anchor != null) {
+            lat0 = anchor.lat
+            lon0 = anchor.lon
         } else if (pts.isNotEmpty()) {
             lat0 = pts.map { it.lat }.average()
             lon0 = pts.map { it.lon }.average()
@@ -391,17 +415,39 @@ object SitPathPlot {
             lon0 = model.dots.map { it.lon }.average()
         }
         val cos0 = cos(Math.toRadians(lat0)).coerceAtLeast(0.2)
-        fun mx(lat: Double, lon: Double) = ((lon - lon0) * 111_320.0 * cos0).toFloat()
-        fun my(lat: Double, lon: Double) = ((lat - lat0) * 110_540.0).toFloat()
+        val turn = if (held == null && courseDeg.isFinite()) Math.toRadians(courseDeg) else 0.0
+        val cosT = cos(turn)
+        val sinT = sin(turn)
+        fun mx(lat: Double, lon: Double): Float {
+            val east = (lon - lon0) * 111_320.0 * cos0
+            val north = (lat - lat0) * 110_540.0
+            return (east * cosT - north * sinT).toFloat()
+        }
+        fun my(lat: Double, lon: Double): Float {
+            val east = (lon - lon0) * 111_320.0 * cos0
+            val north = (lat - lat0) * 110_540.0
+            return (east * sinT + north * cosT).toFloat()
+        }
         val minX: Float
         val maxX: Float
         val minY: Float
         val maxY: Float
+        val innerW = width - pad * 2
+        val innerH = height - pad * 2 - scaleBarReserve
         if (held != null) {
             minX = -held.halfEastM
             maxX = held.halfEastM
             minY = -held.halfNorthM
             maxY = held.halfNorthM
+        } else if (anchor != null) {
+            val shortPx = min(innerW, innerH)
+            val metersPerPx = (followHalfM * 2f) / shortPx
+            val halfX = innerW / 2f * metersPerPx
+            val halfY = innerH / 2f * metersPerPx
+            minX = -halfX
+            maxX = halfX
+            minY = -halfY
+            maxY = halfY
         } else {
             var loX = Float.POSITIVE_INFINITY
             var hiX = Float.NEGATIVE_INFINITY
@@ -425,8 +471,6 @@ object SitPathPlot {
         }
         val spanX = (maxX - minX).coerceAtLeast(8f)
         val spanY = (maxY - minY).coerceAtLeast(8f)
-        val innerW = width - pad * 2
-        val innerH = height - pad * 2 - scaleBarReserve
         val scale = min(innerW / spanX, innerH / spanY)
         val usedW = spanX * scale
         val usedH = spanY * scale
@@ -453,8 +497,10 @@ object SitPathPlot {
             samples = phone,
             metersPerPx = 1f / scale,
             unproject = { x, y ->
-                val east = minX + (x - ox) / scale
-                val north = maxY - (y - oy) / scale
+                val screenEast = minX + (x - ox) / scale
+                val screenNorth = maxY - (y - oy) / scale
+                val east = screenEast * cosT + screenNorth * sinT
+                val north = -screenEast * sinT + screenNorth * cosT
                 val lat = lat0 + north / 110_540.0
                 val lon = lon0 + east / (111_320.0 * cos0)
                 lat to lon
@@ -549,6 +595,12 @@ object SitPathPlot {
                             pilotLon = d.payloadOpLon,
                             aircraft = d.payloadAircraft?.trim().orEmpty(),
                             opKind = d.payloadOpKind,
+                            fixAt = d.payloadAt,
+                            phoneLat = d.payloadPhoneLat,
+                            phoneLon = d.payloadPhoneLon,
+                            opAt = d.payloadOpAt,
+                            opPhoneLat = d.payloadOpPhoneLat,
+                            opPhoneLon = d.payloadOpPhoneLon,
                         )
                     } else {
                         ""

@@ -13,7 +13,7 @@ import kotlin.math.min
 object Sit {
     const val NAME_MAX = 40
     const val RADIO_CAP = 6000
-    const val PATH_CAP = 2000
+    const val PATH_CAP = 16_000
     const val CLOSED_CAP = 10
     const val TRAIL_CAP = 40
     const val FLUSH_MS = 10_000L
@@ -133,6 +133,24 @@ data class SitRadio(
     val gpsTrail: List<GpsSample> = emptyList(),
     /** Live-row labels captured at hear-time. Saved sits do not keep the advertisement bytes. */
     val liveDecode: List<LiveDecodeChip> = emptyList(),
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val payloadAt: Long? = null,
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val payloadPhoneLat: Double? = null,
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val payloadPhoneLon: Double? = null,
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val payloadOpAt: Long? = null,
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val payloadOpPhoneLat: Double? = null,
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val payloadOpPhoneLon: Double? = null,
 ) {
     fun toSighting(): Sighting = Sighting(
         key = key,
@@ -173,6 +191,12 @@ data class SitRadio(
         payloadOpAlt = payloadOpAlt,
         payloadTrail = payloadTrail,
         liveDecode = liveDecode,
+        payloadAt = payloadAt,
+        payloadPhoneLat = payloadPhoneLat,
+        payloadPhoneLon = payloadPhoneLon,
+        payloadOpAt = payloadOpAt,
+        payloadOpPhoneLat = payloadOpPhoneLat,
+        payloadOpPhoneLon = payloadOpPhoneLon,
     )
 
     companion object {
@@ -208,6 +232,12 @@ data class SitRadio(
             payloadTrail = AircraftTrail.append(emptyList(), device),
             gpsTrail = trailSample(device),
             liveDecode = device.liveDecode,
+            payloadAt = device.payloadAt,
+            payloadPhoneLat = device.payloadPhoneLat,
+            payloadPhoneLon = device.payloadPhoneLon,
+            payloadOpAt = device.payloadOpAt,
+            payloadOpPhoneLat = device.payloadOpPhoneLat,
+            payloadOpPhoneLon = device.payloadOpPhoneLon,
         )
 
         fun trailSample(device: Sighting): List<GpsSample> {
@@ -537,6 +567,12 @@ class SitSession(
             payloadTrail = AircraftTrail.append(old.payloadTrail, next),
             gpsTrail = trail,
             liveDecode = next.liveDecode.ifEmpty { old.liveDecode },
+            payloadAt = next.payloadAt ?: old.payloadAt,
+            payloadPhoneLat = if (next.payloadAt != null) next.payloadPhoneLat else old.payloadPhoneLat,
+            payloadPhoneLon = if (next.payloadAt != null) next.payloadPhoneLon else old.payloadPhoneLon,
+            payloadOpAt = next.payloadOpAt ?: old.payloadOpAt,
+            payloadOpPhoneLat = if (next.payloadOpAt != null) next.payloadOpPhoneLat else old.payloadOpPhoneLat,
+            payloadOpPhoneLon = if (next.payloadOpAt != null) next.payloadOpPhoneLon else old.payloadOpPhoneLon,
         )
     }
 

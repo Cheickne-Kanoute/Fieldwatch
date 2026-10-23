@@ -93,6 +93,9 @@ import app.fieldwatch.domain.ClassSlice
 import app.fieldwatch.domain.FastPair
 import app.fieldwatch.domain.OutlineSnap
 import app.fieldwatch.domain.GpsSample
+import app.fieldwatch.domain.MapBasemap
+import app.fieldwatch.domain.MapFrame
+import app.fieldwatch.ui.component.rememberMapFooter
 import app.fieldwatch.domain.ListLine
 import app.fieldwatch.domain.MacUtil
 import app.fieldwatch.domain.RadioBookmarks
@@ -468,14 +471,36 @@ private fun LivePathSplit(
         )
     }
     val online = state.settings.onlineLookup
-    val tileKey = remember(state.operatorPath, online) { livePathTileKey(state.operatorPath, online) }
-    LaunchedEffect(tileKey, viewport) {
+    val basemap = state.settings.mapBasemap
+    val mapKeyRev by vm.mapKeyRevision.collectAsStateWithLifecycle()
+    val mapFrame = MapFrame.resolved(state.settings.mapFrame, state.settings.mapRotate)
+    val tileKey = remember(state.operatorPath, online, basemap, mapKeyRev) {
+        livePathTileKey(state.operatorPath, online, basemap, mapKeyRev)
+    }
+    val tip = state.operatorPath.lastOrNull()
+    val tipBucket = if (tip == null) "" else {
+        "${(tip.lat * 2500.0).toInt()}:${(tip.lon * 2500.0).toInt()}"
+    }
+    LaunchedEffect(tileKey, viewport, mapFrame, tipBucket) {
         val held = viewport
-        if (held == null) {
-            vm.refreshLivePathTiles(state.operatorPath, online)
-        } else {
-            delay(350)
-            vm.refreshLivePathViewport(held, online)
+        when {
+            held != null -> {
+                delay(350)
+                vm.refreshLivePathViewport(held, online, basemap)
+            }
+            MapFrame.zoomed(mapFrame) && tip != null -> {
+                vm.refreshLivePathViewport(
+                    SitPathPlot.Viewport(
+                        tip.lat,
+                        tip.lon,
+                        MapFrame.CLOSE_TILE_HALF_M,
+                        MapFrame.CLOSE_TILE_HALF_M,
+                    ),
+                    online,
+                    basemap,
+                )
+            }
+            else -> vm.refreshLivePathTiles(state.operatorPath, online, basemap)
         }
     }
     val split = splitState.floatValue
@@ -517,6 +542,16 @@ private fun LivePathSplit(
                     expand = true,
                     viewport = viewport,
                     onViewport = { viewport = it },
+                    courseDeg = state.travelDeg,
+                    mapFrame = mapFrame,
+                    onRotate = { vm.cycleMapFrame() },
+                    onToggleClose = { vm.toggleMapClose() },
+                    position = rememberMapFooter(
+                        state.settings.mapFooter,
+                        state.phoneLat,
+                        state.phoneLon,
+                        state.settings.demoMode,
+                    ),
                 )
             }
         }
@@ -561,10 +596,15 @@ private fun LivePathSplit(
     }
 }
 
-private fun livePathTileKey(samples: List<GpsSample>, online: Boolean): String {
+private fun livePathTileKey(
+    samples: List<GpsSample>,
+    online: Boolean,
+    basemap: MapBasemap,
+    mapKeyRev: Int,
+): String {
     if (!online || samples.isEmpty()) return "off"
     val end = samples.last()
-    return "${samples.size / 4}:${(end.lat * 1000.0).roundToInt()}:${(end.lon * 1000.0).roundToInt()}"
+    return "$mapKeyRev:${basemap.name}:${samples.size / 4}:${(end.lat * 1000.0).roundToInt()}:${(end.lon * 1000.0).roundToInt()}"
 }
 
 @Composable

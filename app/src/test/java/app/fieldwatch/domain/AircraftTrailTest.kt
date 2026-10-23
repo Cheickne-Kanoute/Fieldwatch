@@ -311,6 +311,50 @@ class AircraftTrailTest {
     }
 
     @Test
+    fun bodyNamesTheGridAndWhereThePhoneWas() {
+        val at = 1_700_000_000_000L
+        val pic = AircraftTrail.Picture(
+            uasId = "SN",
+            title = "SN",
+            fixes = listOf(PayloadFix(at, 36.2361322, -115.0820944)),
+            status = "",
+            alt = null,
+            heading = null,
+            speed = null,
+            pilotLat = 36.24,
+            pilotLon = -115.09,
+            opKind = OperatorLoc.LIVE,
+            pilotOnMap = false,
+            onWalk = false,
+            ownFigure = true,
+            fixAt = at,
+            phoneLat = 36.23,
+            phoneLon = -115.08,
+            opAt = at,
+            opPhoneLat = 36.23,
+            opPhoneLon = -115.08,
+        )
+        val text = AircraftTrail.body(listOf(pic))
+        assertTrue(text.contains("11S PA 72349 11844"))
+        assertTrue(text.contains("from this phone at"))
+        assertTrue(text.contains("Pilot"))
+        val older = AircraftTrail.body(
+            listOf(
+                pic.copy(
+                    fixAt = null,
+                    phoneLat = null,
+                    phoneLon = null,
+                    opAt = null,
+                    opPhoneLat = null,
+                    opPhoneLon = null,
+                ),
+            ),
+        )
+        assertTrue(older.contains("11S PA 72349 11844"))
+        assertFalse(older.contains("from this phone"))
+    }
+
+    @Test
     fun sitKeepsSerialMakerUntilTheUasIdChanges() {
         val first = drone(1_000L, 28.0, -81.0).copy(payloadAircraft = "Freefly Alta X")
         val session = SitSession.start(

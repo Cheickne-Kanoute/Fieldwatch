@@ -479,8 +479,8 @@ def draw_cover(c, doc):
         y -= 16
     c.setFillColor(MUTED)
     c.setFont("Helvetica", 9)
-    c.drawString(48, 108, "Version 1.1.30")
-    c.drawString(48, 94, "22 October 2026")
+    c.drawString(48, 108, "Version 1.1.31")
+    c.drawString(48, 94, "23 October 2026")
     c.drawString(48, 80, "Package  app.fieldwatch   ·   Android 10+ (API 29)   ·   Target API 35")
     c.setStrokeColor(colors.HexColor("#2A3340"))
     c.setLineWidth(0.6)
@@ -520,7 +520,7 @@ def draw_body(c, doc):
     c.line(48, 40, PAGE_W - 48, 40)
     c.setFillColor(MUTED)
     c.setFont("Helvetica", 8)
-    c.drawString(48, 28, "v1.1.30  ·  Off Grid Pete LLC")
+    c.drawString(48, 28, "v1.1.31  ·  Off Grid Pete LLC")
     draw_ig_mark(c, 148, 30, 5.2, MUTED)
     c.setFillColor(MUTED)
     c.setFont("Helvetica", 8)
@@ -925,7 +925,10 @@ def story():
             "loosely with range — walls, body attenuation, and TX power dominate. "
             "Hunt (§5.5, §12.13) uses that same RSSI as a closer/further needle and, if you "
             "hold the phone against your body and turn, a crude heading from body-block. "
-            "That is not DF and not a compass."
+            "Hunt also paints a heat cloud of where this phone heard that radio. A louder "
+            "color means it was stronger there. That is still not a bearing and not a fix "
+            "on the other radio. That is not DF and not a compass. "
+            "The button on Show live path and Hunt only turns that map between north up and the direction of travel. A double-tap on Show live path switches the whole path and a close view around this phone. It is not a bearing to the other radio. §5.3.4."
         ),
         P("3.3 Dependence on active broadcast", "h2"),
         P(
@@ -1015,7 +1018,7 @@ def story():
                 ["Notifications (13+)", "Persistent scan status and watchlist alerts."],
                 ["Vibrate", "Watchlist haptic."],
                 ["Foreground service (location + connected device)", "Keep both radios scanning when the UI is not in front."],
-                ["Internet (install-time)", "Online place names and maps (Debrief/AI Export geocoder; Path OSM tiles) and, if you turn it on, the TAK / CoT UDP feed (§5.8). Fieldwatch has no account and does not call a Fieldwatch server."],
+                ["Internet (install-time)", "Online place names and maps (Debrief/AI Export geocoder; the map under Path) and, if you turn it on, the TAK / CoT UDP feed (§5.8). Fieldwatch has no account and does not call a Fieldwatch server."],
                 ["Ignore battery optimizations", "Optional. Requested from Settings so OEM killers do not freeze the service."],
             ],
             [2.1 * inch, 4.4 * inch],
@@ -1072,7 +1075,7 @@ def story():
                 ["Filters", "Which radios appear on Live. Presets and Radios stay open at the top. Moving with you, Seen at more than one place, and New detections are switches on this list. Keep or hide, Selected signature classes, Selected signatures, and Signal, name, MAC, vendor open their own page. The row names what is selected in that section. Signatures still label and can beep. Logging is unchanged."],
                 ["Signatures", "The pattern catalog — which radios get a name. Tap a class to open its signatures, then a row to edit. Bookmark a signature to alert when that family appears. Hide a family on Filters."],
                 ["Reports", "Named sits, Path, Debrief, Sit export, Compare, AI Export, Signature candidates, Log export. Start and End sit live here."],
-                ["Settings", "A list of topics. Tap a row for that page. The row shows the current choice. Back returns to the list. Appearance (Night mode, Keep screen on, Privacy mode), Language, Scanning, Watchlist, Named radios, Location, GNSS interference, TAK / CoT, Logging, Signatures, Settings backup. Show Live tour and Diagnostics stay on the list. Row layout is Live → Display, not here. Language is the section after §5.7."],
+                ["Settings", "A list of topics. Tap a row for that page. The row shows the current choice. Back returns to the list. Appearance (Night mode, Keep screen on, Privacy mode), Language, Scanning, Watchlist, Named radios, Location and Maps, GNSS interference, TAK / CoT, Logging, Signatures, Settings backup. Show Live tour and Diagnostics stay on the list. Row layout is Live → Display, not here. Language is the section after §5.7."],
                 ["Tune (top right on Live)", "The sliders icon. Opens <b>Display</b> over Live: View (Radar, Strength list, Timeline, Hybrid, By class), Sort, Brief hold, Title line, Subtitle line, then switches. <b>Show live path</b> is the first switch, above RSSI bars. It is off until you turn it on (§5.3.4). Then signature names, Frequency, and first/last. This is how you change the picture — appearance, sorting, and which fields each row shows. Tap Tune again, or tap the dimmed list, to close it. Not on Settings. §5.3."],
             ],
             [1.7 * inch, 4.8 * inch],
@@ -1295,8 +1298,7 @@ def story():
         ),
         figure_wrap(
             "fig-flood.png",
-            "Fig. 1 — Pairing flood. The burst can be many radios already advertising pairing, such as in a store, "
-            "or one radio changing its address. Hide these takes them off Live. Continue leaves them up.",
+            "Fig. 1 — Pairing flood. Hide these takes this burst off Live. Continue leaves it up.",
             "A burst of new Bluetooth addresses in a few seconds raises one dialog, as in this figure, then a single red line. "
             "<b>Pairing flood</b> is many new addresses advertising a pairing popup at about the same loudness. "
             "<b>Name flood</b> is many new randomized addresses that only advertise a name. "
@@ -1352,7 +1354,7 @@ def story():
                 ["Filters", "Which radios appear. Presets and Radios (Both, Wi-Fi only, BLE only) stay open at the top. Moving with you, Seen at more than one place, and New detections are switches on this list. Keep or hide, Selected signature classes, Selected signatures, and Signal, name, MAC, vendor open their own page. The row names what is selected in that section. Reset filter is under the list. Signatures still label and can alert. See §8 and Figs. 15–17."],
                 ["Signatures", "The pattern catalog. Title shows how many signatures are loaded (stock plus any you added). The line under the title says Bookmark to alert. Name A–Z or Class A–Z (classes start collapsed; tap to open). Tap a row to edit (rules, color, Decode fields on BLE). A bookmark alerts (beep and/or spoken class). No matching on/off — hide on Filters. + adds a blank signature. Fig. 2, §9.6."],
                 ["Reports", "Sits stay on this page. Using… names the sit that Path, Debrief, Sit export, and Compare will use. Those four open their own pages. Log Export and Signature candidates are under them. Clear log is on the Log Export page. AI Export is on Debrief, and again on Compare. GPS, place names, and logging on/off stay on Settings."],
-                ["Settings", "A list of topics. Tap a row for that page. The row shows the current choice. Back returns to the list. Appearance (Night mode, Keep screen on, Privacy mode), Scanning, Watchlist, Named radios, Location (GPS tagging, Places, place names), GNSS interference (calibrate before the check will turn on, §5.9), TAK / CoT feed (off), Logging, Signatures (export / import, Update stock catalog from GitHub, restore defaults), Settings backup. Show Live tour and Diagnostics stay on the list. Row layout is Live display → Display (tune), not here. TAK: §5.8."],
+                ["Settings", "A list of topics. Tap a row for that page. The row shows the current choice. Back returns to the list. Appearance (Night mode, Keep screen on, Privacy mode), Scanning, Watchlist, Named radios, Location and Maps (GPS tagging, Places, place names, the map, and Position), GNSS interference (calibrate before the check will turn on, §5.9), TAK / CoT feed (off), Logging, Signatures (export / import, Update stock catalog from GitHub, restore defaults), Settings backup. Show Live tour and Diagnostics stay on the list. Row layout is Live display → Display (tune), not here. TAK: §5.8."],
             ],
             [1.2 * inch, 5.3 * inch],
         ),
@@ -1384,7 +1386,7 @@ def story():
         ),
         figure_wrap(
             "fig-display.png",
-            "Fig. 3 — Display. Show live path is the first switch, above RSSI bars. It is on in this shot. It starts off.",
+            "Fig. 3 — Display. Show live path is the top switch. It is on here. It starts off.",
             "View is the first dropdown. That is Radar vs Strength list vs Timeline vs Hybrid vs By class. "
             "Sort, Brief hold, Title line, and Subtitle line follow. "
             "<b>Show live path</b> is the first switch, above RSSI bars, and it starts off. "
@@ -1560,24 +1562,21 @@ def story():
         P("5.3.4 Show live path", "h3"),
         figure_wrap(
             "fig-live-path.png",
-            "Fig. 3 — Show live path. The map sits across the top of Live. Start is the beginning of the line. Now is this phone. Drag the bar under the map. The list stays underneath.",
-            "The switch is on Display, directly above <b>RSSI bars</b>. It starts off. "
-            "Turn it on and a north-up map sits across the top of Live, with the list still "
-            "under it. By class, Strength list, Timeline, and Hybrid all keep that list. "
-            "Drag the bar between the map and the list. "
-            "The split stays where you leave it, from about a fifth of the screen to about "
-            "three quarters. This is not a sixth view. Radar has no list under it, so while "
-            "View is Radar the switch stays on the panel, dimmed, and will not change. "
-            "Leaving Radar brings the map back if the switch was already on. "
-            "Choosing Radar does not turn the switch off.",
+            "Fig. 3 — Show live path. Drag the bar under the map.",
+            "The switch is on Display, just above <b>RSSI bars</b>. It starts off. "
+            "Turn it on and a north-up map sits over the list. Drag the bar. "
+            "It stays where you leave it, from about a fifth of the screen to about three quarters. "
+            "By class, the strength list, Timeline, and Hybrid all keep the list. "
+            "Radar has no list, so the switch is dimmed there and does nothing. "
+            "Leave Radar and the map comes back. Picking Radar does not turn the switch off.",
         ),
         P(
             "The line is this phone. The black dot is the start. The blue dot is you, labeled "
             "<b>Now</b>. The line starts where you are when the map opens, when you turn the "
             "switch on, or when a sit ends. It draws as soon as you move. You do not wait for "
-            "a bend. A bend is kept when the drive leaves the last line by about 12 meters, "
-            "about the width of a road. Side-to-side GPS wobble stays off the line, so a "
-            "straight road stays straight. A network location, and a GPS fix worse than about "
+            "a bend. A point is kept every few meters, so the line follows the street around a corner. "
+            "The road already driven stays where it was. "
+            "A network location, and a GPS fix worse than about "
             "25 meters, stay off the line. A hop faster than about 150 km/h is dropped. "
             "Standing still is the blue dot, not a scribble. Before the first fix the band "
             "says <b>Waiting for a GPS fix.</b> Tag detections with GPS has to be on, or the "
@@ -1597,18 +1596,52 @@ def story():
             "signature. Extra attention alone does not put a dot here. A burst you hid stays "
             "off. The list under the map is still the filtered Live list, and Filters still "
             "decide who is on that list. Tap a dot to open that radio. A stack says "
-            "<b>Radios here: N</b>. Thick green on the line is a stay (about 40 m), the same "
-            "mark Reports → Path uses. Time of day sits along the path. Aircraft tracks and "
+            "<b>Radios here: N</b>. Thick green is a real stop: this phone stayed within about "
+            "25 m for about 40 seconds. Reports → Path uses that same mark. The rest of the "
+            "drive is the plain line. Time of day sits along the path. Aircraft tracks and "
             "the GNSS diamond stay on Reports → Path. They are not drawn on this band."
         ),
         P(
             "One GPS fix is enough to show the neighborhood and the blue dot. "
-            "Settings → <b>Online place names and maps</b> (on by default) loads street tiles "
-            "when the phone is online. Off, or no network: the line on a plain background, "
-            "with no error dialog. Pinch or drag holds the view and stops following you. "
-            "Tiles then load for the area on screen. <b>Recenter</b>, or a double-tap, fits "
-            "the whole path again and follows you. Recenter stays hidden while the map is "
-            "already following. The path is recorded while Tag detections with GPS is on, "
+            "Settings → <b>Online place names and maps</b> (on by default) loads the map from "
+            "Settings → <b>Location and Maps</b> when the phone is online. OpenStreetMap is the start and covers the world. "
+            "USGS Imagery and USGS Topo cover the United States. "
+            "A map marked Key also covers the world. How to get that key and paste it is §5.7.1. "
+            "The key stays on this phone and is left out of Export settings. "
+            "OpenStreetMap and the USGS maps do not ask for a key. "
+            "A small line in the lower right names the map. "
+            "Settings → <b>Location and Maps</b> can put where this phone is now on the lower left, as GPS or as a grid. "
+            "Off leaves that corner empty. Privacy mode masks it. "
+            "The line stays put until this phone has moved. "
+            "Off, or no network, or no picture for that place: the line on a plain background. "
+            "OpenStreetMap and the USGS maps show no error dialog. "
+            "A map marked Key shows a popup when the key is missing, the service rejects it, or the map does not load. "
+            "Pinch or drag holds the view and stops following you. "
+            "Tiles then load for the area on screen. <b>Recenter</b> follows again in the zoom and facing you already chose. "
+            "It stays hidden while the map is already following. "
+            "While the view is held, the map stays north-up."
+        ),
+        P(
+            "<b>Two zoom levels.</b> Double-tap the map. One fits the whole path. "
+            "The other stays on this phone, a little past about 100 m, so a loud radio nearby still fits. "
+            "Facing stays as you left it. A double-tap also lets go of a pinch or a drag. "
+            "On a long drive, direction of travel can leave the sides blank. The close view still shows the map around you."
+        ),
+        P(
+            "<b>North up and direction of travel.</b> Tap the button. North up keeps north at the top. "
+            "Direction of travel keeps the way you are going at the top. Zoom stays put. "
+            "The picture on the button is the one you are in. "
+            "Whole path, north up: a bent path, with N above it. "
+            "Whole path, direction of travel: compass letters over a smaller bent path. "
+            "Close view, direction of travel: those letters, larger, turning as you turn. "
+            "Close view, north up: N over an arrow. "
+            "Standing still keeps the last direction. Turning in place does not turn the map. "
+            "With no direction yet, the map stays north-up. "
+            "Hunt uses the same button and stays close on you. A double-tap there changes this zoom too. "
+            "Reports → Path stays north-up. No button, and no double-tap."
+        ),
+        P(
+            "The path is recorded while Tag detections with GPS is on, "
             "even with this switch off. The switch only shows it. "
             "Live → <b>Start over</b>, while Moving with you is on, clears that path. "
             "Reports → Path is the full page for a sit, the letter figure, and an advertised "
@@ -1667,7 +1700,8 @@ def story():
             "The status chip comes back on the next Location message. "
             "A Location message buried in a BLE message pack does not light the chip. "
             "Wi-Fi Remote ID packs are split, so a Wi-Fi location can. "
-            "Detail still has latitude, heading, speed, and UAS id when those messages are current. "
+            "Detail still has latitude, the grid, heading, speed, and UAS id when those messages are current. "
+            "Distance and bearing on that page use this phone's current GPS fix. "
             "The TAK pin does not depend on this chip."
         ),
         P(
@@ -1683,15 +1717,15 @@ def story():
             "When it shares a spot with other alerts, the count lists every radio there. "
             "A farther aircraft with a UAS id gets its own map, up to three. "
             "The operator on that map is a person icon. The report says takeoff, the pilot, or a fixed point. "
+            "The report shows the grid, and the distance and bearing from where this phone was when that position was heard. "
+            "An older sit without that time shows the grid and leaves the distance and bearing off. "
             "Sits saved before this change keep that single last position. "
             "Last 15 minutes marks the current advertised position and does not keep a track. §5.6.1, §11.4, §12.6, §12.16."
         ),
         P("5.5 Device detail", "h2"),
         figure_wrap(
             "fig-detail.png",
-            "Fig. 4 — Device detail. Custom name is the title; advertised name is smaller. "
-            "Cyan Observer notes sit under the name. Mine is the switch under those notes. "
-            "Privacy mode masks MAC tails.",
+            "Fig. 4 — Device detail. The custom name is the big title. Mine sits under the notes.",
             "Tap a row or a radar blip. Detail is the full decode of that observation, resolved "
             "offline from packed IEEE and Bluetooth SIG tables (no network). Jargon is spelled "
             "out in plain language (for example BR/EDR not supported = BLE-only, no classic "
@@ -1844,17 +1878,31 @@ def story():
             "fig-hunt.png",
             "Fig. 5 — Hunt.",
             "<b>Hunt</b> (BLE only). Device detail → Hunt. A full-screen page for this advertiser. "
-            "You get a large RSSI and a cue: Very Close, Closer, Further, About the same, Quiet, or Gone. "
-            "Very Close is about −45 dBm or louder (the same “very strong” band as detail). "
-            "A 127 callback is ignored (not available), not treated as Very Close. "
-            "Closer / Further / About the same come from a few seconds of smoothed packets (about a 3 dB step). "
-            "A ring around YOU contracts on Closer / Very Close and expands on Further. Loudest this hunt and a hunt-only sparkline sit with it. Cue and hint are in fixed slots so the dBm number does not jump. "
-            "Beep and Vibrate (off by default, remembered) sit under Reset / Back and tick faster as RSSI gets louder — a short click, not the watchlist chirp. Silent when Quiet or Gone. "
+            "The map paints a heat cloud of where this phone heard that radio. "
+            "The color runs from blue where it was weak, through cyan, green, yellow, and orange, to red where it was powerful. "
+            "The bar on the map reads Weak, Moderate, Strong, and Powerful. "
+            "Hold the phone upright, out in front of you, in one hand. Point the top of the phone the way you are walking, and keep that grip. Walk slowly. "
+            "Walk a pattern — forward, back, and to both sides — and let the cloud build. A turn in place does not move the dot. "
+            "The walk connects the hears, and the color changes smoothly from one to the next. "
+            "Close parts of the walk fill in between the lines. A far gap stays open. "
+            "Red is about −45 dBm or louder. The brightest patch is where this phone heard it loudest. Search there. The radio is usually near that spot, because the signal is strongest close to the radio. "
+            "The loudest mark sits in that patch. The patch is that hear. It is not a pin on the other radio. "
+            "The map stays close on you. Pinch out for the whole walk, or pinch in for a few meters of ground. "
+            "Leaving the page keeps the cloud until Reset this hunt, or until you hunt a different radio. "
+            "Steps fill in short moves between GPS fixes. While GPS is moving, steps follow that direction. The top of the phone is used when GPS is stuck. A turn in place does not move the dot. A tight GPS fix still recenters the walk. The lower-left reading matches the dot. Privacy mode shows masked in that corner. "
+            "Pinch or drag holds the view. Double-tap, or Recenter, follows you again. "
+            "The same button sits where N was. It turns this map the same way. It does not point at the radio. "
+            "Night mode leaves this cloud in its own colors. "
+            "The map fills the space above the number. "
+            "About −45 dBm or louder is the same very strong band as detail. Look around. "
+            "A 127 reading is ignored. It is not available. "
+            "Watch the big RSSI number, the sparkline, and loudest-this-hunt. Closer to 0 is louder here. "
+            "Beep and Vibrate (off by default, remembered) sit under Reset / Back and tick faster as RSSI gets louder — a short click, not the watchlist chirp. They are on in this shot. They stay quiet when there is no packet, or the radio has left. "
             "The screen stays on while Hunt is open. "
-            "It uses the live BLE store, even if the Live display was paused. This is not meters, not a compass, "
-            "and not a map pin on the other radio. Wi-Fi access points have no Hunt button: stock "
+            "It uses the live BLE store, even if the Live display was paused. This is not meters "
+            "and not a pin on the other radio. Wi-Fi access points have no Hunt button: stock "
             "Android batches them about every 30 s (about 8 s with Faster Wi-Fi AP scans), still "
-            "too slow to walk toward. Randomized BLE can vanish mid-hunt (Gone). Experimental. Field tactics: §12.13.",
+            "too slow to walk toward. Randomized BLE can vanish mid-hunt. Experimental. Field tactics: §12.13.",
         ),
         P(
             "At the bottom of the page, under Hunt and the Signature family card: "
@@ -1870,7 +1918,7 @@ def story():
         P("5.6 Reports tab", "h2"),
         figure_wrap(
             "fig-reports.png",
-            "Fig. 6 — Reports. Sits stay on this page. Using last 15 minutes names the sit the next four rows will use.",
+            "Fig. 6 — Reports. The line above those four rows names the sit they use.",
             "Reports is the bottom tab next to Settings. Sits stay open here. "
             "The line under Sits says radios heard during a named stretch of time. "
             "Start sit is at the top. With no sit running, the helper under that button says Select Sit for actions below. "
@@ -1927,7 +1975,7 @@ def story():
         ]),
         figure_wrap(
             "fig-reports-sit.png",
-            "Fig. 6 — Reports → Debrief. Text and PDF are the same report. The two switches and AI Export are on this page.",
+            "Fig. 6 — Debrief. Text and PDF are the same report.",
             "Debrief (text) and Debrief (PDF) are the same report. "
             "The line under the buttons names the window, here the last 15 minutes still in memory. "
             "Show unmatched rotating BLE adds those addresses to the lists. The counts already include them. "
@@ -1938,13 +1986,13 @@ def story():
         P("5.6.1 Path", "h3"),
         figure_wrap(
             "fig-path.png",
-            "Fig. 6 — Reports → Path. Saved sit Trip to Lake House. 25333 m path, 16110 m span, 12 alerts, 5 GNSS. North is up. Street tiles are on.",
+            "Fig. 6 — Path for Trip to Lake House. North stays up.",
             "Reports → Path is its own page: a north-up plot of <b>this phone</b> for the sit you selected "
             "(open sit, a saved sit, or last 15 minutes). "
             "Tag detections with GPS must have been on, and the window needs a GPS fix, "
             "or the page says so. One fix still draws, on a short scale, so the point is easy to see. "
-            "The header in this figure is a saved sit, Trip to Lake House: 25333 m path, 16110 m span, "
-            "12 alerts, and 5 GNSS detections. Street tiles are on. The head is labeled End. "
+            "This shot is Trip to Lake House: 25333 m path, 16110 m across, 12 alerts, 5 GNSS. "
+            "The street map is on. The head says End. "
             "Red diamonds are where this phone was during a GNSS detection. "
             "A longer walk or drive fills the plot the same way. Start sit for a longer track than Live’s last 15 minutes. "
             "Privacy mode still draws the line; coordinate text is masked. "
@@ -1953,8 +2001,7 @@ def story():
         P(
             "<b>Watch it live.</b> Leave the Path page in front while you walk or drive. The plot redraws "
             "about every three seconds — not every GPS fix. The line is the same driven trace as "
-            "Show live path (§5.3.4): a bend is kept when you leave the last line by about 12 meters, "
-            "and side-to-side GPS wobble stays off it. "
+            "Show live path (§5.3.4): the line keeps a point every few meters, so it follows the street around a corner. The road already driven stays where it was. "
             "Last 15 minutes (no sit running): a sliding 15-minute window. The tail drops off; the head "
             "is labeled Now. An open sit: the line grows from Start to Now for that window. "
             "While a sit is running, Path follows it (saved sits and Last 15 minutes are disabled until End sit). "
@@ -1967,6 +2014,10 @@ def story():
         ),
         P(
             "The line is this phone. The black dot is the start. The blue dot is you, at the last point. "
+            "Settings → <b>Location and Maps</b> can put where this phone is now on the lower left, as GPS or as a grid. "
+            "That line is this phone now, not the last point of the sit. "
+            "It stays put until this phone has moved. "
+            "Off leaves that corner empty. Privacy mode masks it. "
             "Header counts alerts. "
             "A MAC alert or a signature alert is drawn once. "
             "A decoded latitude and longitude is the last advertised position. "
@@ -1977,7 +2028,7 @@ def story():
             "The list puts the Wi-Fi or BLE icon next to the MAC. "
             "The class icon matches the map. Observer notes sit on that row. "
             "Live list still shows only the cyan notes chip, not the text. "
-            "Thick green on the line is a stay (~40 m, same as Debrief Where you were). Time ticks (HH:mm) sit along the path. "
+            "Thick green is a real stop: this phone stayed within about 25 m for about 40 seconds. The rest of the drive is the plain line. Time ticks (HH:mm) sit along the path. "
             "A red diamond is where this phone was during a GNSS detection. "
             "The note under the map has the time, the level, and what changed. "
             "That spot is this phone, not the source of the interference. "
@@ -2001,23 +2052,29 @@ def story():
             "These positions were broadcast by the radio."
         ),
         P(
-            "Settings → <b>Online place names and maps</b> (on by default) also loads OpenStreetMap tiles under this plot when the phone has internet. "
+            "This page stays the whole path, with north up. It has no facing button and no double-tap zoom. Those are on Show live path (§5.3.4). "
+            "Settings → <b>Online place names and maps</b> (on by default) also loads the map under this plot when the phone has internet. The picture is the one chosen on Settings → <b>Location and Maps</b>. "
+            "OpenStreetMap is the start. USGS Imagery and USGS Topo cover the United States. "
+            "A map marked Key also covers the world and uses a key kept on this phone. "
             "Tiles fill the plot box, then clip; extra map shows around the route. "
-            "Offline or no tiles: the north-up plot only — no error dialog. Airplane mode is fine. Privacy mode does not hide this map. "
+            "Offline or no tiles: the north-up plot only. OpenStreetMap and the USGS maps show no error dialog. "
+            "A map marked Key shows a popup when the key is missing, the service rejects it, or the map does not load. "
+            "Airplane mode is fine. Privacy mode does not hide this map. "
             "Turn that switch off to keep streets out of Debrief/AI Export and maps off Path together."
         ),
         P(
             "Debrief PDF and Compare PDF include a letter-size operator-path figure of the same walk, "
             "full width of the report frame. When Online place names and maps is on "
-            "and the phone is online, OpenStreetMap tiles fill that frame the same way Reports → Path does. "
-            "Thick green is a stay. A MAC alert or a signature alert is drawn once, the same radios as Reports → Path. "
+            "and the phone is online, the map from Settings → Location and Maps fills that frame the same way Reports → Path does. "
+            "The lower right names the map. "
+            "Thick green is a real stop. A MAC alert or a signature alert is drawn once, the same radios as Reports → Path. "
             "A decoded latitude and longitude is the last advertised position. Anything else is the strongest hear. "
             "Extra attention is red, a MAC alert is blue, and a signature alert with neither is green. "
             "A red diamond is a GNSS detection where this phone was. The Path key under the figure has the time, the level, and what changed. "
             "It does not say where the interference came from. "
             "Stacked radios at one place share a Path-key number. "
-            "An advertised aircraft on that figure is the drone class icon in the Path key, not a number, with the live status, UAS id, last position, motion, and the operator position when the radio sent one. "
-            "Privacy mode masks the MAC tail, the UAS id, and those coordinates in that key and in the Aircraft section. Altitude, course, and speed stay. The track still draws. "
+            "An advertised aircraft on that figure is the drone class icon in the Path key, not a number, with the live status, UAS id, last position, grid, distance and bearing from where this phone was when that position was heard, motion, and the operator position when the radio sent one. "
+            "Privacy mode masks the MAC tail, the UAS id, the grid, and those coordinates in that key and in the Aircraft section. Altitude, course, and speed stay. Distance and bearing stay off. The track still draws. "
             "The letter figure draws that advertised track as a black dotted line, "
             "with a class icon at the last position. The operator is a person icon, with no word on the figure. "
             "Offline: the north-up trace only. Compare overlays this sit "
@@ -2027,7 +2084,7 @@ def story():
         P("Compare sits", "h3"),
         figure_wrap(
             "fig-compare.png",
-            "Fig. 6 — Reports → Compare. This sit is the one named on Reports. Pick a second saved sit under it.",
+            "Fig. 6 — Compare. Pick a second saved sit.",
             "Compare is its own page. This sit versus a second saved sit. Same window as Debrief. Text and PDF, same letter layout. "
             "The line at the top names this sit. In this figure it is the last 15 minutes still in memory. "
             "Second sit is the list of sits already saved on this phone. "
@@ -2040,7 +2097,7 @@ def story():
         P("5.6.2 Sit export", "h3"),
         figure_wrap(
             "fig-sit-export.png",
-            "Fig. 6 — Reports → Sit export. One row per radio in the selected sit, or the last 15 minutes. Not the log.",
+            "Fig. 6 — Sit export. One row per radio. This is not the log.",
             "Sit export is its own page, opened from the row under the green bar. "
             "Format starts at Log file — CSV. Both radios, Wi-Fi only, or BLE only, then Share or Save to SD card / storage. "
             "The dropdown also has JSON lines, GPX, KML, WiGLE, GeoJSON, and an ATAK data package. Log Export does not have the last two. "
@@ -2069,7 +2126,7 @@ def story():
         P("5.6.3 Log export", "h3"),
         figure_wrap(
             "fig-log.png",
-            "Fig. 6 — Reports → Log Export. Share or save the log. Reset / clear log is on this page.",
+            "Fig. 6 — Log Export. Share or save the log. Clear log is on this page.",
             "Log Export is its own page. The line at the top is how many lines this session, and how much is on disk. "
             "The rotating file on disk is JSON lines: "
             "<font face='Courier'>files/logs/fieldwatch-NNN.jsonl</font>, one hear per line — the session tape, not the sit roster. "
@@ -2111,7 +2168,7 @@ def story():
         ),
         figure_wrap(
             "fig-candidates.png",
-            "Fig. 7 — Signature candidates. The page explains the search. Find candidates starts it.",
+            "Fig. 7 — Signature candidates. Find candidates starts the search.",
             "Opening this page does not read the log. The note says it reads the whole log, not the sit above, and that it can take a while. "
             "After Find candidates, each card is one family: proposed name, class guess, radio count (number plus a Wi-Fi or Bluetooth icon), the rule in "
             "monospace, one sentence why it is not a house SSID, and a couple of examples. "
@@ -2136,8 +2193,10 @@ def story():
         ),
         figure_wrap(
             "fig-settings.png",
-            "Fig. 8 — Settings. Tap a row to open that page. The line under the name is the current choice.",
-            "Settings opens on this list. Appearance, Language, Scanning, Watchlist, Named radios, Location, GNSS interference, TAK / CoT, Logging, and Signatures are here. "
+            "Fig. 8 — Settings. Location and Maps says GPS on · Places on.",
+            "Settings opens on this list. Appearance, Language, Scanning, Watchlist, Named radios, Location and Maps, GNSS interference, TAK / CoT, Logging, and Signatures are here. "
+            "Map and Position are on Location and Maps, under Online place names and maps. "
+            "TAK / CoT says Paused in this shot because Privacy mode is on. "
             "Settings backup, Show Live tour, and Diagnostics are further down. "
             "This is not where you hide radios on the Live display, "
             "and not where you tap Debrief. Mute a noisy OUI or name with the per-rule switches "
@@ -2150,7 +2209,7 @@ def story():
         ]),
         figure_wrap(
             "fig-settings-night.png",
-            "Fig. 9 — Settings → Appearance, Night mode on.",
+            "Fig. 9 — Appearance. Night mode is on.",
             "Red on black so a dark sit stays dim. The top-bar icons follow the same red. Phone brightness does not change. Restore defaults turns it off.",
         ),
         P("Radios, watchlist, logging, and backup", "h3"),
@@ -2162,17 +2221,61 @@ def story():
             "<b>Places</b> — On by default, under Tag detections with GPS. A tracker that keeps its address is listed on its page and in the sit report when this phone hears it at two or more places in the last 7 days. Each radio keeps the latest 8 stops. A ninth confirmed stop drops the oldest. Hearing it many times at one stop is still one stop. A single jumped fix does not erase an older stop. A return after about 20 quiet minutes is listed on its page for a day. Times are when this phone heard it, with the date when the stop is not today. Each stop includes where this phone was. Online place names adds the street. A radio that changes its address is skipped. Ordinary Wi-Fi and Bluetooth stay off. A radio heard the whole way between stops stays with Moving with you and is left out of this list. No beep and no TAK marker. Not part of Export settings. Full write-up: §5.10.",
             "<b>GNSS interference</b> — Calibrate this phone once before the check will turn on. The result stays on this phone and is not part of Export settings. Full write-up: §5.9.",
             "<b>TAK / CoT feed</b> — Off by default. UDP Cursor-on-Target to ATAK / WinTAK / iTAK. Destination chips: This phone (127.0.0.1:10011), LAN multicast (239.2.3.1:6969), Custom. UDP only — a TAK server’s TCP 8087 is not this feed. Heard-here pins sit at operator GPS at the loudest hear (closest approach) and are labeled (here). Advertised lat/lon (stock Remote ID) sit on the aircraft; sticky UAS ID keeps one moving marker; a decoded operator location is a second pin. The callsign says takeoff, the pilot, or a fixed point. Location heading and speed go in the ATAK track when present. Wi-Fi Remote ID (vendor IE FA:0B:BC) can pin the aircraft the same way as BLE FFFA on Android 11+. A radio that leaves keeps its name for How long a spot stays (1 hour unless you change it). This phone’s marker still refreshes about every 2 minutes. Turning the feed off, or Privacy mode on, takes those radio spots off the map. Settings shows last send. What to send chips: Extra attention (on), Payload location (on), Watchlist (off), All signatures (off). GNSS is Off, While alerting, Red line, or Any hit. A GNSS hit also puts a pin or an ellipse on the map where this phone was. A short hit is a pin. A longer hit is an ellipse from the start to the last place it was heard, half as wide as it is long. How long that mark stays is 1 hour, 6 hours, 24 hours, or until deleted. Floods is Off or On and only adds a line to this phone’s marker. The mark, the ellipse, and the hold are §5.8.13. Floods are §5.8.12. Privacy mode pauses the feed. Full configuration: §5.8. Sit: §12.15.",
-            "<b>Online place names and maps</b> — On by default. One switch. Debrief, Places, and AI Export reverse-geocode GPS stamps (system geocoder). Reports → Path and Show live path load OpenStreetMap tiles under the trace (no Fieldwatch cloud, no API key). Offline, no geocoder, or no tiles: Debrief and Places keep the coordinates, and both maps stay the north-up plot — no error dialog. Privacy mode does not hide that map, and it masks coordinates and leaves streets off. Turn off to keep streets and map tiles out of reports, Places, Path, and the live band together. Generate buttons are on Reports (§5.6, §5.6.1). The live band is §5.3.4.",
+            "<b>Online place names and maps</b> — On by default. One switch, on Location and Maps. Debrief, Places, and AI Export reverse-geocode GPS stamps (system geocoder). Reports → Path and Show live path load the map chosen on that same page (no Fieldwatch cloud). OpenStreetMap is the start. USGS Imagery and USGS Topo cover the United States and do not ask for a key. A map marked Key covers the world. Paste the key from that account (§5.7.1). It stays on this phone and is left out of Export settings. Offline, no geocoder, or no tiles: Debrief and Places keep the coordinates, and the path stays the north-up plot. OpenStreetMap and the USGS maps show no error dialog. A map marked Key shows a popup when the key is missing, the service rejects it, or the map does not load. Privacy mode does not hide that map, and it masks coordinates and leaves streets off. Turn off to keep streets and map tiles out of reports, Places, Path, and the live band together. Generate buttons are on Reports (§5.6, §5.6.1). The live band is §5.3.4.",
+            "<b>Map and Position</b> — On Location and Maps, under Online place names and maps. Map chooses the picture. OpenStreetMap is the start and covers the world. USGS Imagery and USGS Topo cover the United States. Esri, MapTiler, Stadia, and Thunderforest cover the world, and those rows show Key. The key field appears only for a Key row. One key covers every style from that company. Export settings leaves it out. How to get a key and paste it: §5.7.1. Show live path, Reports → Path, and the path figure use that picture. Online place names and maps has to be on, or the page says to turn it on and the plot stays plain. The small line in the corner names the map. Position is Off, GPS, or Grid. GPS or Grid shows where this phone is now on the lower left. Off leaves that corner empty. The saved path figure leaves that corner empty. §5.3.4, §5.6.1.",
             "<b>Logging</b> — Write to disk, rotate size, Stale after slider (when a radio is marked gone). The rotating file is JSON lines. Format (CSV, JSON lines, GPX, KML, WiGLE), radios (Both / Wi-Fi / BLE), Share, Save, the line and disk counts, and Reset / clear log are on Reports → Log Export.",
             "<b>Allow background usage</b> — Switch. Opens Fieldwatch’s Battery page; turn on Allow background usage so the OS may run the scan when Fieldwatch is not in front. Follows that Android setting. Not Keep screen on.",
             "<b>Unrestricted battery</b> — Switch. Opens the Battery page. Select Unrestricted (not Optimized). Some phones (Samsung among them) do not open onto that choice — tap Allow background usage (the words, not the switch) to click through and select Unrestricted. Fieldwatch follows that grant when you return.",
             "<b>Signatures — export / import</b> — Export signatures shares a JSON pack of the whole catalog (stock plus any you added or edited, including Decode fields). Save signatures to SD card / storage… writes the same file through the system picker. Import signatures… reads a pack from another Fieldwatch. Same id or the same match rules are skipped, so importing twice does not clone the catalog. Extra rules on a stock row (for example a glob you added to Govee) merge onto the local row; a missing Decode fields map on that stock id is filled from the pack. A new name that already exists is imported as “Name (imported)”. Watchlist, filters, settings, logs, and GPS are not in the pack. A settings pack is a different file — use Import settings. Done and error both show an OK dialog. The file is <font face='Courier'>fieldwatch-signatures-YYYYMMDD.json</font>.",
             "<b>Update stock catalog from GitHub</b> — Needs internet. Pulls <font face='Courier'>dist/fieldwatch-signatures-v2.json</font> from the Fieldwatch GitHub (1.1.12+). 1.1.11 still reads <font face='Courier'>dist/fieldwatch-signatures.json</font>. Replaces stock rows, including Extra attention text. Bookmarks, Settings, muted stock rows, extra rules you added on a stock id, and signatures you added stay. Dialogs: no internet, could not reach GitHub, could not import catalog, already on the latest catalog, catalog updated. If a field map uses a decode source this APK does not know, the signature still imports and a second dialog (Signature decoding skipped) asks you to install a newer Fieldwatch APK. Offline: Import signatures from a file. A new APK still applies default watches; this button does not. Settings footer shows Catalog N under the app version.",
-            "<b>Restore default signatures &amp; presets</b> — Rewrites the catalog (stock rows, class colors, and stock Decode fields maps), stock bookmarks (Extra attention plus Drone-class), the full stock filter-chip set (including chips you long-press deleted), named radios, and the default Settings switches (Keep screen on, Tag detections with GPS, Online place names, Voice on with Class + signature, Jump on, TAK / CoT off, Night mode off). This wipes custom signatures and any chips you saved. Export signatures and Export settings first if you want a backup. It is not an undo for a single rule. To drop one preset chip, long-press it on Filters. There is no second factory-settings button; this is the stock rewrite.",
-            "<b>Settings backup — export / import</b> — Fieldwatch-only backup for a factory reset or a new phone. Export settings shares a JSON pack; Save settings to SD card / storage… writes the same file through the system picker. Import settings… replaces Settings switches, the current filter, filter presets, named radios, and signature watches on this phone. The catalog stays (that is Export / Import signatures). Logs, GPS, and already-seen for New detections only stay out of the pack. The language choice and an imported language file stay out of the pack too. The first-run disclaimer is not overwritten, so scanning does not stop. If the file would turn the TAK / CoT feed on or change its destination, Fieldwatch asks before it imports. A file that leaves the feed and the destination as they are imports with no extra step. Importing twice is the same as once. Picking a signature pack by mistake tells you to use Import signatures. Done and error both show an OK dialog. The file is <font face='Courier'>fieldwatch-settings-YYYYMMDD.json</font>. Not a Spectre config import.",
+            "<b>Restore default signatures &amp; presets</b> — Rewrites the catalog (stock rows, class colors, and stock Decode fields maps), stock bookmarks (Extra attention plus Drone-class), the full stock filter-chip set (including chips you long-press deleted), named radios, and the default Settings switches (Keep screen on, Tag detections with GPS, Online place names, Maps back to OpenStreetMap, Voice on with Class + signature, Jump on, TAK / CoT off, Night mode off). Saved map keys stay on the phone. This wipes custom signatures and any chips you saved. Export signatures and Export settings first if you want a backup. It is not an undo for a single rule. To drop one preset chip, long-press it on Filters. There is no second factory-settings button; this is the stock rewrite.",
+            "<b>Settings backup — export / import</b> — Fieldwatch-only backup for a factory reset or a new phone. Export settings shares a JSON pack; Save settings to SD card / storage… writes the same file through the system picker. Import settings… replaces Settings switches, the current filter, filter presets, named radios, and signature watches on this phone. The catalog stays (that is Export / Import signatures). Logs, GPS, already-seen for New detections only, and a map key stay out of the pack. The language choice and an imported language file stay out of the pack too. The first-run disclaimer is not overwritten, so scanning does not stop. If the file would turn the TAK / CoT feed on or change its destination, Fieldwatch asks before it imports. A file that leaves the feed and the destination as they are imports with no extra step. Importing twice is the same as once. Picking a signature pack by mistake tells you to use Import signatures. Done and error both show an OK dialog. The file is <font face='Courier'>fieldwatch-settings-YYYYMMDD.json</font>. Not a Spectre config import.",
             "<b>Show Live tour</b> — Shows the Live tour again. It points at the sliders for how Live looks. Open it opens Display and ends the tour. Skip closes it. The same card runs once, on the first Live screen, after the license on a new install. An upgrade to this version shows it once as well.",
             "<b>Diagnostics</b> — Under Show Live tour. Shows whether scanning is running, and the state of Wi-Fi, Bluetooth, Location, and GPS. What to check names anything that is off and needs to be on: Location, the location permission, Wi-Fi or Bluetooth, a refused scan, or a filter hiding the list. It does not tell you to flip Wi-Fi scanning or Bluetooth scanning while that radio is already on. Faster Wi-Fi scans, background use, unrestricted battery, and a GPS fix are not required while Fieldwatch is open. The page also lists the phone maker and model, Android version and build fingerprint, catalog, Wi-Fi and Bluetooth on or off, how old the last Wi-Fi scan is, whether BLE is running, BLE results in the last minute, Faster Wi-Fi AP scans, Allow background usage, Unrestricted battery, system Location, location permission, and how old the GPS fix is. It refreshes about once a second. Copy puts the same lines, including What to check, on the clipboard. No network names, no addresses, and no GPS coordinates. An empty Live list adds “Settings → Diagnostics” when a scan is blocked (Location off, permission missing, or neither radio is delivering). When Location is off, Live also shows a banner. Turn on opens the phone’s Location screen when that screen exists. A filter that hides the list is not a blocked scan. A quiet minute with BLE still running is not a failure.",
         ]),
+        P("5.7.1 A map key", "h3"),
+        P(
+            "OpenStreetMap, USGS Imagery, and USGS Topo load with no key. "
+            "The other maps are marked <b>Key</b> on the Map list. "
+            "Each of those companies gives you a key from your own account. "
+            "Fieldwatch does not include a key. "
+            "You paste it once. Fieldwatch keeps it on this phone. "
+            "Export settings, the log, a sit report, a PDF, and TAK leave it out. "
+            "One key covers every style from that company, so you can switch "
+            "among those styles without pasting it again."
+        ),
+        P(
+            "<b>Esri</b> covers Esri Satellite, Esri Streets, and Esri Outdoor. "
+            "Sign in at location.arcgis.com with an ArcGIS Location Platform account. "
+            "Create an API key and turn on Static basemap tiles. Copy that key. "
+            "<b>MapTiler</b> covers MapTiler Satellite, MapTiler Streets, and MapTiler Outdoor. "
+            "Sign in at cloud.maptiler.com and open API keys. Copy a key, or tap New key and copy it. "
+            "Use a key this phone can send. A key limited to a website address will not load here. "
+            "<b>Stadia</b> covers Stadia Satellite, Stadia Streets, and Stadia Terrain. "
+            "Sign in at client.stadiamaps.com. Open Manage Properties, then Authentication Configuration, "
+            "and create an API key. A website domain by itself does not work in the app. "
+            "<b>Thunderforest</b> covers Thunderforest Streets, Thunderforest Outdoors, and Thunderforest Transport. "
+            "Sign in at thunderforest.com and copy the API key on the account page."
+        ),
+        P("<b>Paste it on this phone.</b>", "body_left"),
+        numbered([
+            "Settings → Location and Maps.",
+            "Turn on Online place names and maps. With that switch off, Map stays closed and the plot stays plain.",
+            "Open Map.",
+            "Tap a row marked Key. Map key appears under the list. OpenStreetMap and the USGS rows do not show that field.",
+            "Paste the key. Tap Done on the keyboard, or leave the field. Fieldwatch stores it then.",
+            "Open Show live path, Reports → Path, or a path figure. The picture is the map you picked. The lower right names it.",
+        ]),
+        P(
+            "The key is letters, numbers, and . - _ only. A space or another mark is refused, "
+            "and that paste is not stored. Clearing the field and leaving it removes the saved "
+            "key for that company. The next time you pick one of its maps, the popup says the "
+            "map needs a key. "
+            "A missing key, a key the service rejects, or a map that does not load opens one popup. "
+            "OpenStreetMap and the USGS maps stay quiet when a picture is missing. "
+            "Restore defaults sets Map back to OpenStreetMap and leaves the keys you saved. "
+            "Fig. 8 is the Settings list. The Map list and the key field are on Location and Maps."
+        ),
         P(
             "How the Live display row looks — View (Radar, list, timeline, hybrid, By class), Sort, "
             "Title line, Subtitle line, RSSI bars, signature chips, Frequency, first/last, Brief hold — "
@@ -2640,7 +2743,7 @@ def story():
         P("5.8.15 What ATAK shows", "h3"),
         figure(
             "fig-atak-gnss.png",
-            "Fig. 26 — A GNSS mark on ATAK. The ellipse is Possible GNSS interference. W is the full width and L is the full length. The Cyan Fieldwatch marker is this phone.",
+            "Fig. 26 — A GNSS mark on ATAK. The ellipse is the hit. Cyan is this phone.",
             6.9 * inch,
         ),
         P(
@@ -2830,7 +2933,7 @@ def story():
         P("5.9.1 Calibrate this phone", "h3"),
         figure_wrap(
             "fig-settings-gnss.png",
-            "Fig. 21 — Settings → GNSS interference, after a calibration. This phone graded Good. The check can be turned on only after a result is saved.",
+            "Fig. 21 — GNSS interference, after calibration. This phone graded Good.",
             "Stand where the sky is open. A roof, a router, or a radio next to the phone can spoil the minute. "
             "Tap <b>Calibrate this phone</b>. The line counts down. "
             "Stop calibration leaves the last result unchanged. "
@@ -2859,7 +2962,7 @@ def story():
         ),
         figure_wrap(
             "fig-settings-gnss-levels.png",
-            "Fig. 22 — Sensitivity and Alert from. Both are Low, Medium, or High. Spoofing checks, Beep, and Voice are separate from the watchlist beep and voice.",
+            "Fig. 22 — Sensitivity and Alert from. Each is Low, Medium, or High.",
             "<b>Spoofing checks</b> watch for gain falling while the signal holds or rises, plus a clock or a position that does not match the network. "
             "A careful spoofer can still get past these checks. A wrong position can also be a side effect of interference. "
             "<b>Beep</b> is the same pip as a watchlist hit, on the media volume. The popup and the red line still show if Beep is off. "
@@ -2931,7 +3034,7 @@ def story():
         P("5.9.4 What a hit looks like", "h3"),
         figure_wrap(
             "fig-gnss-dialog.png",
-            "Fig. 24 — The detection dialog. The title is Possible GPS interference, with the level. The first lines are what changed on this phone’s receiver. OK dismisses the dialog. The red line stays, and the GPS mark in the top bar is red.",
+            "Fig. 24 — Possible GPS interference. OK closes it. The red line stays.",
             "The dialog title is <b>Possible GPS interference</b>, with Low, Medium, or High. "
             "If spoofing checks are on and that pattern hits as well, the dialog title is "
             "<b>Possible GPS interference and spoofing</b>. "
@@ -2942,7 +3045,7 @@ def story():
         ),
         figure_wrap(
             "fig-gnss-live.png",
-            "Fig. 25 — After OK, the red line stays on Live until the hit ends. The GPS mark in the top bar is red for that same stretch. There is no Hide button. This is not the flood line.",
+            "Fig. 25 — After OK, the red line stays. This is not the flood line.",
             "Dismiss the dialog and the red line stays across the top of Live: "
             "<b>Possible GNSS interference</b>, then the level. "
             "It stays until the condition ends. "
@@ -3049,7 +3152,7 @@ def story():
         P("6.2 Strength-ranked live list", "h2"),
         figure_wrap(
             "fig-list.png",
-            "Fig. 11 — Strength list. Privacy mode masks MAC tails (**:**:**). Radios with Observer notes also carry a cyan notes chip on this row (next to Extra attention “!”).",
+            "Fig. 11 — Strength list. Privacy mode hides the end of each MAC.",
             "<b>What it shows.</b> Devices in Display → Sort order (default Strongest averaged over 30 s; every option is in §5.3). This is "
             "the view Display was built for: one row per radio, as dense or as spare as you set. "
             "Each row: class glyph in a circle (unmatched = ?); first line from Title line (default MAC); "
@@ -3496,7 +3599,7 @@ def story():
         P("8.1 What this tab changes", "h2"),
         figure_wrap(
             "fig-filters-mid.png",
-            "Fig. 16 — Filters, from Radios down through Reset filter. The four rows with a chevron open their own page.",
+            "Fig. 16 — The rest of Filters. A chevron opens that page.",
             "Hearing radios and showing them are separate jobs. Fieldwatch always records what it "
             "hears; the filter only changes what the Live display (radar, list, timeline, hybrid, By class) shows. The log "
             "still writes every observation, including radios the current filter would hide, so "
@@ -3550,7 +3653,7 @@ def story():
         P("8.3 Keep signature matches only, classes, and selected families", "h2"),
         figure_wrap(
             "fig-filters-selected.png",
-            "Fig. 17 — Selected signatures. Show only or Hide these, then tap a class to open its signatures.",
+            "Fig. 17 — Selected signatures. Show only or Hide these, then open a class.",
             "<b>Keep signature matches only</b> hides radios that match no signature, so the Live display is pattern hits "
             "of every class. If the list goes empty, nothing matching is in earshot — signatures "
             "always label; Filters only hide radios from the Live display. Class <b>Show only</b> or Show only "
@@ -4680,7 +4783,7 @@ def story():
             "straight-line span when tagging is on), then (1) executive summary, (2) <b>Where you were</b> "
             "(stays vs transit along the operator path — coordinates once per stay, not on every radio line; "
             "street names on those stays if Online place names ran), then an <b>Aircraft</b> section when a radio advertised a latitude and longitude "
-            "(status word, last position, altitude, course, speed, how many fixes; the map is §5.6.1), "
+            "(status word, last position, grid, distance and bearing from where this phone was when that position was heard, altitude, course, speed, how many fixes; an older sit without that time shows the grid and leaves the distance and bearing off; the map is §5.6.1), "
             "then (3) <b>Observer notes</b> when any heard radio in this window has a Named-radio note "
             "(custom name, MAC, RSSI, the note — quieter radios still appear here even if they are not in Loudest APs), "
             "then <b>Marked mine</b> when any heard radio is marked yours "
@@ -4693,7 +4796,7 @@ def story():
             "pattern match, not a skimmer detector), anomalies, privacy, "
             "recommended actions, and a one-line takeaway. "
             "When GPS tagging recorded a walk, a full-width operator-path figure sits with the report "
-            "(OSM tiles when maps are on; stacked radios at one place share a Path-key number; "
+            "(the map from Settings → Location and Maps when maps are on; stacked radios at one place share a Path-key number; "
             "a nearby advertised aircraft track is a black dotted line on that figure, with a class icon at the last position and a person icon for the operator). "
             "<b>Anomalies</b> is not a second inventory: Extra attention, Signature hits, and tracking callouts already list named matches. "
             "Anomalies only keeps cues that are not those sections (Fast Pair in pairing mode, a very loud unnamed radio, a high randomized-BLE count). "
@@ -4732,7 +4835,7 @@ def story():
             "and the loud radios GPS-stamped at that stay. Sitting still is one stay. A walk to a new "
             "block becomes stay → transit → stay. Coordinates are not dumped on every AP/BLE line. "
             "Settings → <b>Online place names and maps</b> (on by default) reverse-geocodes stay centroids via the "
-            "system geocoder when the phone has internet, and loads map tiles on Reports → Path. Offline: a note, coords still print, Path stays the north-up trace, no error dialog. "
+            "system geocoder when the phone has internet, and loads the map from Settings → Location and Maps on Reports → Path. Offline: a note, coords still print, Path stays the north-up trace. OpenStreetMap and the USGS maps show no error dialog. A map marked Key shows a popup when the key is missing, the service rejects it, or the map does not load. "
             "Phone GPS ≠ pole or tag location."
         ),
         P(
@@ -5014,7 +5117,7 @@ def story():
             "No guarantee of a find",
             "Tags advertise slowly, rotate addresses, and may be outside what this phone "
             "hears. Absence of a row is not proof there is no tracker. Hunt is relative "
-            "loudness, not meters and not a compass. Do not use this to decide personal "
+            "loudness, not meters and not a bearing to the radio. The button only turns the map between north up and the direction of travel. On Show live path a double-tap switches the whole path and a close view around this phone. That is still not a bearing. Do not use this to decide personal "
             "safety. See the Notice page.",
             "warn",
         ),
@@ -5026,8 +5129,8 @@ def story():
             "new MAC, not one identity for the hour. A loud row that stays with you on a walk "
             "belongs in §12.2, not here — Debrief still writes that last-15-minute co-travel "
             "whether Hunt or a Finder-tags filter is on the screen. When you have <b>one</b> BLE candidate, open its detail → "
-            "<b>Hunt</b> (Wi-Fi has no Hunt button). Screen stays on. Hold the phone the same way "
-            "the whole time. Reset this hunt after you change grip.",
+            "<b>Hunt</b> (Wi-Fi has no Hunt button). Screen stays on. Hold the phone upright, out in front of you, "
+            "top pointing the way you walk, and walk slowly (§12.13). Reset this hunt after you change grip.",
             "body_left",
         ),
         P(
@@ -5038,8 +5141,8 @@ def story():
             "spare, cabin (console, under seats, visors). Dwell 10–20 s at each spot so a slow "
             "advertiser can speak; tags do not ping every second. If a tracker-family row jumps "
             "to the top or RSSI climbs a lot versus the last spot, that is the candidate. Open "
-            "that row → Hunt. Repeat the same grid with Hunt’s Closer/Further, then the body-block "
-            "turn if you still need a heading. If Hunt goes Gone, the MAC rotated — back to the Live display, "
+            "that row → Hunt. Repeat the same grid watching the big RSSI number, then the body-block "
+            "turn if you still need a heading. If the radio leaves Hunt, the MAC rotated — back to the Live display, "
             "pick the new top tracker row, Hunt again. A quiet sweep is not proof the car is clean: "
             "the tag may be asleep, out of this phone’s earshot, or not in the tracker catalog. "
             "The car’s metal will shadow; a peak at one wheel can be a bounce. Same grid works on "
@@ -5047,12 +5150,15 @@ def story():
             "body_left",
         ),
         P(
-            "<b>Walk it down.</b> Slow steps, one direction at a time. Watch Closer / Further / "
-            "About the same and the loudest-this-hunt number — not the Live display radar angle (that is a "
-            "MAC hash, not north). If Closer, keep that heading. If Further, stop, turn, try "
-            "another way. About the same means wait or change heading; do not convert dBm to feet. "
-            "Very Close (about −45 dBm or louder) means look around — usually in-hand, pocket, or the same bag; still not meters. "
-            "Quiet can be a wall, not the wrong way. If Gone from the Live display, the address likely rotated "
+            "<b>Walk it down.</b> Hold the phone upright, out in front of you, top pointing the way you walk. "
+            "Walk slowly, one direction at a time, in a pattern: forward, back, and to both sides, so the cloud can build. "
+            "Search the brightest patch. That is where this phone heard it loudest, and the radio is usually near there. "
+            "Watch the big RSSI number, the sparkline, "
+            "and loudest-this-hunt — not the Live display radar angle (that is a "
+            "MAC hash, not north). Closer to 0 is louder here. When the number climbs, keep that heading. When it falls, stop, turn, and try "
+            "another way. Do not convert dBm to feet. "
+            "About −45 dBm or louder means look around — usually in-hand, pocket, or the same bag. Still not meters. "
+            "A few seconds with no packet can be a wall, not the wrong way. If the radio leaves the Live display, the address likely rotated "
             "— back to the Live display, pick the new row if it is still the same family, Hunt again.",
             "body_left",
         ),
@@ -5064,8 +5170,8 @@ def story():
             "through a full circle. Watch the big RSSI and loudest-this-hunt. If the signal gets "
             "stronger on one heading, that is a <i>candidate</i> bearing — often the direction of "
             "least body in the path, i.e. roughly toward the radio. Repeat the circle. Treat it as "
-            "tens of degrees, not a compass rose. Then Reset this hunt and walk that heading using "
-            "Closer/Further. Reflections and metal can fake a peak (see structures below).",
+            "tens of degrees, not a compass rose. Then Reset this hunt and walk that heading, watching "
+            "the big RSSI number. Reflections and metal can fake a peak (see structures below).",
             "body_left",
         ),
         P(
@@ -5073,8 +5179,8 @@ def story():
             "in true range. Metal (cars, cabinets, elevators, foil-backed insulation) reflects and "
             "shadows — the loudest body-block heading can be a bounce off a van. People and water "
             "absorb. Concrete and rebar scatter. Glass is kinder than brick. Two floors of a house "
-            "can fake Further. Covering the antenna with a fist is another wall. Do not treat one "
-            "peak as a map pin; walk, turn, and see whether Closer survives the next opening. "
+            "can fake a quieter number. Covering the antenna with a fist is another wall. Do not treat one "
+            "peak as a map pin; walk, turn, and see whether the louder hear survives the next opening. "
             "More on the Hunt page itself: §12.13.",
             "body_left",
         ),
@@ -5112,7 +5218,7 @@ def story():
                 ["List too fast to tap", "Pause. Then detail. Resume. Or Display → Subtitle None so more of the list fits without Pause."],
                 ["Fit the row to the job", "§5.3. Display is look (Title/Subtitle, extras). Filters are who. Plaza: Subtitle None. Copy MAC: Title → MAC. Channel sit: Frequency on."],
                 ["Write the sit", "§12.12. Debrief for a sit report; Sit export for that window’s roster; AI Export for a chat prompt; Log export for the session tape. Long drive: Debrief each stop (§11.4.1)."],
-                ["Walk toward one BLE / a tracker chip", "§12.8 (tracker) or §12.13 (Hunt page). Walk for Closer/Further; body-block turn for a candidate bearing. Not meters."],
+                ["Walk toward one BLE / a tracker chip", "§12.8 (tracker) or §12.13 (Hunt page). Walk watching the big RSSI number; body-block turn for a candidate bearing. Not meters."],
                 ["Don’t know which tracker", "§12.8. Filters → Show only Finder tags, hide own kit, dwell the phone at each hide (wheels, bumpers, cabin). Top row → Hunt. Repeat. Not a clean bill."],
                 ["A “!” / card reader / pentest kit", "§12.14. Extra attention on Hobby BLE serial (not a skimmer detector) and Pineapple / Flipper / Pwnagotchi / Marauder / Porkchop. Open detail, look with your eyes. A miss is not a clean bill."],
             ],
@@ -5156,7 +5262,7 @@ def story():
                 ["Sit export", "Reports → Sit export. One row per unique radio in the selected sit (or last 15 minutes). CSV / JSON lines include matched signatures and Extra attention families. Logging can be off. GPX, KML, and GeoJSON include the operator path. The ATAK data package is a zip ATAK can import: path, hear-points, an advertised aircraft and operator pin, and a GNSS hit as a pin. Not the rotating log.", "Take this walk’s roster to a spreadsheet, Google Earth, or ATAK without the whole day’s log."],
                 ["Share as text (detail)", "Plain dump of the open radio’s detail page.", "Notes, a ticket, or to keep one MAC/payload without the whole sit."],
                 ["AI Export (detail)", "Prompt about <b>one</b> radio: dump plus registry/format decode job. Same disclaimer as sit-level AI Export.", "“What is this AP / tag / chip?” Do not use it as a following test — that is Reports → Debrief after you move."],
-                ["Hunt (detail, BLE)", "Closer/further needle, rings around YOU, hunt sparkline. Very Close at about −45 dBm or louder. Beep/Vibrate geiger tick at the bottom. Optional body-block heading. Structures shadow and reflect.", "Walk toward one BLE in a room, bag, or car. Not meters. Not a following test. §12.13."],
+                ["Hunt (detail, BLE)", "Heat cloud of where this phone heard that radio, the big RSSI number, and a hunt sparkline. Hold the phone upright, top pointing the way you walk, and walk slowly in a pattern so the cloud can build. About −45 dBm or louder means look around. Beep/Vibrate geiger tick at the bottom. Optional body-block heading. Structures shadow and reflect.", "Search the brightest patch. That is where this phone heard it loudest, and usually where the radio is. Not meters. Not a pin on the other radio. Not a following test. §12.13."],
             ],
             [1.45 * inch, 2.3 * inch, 2.75 * inch],
         ),
@@ -5189,7 +5295,7 @@ def story():
             "Relative loudness, not a tracker",
             "Hunt is a fox-hunt needle for one BLE advertiser. It does not measure meters, "
             "does not give a compass bearing, and does not identify a person. Randomized "
-            "addresses can vanish mid-hunt. Absence of Closer is not proof the radio is gone. "
+            "addresses can vanish mid-hunt. A quieter number is not proof the radio is gone. "
             "Do not use this page to decide personal safety. See the Notice page.",
             "warn",
         ),
@@ -5200,20 +5306,43 @@ def story():
             "are the realistic envelope. A parking garage through walls will lie.",
             "body_left",
         ),
-        P("<b>Setup.</b> High performance. Hold the phone the same way the whole hunt (same hand, same tilt). Screen stays on on this page. Reset this hunt after you change grip or after a body-block turn so the walk is not compared to the spin. Logging and GPS tagging can stay on; in a dense plaza they add work — turn them off if the needle feels late.", "body_left"),
+        P("<b>Setup.</b> High performance. Screen stays on on this page. Logging and GPS tagging can stay on; in a dense plaza they add work — turn them off if the needle feels late.", "body_left"),
+        P(
+            "<b>How to hold the phone.</b> Hold it upright, out in front of you, in the same hand the whole hunt. "
+            "Point the top of the phone the way you are walking. Keep the same height and the same tilt. "
+            "Do not cover the top with your palm, and do not switch hands. "
+            "Walk slowly. A slow step lets each hear land on the map. A jog skips ground. "
+            "A turn in place does not move the dot, so spinning does not build the cloud. "
+            "While you are walking, short steps follow the direction you are moving. The top of the phone is used when GPS is stuck. "
+            "Reset this hunt if you change grip, or after a body-block turn, so the walk is not compared to the spin.",
+            "body_left",
+        ),
         figure_wrap(
             "fig-hunt.png",
             "Fig. 5 (repeated) — Hunt.",
-            "<b>Walk.</b> Slow steps. Watch Closer / Further / About the same (~3 dB over a few seconds), "
-            "the rings around YOU (in = louder, out = quieter), and the loudest-this-hunt number. "
+            "<b>Walk a pattern.</b> Cross the room, the car, or the floor in a loop: forward, back, and to both sides. "
+            "Walk slowly. Watch the heat cloud, the big RSSI number, the sparkline, and loudest-this-hunt. Closer to 0 is louder here. "
+            "One place you stand paints one patch. Keep moving so the colors can separate. "
+            "Blue is a weak hear. Red is a powerful one. The bar on the map reads Weak, Moderate, Strong, and Powerful. "
+            "The colors between them run cyan, green, yellow, and orange. "
+            "The walk connects the hears, and the color changes smoothly from one to the next. "
+            "Close parts of the walk fill in between the lines. A far gap stays open. "
+            "If the cloud is all one color, cover more ground before you decide. "
+            "<b>Where to look.</b> Walk toward the warmer color and keep the same slow pattern. "
+            "The brightest patch is where this phone heard it loudest. The loudest mark sits in that patch. "
+            "Search there. The radio is usually near that spot, because the signal is strongest close to the radio. "
+            "The patch is the hear, not a pin on the other radio, and not a distance in meters. "
+            "A wall or a piece of metal can put the bright spot a step or two off the radio. Look around the patch, then walk the pattern again. "
+            "The map stays close on you. While GPS is moving, short steps follow that direction. The top of the phone is used when GPS is stuck. A turn in place does not move the dot. "
             "Beep / Vibrate sit under Reset and Back (off until you turn them on): a geiger tick on last-heard RSSI — "
-            "faster when louder, silent when Quiet or Gone. Raise media volume if you chose Beep and hear nothing. "
-            "Very Close (about −45 dBm or louder) means look here — pocket, bag, in-hand — not a tape measure. "
-            "Pause when Quiet; it may be a wall, not the wrong way. If Gone from the Live display, the MAC likely rotated or left — "
+            "faster when louder, quiet when there is no packet or the radio has left. Raise media volume if you chose Beep and hear nothing. "
+            "About −45 dBm or louder means look here — pocket, bag, in-hand — not a tape measure. "
+            "Pause when the packets stop. It may be a wall, not the wrong way. If it leaves the Live display, the MAC likely rotated or left — "
             "back to the Live display, pick the new row if it is the same family, start Hunt again. Do not convert dBm to feet.",
         ),
         P(
-            "<b>Body-block heading (optional).</b> The phone has no direction finding. Your torso is a lossy "
+            "<b>Body-block heading (optional).</b> This is a different grip from the walk. For the walk, the phone stays out in front of you. "
+            "The phone has no direction finding. Your torso is a lossy "
             "shield, the same trick as holding a whip close to the body and turning for a peak. "
             "Stand still. Hold the phone against the center of your chest (or the same pocket "
             "every time). Turn slowly in place through a full circle. Watch loudest-this-hunt "
@@ -5221,26 +5350,26 @@ def story():
             "heading where it peaked is often the direction of least body in the path, i.e. "
             "roughly toward the radio. Reflections, metal, and a second source can fake a peak. "
             "Repeat the circle. Treat the heading as tens of degrees, not a compass rose. Then "
-            "Reset this hunt and walk that way using Closer/Further. This is not UWB Precision "
+            "Reset this hunt and walk that way watching the big RSSI number. This is not UWB Precision "
             "Finding and not a bearing you should write as a fact.",
             "body_left",
         ),
         P(
             "<b>Structures change the needle.</b> Hunt reads one path to the radio, not a vacuum. "
-            "A wall, floor, or door can drop RSSI 10–20 dB with no change in true range — Quiet "
-            "or Further may mean you walked behind masonry, not away from the tag. Metal is worse: "
+            "A wall, floor, or door can drop RSSI 10–20 dB with no change in true range. "
+            "A quiet stretch, or a drop in the number, may mean you walked behind masonry, not away from the tag. Metal is worse: "
             "car bodies, filing cabinets, appliances, foil-backed insulation, and elevator cars "
             "reflect and shadow. The loudest heading on a body-block turn can be a bounce off a "
             "van, not the source. Water and people absorb (a crowd between you and a tag looks "
             "like distance). Concrete and rebar (garages, basements) scatter 2.4 GHz; a peak on "
             "the sparkline at a doorway is often a slot through the structure. Glass is kinder "
-            "than brick. Two floors of a house are enough to fake Further. Hold the same grip: "
+            "than brick. Two floors of a house are enough to fake a quieter number. Hold the same grip: "
             "covering the antenna with a fist is another “wall.” Do not treat a single peak as "
-            "a map pin; walk, turn, and see whether Closer survives the next opening.",
+            "a map pin; walk, turn, and see whether the louder hear survives the next opening.",
             "body_left",
         ),
         P(
-            "<b>Must not conclude.</b> Distance. A person. That you are safe because Hunt went Quiet. "
+            "<b>Must not conclude.</b> Distance. A person. That the brightest patch is a pin on the other radio. It is where this phone heard it loudest. Search there. The radio is usually near that spot, and a wall or metal can shift it. That you are safe because the packets stopped. "
             "That two Hunts on rotating MACs were the same tag unless the payload still matches. "
             "That the loudest heading is the true bearing when you are next to metal or a wall.",
             "body_left",
@@ -5510,8 +5639,7 @@ def story():
         ),
         diagram(
             "how-it-works.png",
-            "Fig. 20 — How a hear becomes a row. Source paths are under "
-            "<font face='Courier'>app/src/main/java/app/fieldwatch/</font>.",
+            "Fig. 20 — How a hear becomes a row.",
         ),
         PageBreak(),
         P(
@@ -5596,8 +5724,8 @@ def story():
             ["Payload location", "TAK What-to-send chip, on by default when you turn the feed on. Selects radios with sticky advertised lat/lon. Required for stock Remote ID (no Extra attention mark). BLE FFFA and Wi-Fi FA:0B:BC both qualify."],
             ["Reports", "Bottom tab. Sits stay on this page. Using… names the sit for Path, Debrief, Sit export, and Compare. Those four open their own pages, marked by a green bar. Log Export and Signature candidates are under them. Clear log is on Log Export. AI Export is on Debrief, and again on Compare. GPS, place names, and logging on/off stay on Settings. §5.6."],
             ["Sit (named)", "Optional window of watching, started from Reports → Start sit. Path, Debrief, Compare this-sit, Sit export, and AI Export use that start/end instead of the last 15 minutes in RAM. Cap 6000 unique radios. Extra attention / payload / bookmarks / watched signatures stay when full; unnamed BLE drops first. Checkpoints to app storage about every 10 s. One at a time; keep 10 closed. Live list stays ~400. Not DF. §5.6."],
-            ["Show live path", "Display switch, off by default, above RSSI bars. A north-up map of this phone across the top of Live, with the list still underneath on By class, Strength list, Timeline, and Hybrid. Radar dims the switch and does not turn it off. The line starts where you are when the map opens and draws as soon as you move. A bend is kept when the drive leaves the last line by about 12 meters. Side-to-side GPS wobble stays off the line. With no sit, the line is the later of when the switch turned on and 15 minutes ago. An open sit draws from the start of the sit. Dots are watchlist alerts. Pinch or drag holds the view. Recenter, or a double-tap, follows you again. Not the Reports page. §5.3.4."],
-            ["Path", "Reports page. North-up plot of this phone for the selected sit (or last 15 minutes). The line is the same driven trace as Show live path (§5.3.4). One fix draws as a single point and a length of 0. Leave the page in front to watch an open sit grow, or the last-15-minute snake move; the plot redraws about every three seconds. Black dot is the start. Blue dot is you, at the last point. MAC alerts and signature alerts are drawn once. A decoded latitude and longitude uses the last advertised position. Anything else is a class icon at the strongest RSSI. A count is several in one place. A lone class icon has no number box; tap it for that one radio. Extra attention alone does not plot unless that signature is bookmarked. The list puts the Wi-Fi or BLE icon next to the MAC. Observer notes sit on a MAC-alert row. Thick green = stay. Time ticks. Head labeled Now while live, End on a saved sit. On an open or saved sit, an advertised aircraft track within 2 km is a white dotted line on that plot. The letter figure draws the same track in black dots, with a class icon at the last position and a person icon for the operator. The last position is a class icon. Tap it for that one radio. A count means it shares that spot. One stored fix is that icon, with no line. The operator is a person icon. A farther aircraft with a UAS id gets its own map, up to three. Last 15 minutes stays this phone. OSM tiles when Online place names and maps is on and the phone is online; offline: the trace only. Privacy mode does not hide those tiles. The Debrief and Compare path figures use those same MAC alerts and signature alerts. A decoded position is the last advertised fix. An advertised aircraft on that figure is the drone class icon in the Path key, with the live status, UAS id, last position, motion, and the operator position. Extra attention on that figure is red, a MAC alert is blue, and another signature alert is green. §5.6.1."],
+            ["Show live path", "Display switch, off by default, above RSSI bars. A north-up map of this phone across the top of Live, with the list still underneath on By class, Strength list, Timeline, and Hybrid. Radar dims the switch and does not turn it off. The line starts where you are when the map opens and draws as soon as you move. It keeps a point every few meters, so a bend follows the street. The road already driven stays where it was. Green is a real stop, about 25 m for about 40 seconds. With no sit, the line is the later of when the switch turned on and 15 minutes ago. An open sit draws from the start of the sit. Dots are watchlist alerts. Pinch or drag holds the view. Recenter follows you again. Two zoom levels: the whole path, and a close view that keeps this phone in the center with the short side a little past about 100 m. Double-tap the map to switch zoom. Two facing modes: north up, and direction of travel. Tap the button to switch facing. Zoom stays. The picture shows which of the four you are in. Standing still keeps the last direction. A turn in place does not turn the map. Reports → Path stays north-up, with no button. §5.7.1 is the map key. Not the Reports page. §5.3.4."],
+            ["Path", "Reports page. North-up plot of this phone for the selected sit (or last 15 minutes). The line is the same driven trace as Show live path (§5.3.4). One fix draws as a single point and a length of 0. Leave the page in front to watch an open sit grow, or the last-15-minute snake move; the plot redraws about every three seconds. Black dot is the start. Blue dot is you, at the last point. MAC alerts and signature alerts are drawn once. A decoded latitude and longitude uses the last advertised position. Anything else is a class icon at the strongest RSSI. A count is several in one place. A lone class icon has no number box; tap it for that one radio. Extra attention alone does not plot unless that signature is bookmarked. The list puts the Wi-Fi or BLE icon next to the MAC. Observer notes sit on a MAC-alert row. Thick green is a real stop. Time ticks. Head labeled Now while live, End on a saved sit. On an open or saved sit, an advertised aircraft track within 2 km is a white dotted line on that plot. The letter figure draws the same track in black dots, with a class icon at the last position and a person icon for the operator. The last position is a class icon. Tap it for that one radio. A count means it shares that spot. One stored fix is that icon, with no line. The operator is a person icon. A farther aircraft with a UAS id gets its own map, up to three. Last 15 minutes stays this phone. The map from Settings → Location and Maps when Online place names and maps is on and the phone is online; offline: the trace only. The lower right names the map. Privacy mode does not hide those tiles. The Debrief and Compare path figures use those same MAC alerts and signature alerts. A decoded position is the last advertised fix. An advertised aircraft on that figure is the drone class icon in the Path key, with the live status, UAS id, last position, motion, and the operator position. Extra attention on that figure is red, a MAC alert is blue, and another signature alert is green. §5.6.1."],
             ["Sit export", "Reports page. One row per unique radio in the selected sit (or last 15 minutes). CSV / JSON lines include matched signatures and Extra attention families. Logging can be off. GPX, KML, and GeoJSON include the operator path as a track. The ATAK data package is a zip for ATAK: path, hear-points, an advertised aircraft and operator pin, and a GNSS pin. Log Export does not have those two formats. Not the rotating log. Privacy mode does not mask the file. §5.6.2."],
             ["Log export", "Reports → Log Export. Share/Save of the rotating session file (JSON lines on disk; CSV / GPX / KML / WiGLE at export). One line per hear while logging was on. Needs Write to disk. Reset / clear log is on this page. Clearing the log does not delete sits. §5.6.3, §11.6."],
             ["Observer notes", "Optional 280-character field on a Named radio (same KIND+MAC as the custom name). Cyan block on detail; cyan notes chip on Live next to Extra attention “!”. Debrief lists them after Where you were; Compare after Windows. Path lists the note only if that radio is bookmarked. AI Export lists heard radios with the note. Not catalog Notes and not Extra attention gold. BLE privacy addresses hide the pencil. Settings backup includes the note. §5.5, §5.6."],
@@ -5626,7 +5754,7 @@ def story():
             ["Preset (Filters)", "Chip at the top of Filters. A tap replaces the whole filter, not Display. Short stock set: All traffic, Wi-Fi only, BLE only, Strong signal, Moving with you, Watched only — plus chips you saved. Class Show only (Cameras, Drones, Finder tags, …) is the chips further down; Save current as… if you want that sit as a preset. Show-only presets imply Keep signature matches only (switch dimmed). Long-press any chip to delete it. Stock chips you remove stay gone until Restore default signatures &amp; presets. Reset filter clears this tab; it is not undo. §8.4."],
             ["Signature class", "Bucket on every signature: Finder tags, Retail beacons, Signage, Wearables, Surveillance, Drones, Pentest, Public safety, Vehicle, Glasses, Audio, Cameras, Thermostats, Access control, Health, Home IoT, ISP / routers, Mesh, Phones / PCs, Other. Public safety is Axon / WatchGuard Video and public-safety vehicle APs (Cradlepoint, AirLink, Compex, Novatel, Utility Inc). Those radios are used in law enforcement; they are not exclusive to it — government, municipal, and other corporate fleets likely run some of the same kit. Health is clinic / home-medical BLE (Honeywell Xenon HC scanners, Omron cuffs, Withings scales, Dexcom). Cameras is consumer / action cameras, not poles (Surveillance) and not Axon. Access control is door locks and readers (August / Schlage and ASSA ABLOY / SALTO / dormakaba / Paxton), not cameras. Glasses is Meta / Snap. Audio is AirPods / Sony / Bose / JBL / Sonos. Color is the Live display chip; class is the filter. Custom rows default to Other. An old Body-worn class folded into Wearables. The Locks class label is now Access control; the stored value is still LOCK. §8.3, §9.5."],
             ["Signature pack", "JSON file from Settings → Export signatures (fieldwatch-signatures-YYYYMMDD.json). Stock plus your edits. No logs, GPS, filters, or watchlist. Import skips the same id or the same match rules, merges extra rules onto a stock row, and renames a colliding name to “Name (imported)”. Restore defaults still wipes customs. A settings pack is a different file. §5.7, §9.3."],
-            ["Settings pack", "JSON file from Settings → Export settings (fieldwatch-settings-YYYYMMDD.json). Settings switches, the current filter, filter presets, named radios, and signature watches. Not the catalog, logs, or GPS. Import replaces those setup fields; the catalog stays. First-run disclaimer is not overwritten. Factory-reset / new-phone backup. §5.7."],
+            ["Settings pack", "JSON file from Settings → Export settings (fieldwatch-settings-YYYYMMDD.json). Settings switches, the current filter, filter presets, named radios, and signature watches. Not the catalog, logs, GPS, or a map key. Import replaces those setup fields; the catalog stays. First-run disclaimer is not overwritten. Factory-reset / new-phone backup. §5.7, §5.7.1."],
             ["Show only / Hide these", "Filters → signature classes. Show only keeps radios matching the class chips you pick (unmatched stay hidden; Keep signature matches only is implied and the switch is dimmed). Hide these drops those classes and leaves unmatched. Live display only — matching, log, and Debrief still see them. Show only with no class picked leaves the Live display unchanged. §8.1–8.4."],
             ["Title line", "Display → first line of each list, hybrid, or timeline row. Advertised name, Name + type, or MAC (default). Stays bold even when it is a MAC. Name A–Z sorts by this line (so the default is MAC order). Radar labels ignore it."],
             ["Subtitle line", "Display → second line. Always starts with a small Wi-Fi icon (access point) or Bluetooth icon (BLE advertiser). Then Advertised name, Name + type (default), or MAC, plus rand/pair/gone. pair is Fast Pair pairing-mode seen this session. None hides the line so more rows fit; crumbs move onto the title. The kind icon does not move onto the title. Unnamed BLE on this line is unnamed (the icon already marks LE). Vendor is not on this line."],
@@ -5650,7 +5778,9 @@ def story():
             ["Show all radios", "Debrief page switch, off by default. Off: Debrief and Compare lead with counts and list Extra attention, a custom name, Marked mine, a bookmark, or a Compare decoded value that changed. On lists every radio. PDF draws the counts as bars. Text has the same numbers. §5.6."],
             ["Debrief (PDF)", "Same sit report as Debrief (text), letter-size typeset PDF. Same window, same unmatched-RAND hide, same counts. Disclaimer, FIELDWATCH header, numbered sections, full-width path figure, amber co-travel / Extra attention callouts, takeaway. Long trip: tap more than once (§11.4.1). Share as application/pdf."],
             ["Compare sits", "Reports page. This sit (open, selected, or last 15 minutes) vs a second saved sit. Presence counts for only in this sit, only in the second, and in both, split Wi-Fi and BLE, then by signature. A radio line when it is Extra attention, named, marked Mine, bookmarked, or its decoded value changed. Show all radios prints every kind + MAC. Text, PDF, and AI Export. Observer notes after Windows. Not a radio fix. §5.6."],
-            ["Online place names and maps", "Settings switch, on by default. Debrief, Places, and AI Export reverse-geocode GPS stamps via the system geocoder when online. Reports → Path and Show live path load OpenStreetMap tiles under the trace. Offline or no tiles: coordinates only, and both maps stay the north-up trace — no error dialog. Privacy mode does not hide that map. It masks coordinates and leaves streets off. Turn off to keep streets and maps out together. §5.3.4, §5.6.1."],
+            ["Online place names and maps", "Settings switch, on by default. Debrief, Places, and AI Export reverse-geocode GPS stamps via the system geocoder when online. Reports → Path and Show live path load the map from Settings → Location and Maps under the trace. Offline or no tiles: coordinates only, and the path stays the north-up trace. OpenStreetMap and the USGS maps show no error dialog. A map marked Key shows a popup when the key is missing, the service rejects it, or the map does not load. Privacy mode does not hide that map. It masks coordinates and leaves streets off. Turn off to keep streets and maps out together. §5.3.4, §5.6.1."],
+            ["Maps", "On Settings → Location and Maps, under Online place names and maps. The map under Show live path, Reports → Path, and the path figure in Debrief and Compare. OpenStreetMap is the start and covers the world. USGS Imagery and USGS Topo cover the United States. Esri, MapTiler, Stadia, and Thunderforest cover the world, and those rows are marked Key. One key from that company’s account covers every style from that company. It stays on this phone, and Export settings leaves it out. OpenStreetMap and the USGS maps do not ask for a key. Online place names and maps has to be on. The corner of the map names the source. On Show live path, double-tap switches the whole path and a close view, and the button switches north up and direction of travel. Reports → Path stays north-up. Position can show where this phone is now on the lower left, as GPS or as a grid. Off leaves that corner empty. §5.3.4, §5.6.1, §5.7.1."],
+            ["Map key", "The key from your Esri, MapTiler, Stadia, or Thunderforest account. Settings → Location and Maps → Map, on a row marked Key. Map key appears only for those maps, and only while Online place names and maps is on. Paste it, then Done or leave the field. Letters, numbers, and . - _ only. One key per company. Switching styles from that company keeps it. Restore defaults returns the map to OpenStreetMap and leaves the keys. Missing, refused, rejected, or a map that does not load: one popup. OpenStreetMap and the USGS maps stay quiet. Left out of Export settings, the log, sit reports, PDFs, and TAK. §5.7.1."],
             ["New at bottom", "Display → Sort. First-seen order, oldest at top; new radios append; gone radios drop. List follows the bottom unless you scroll up."],
             ["unnamed LE", "BLE Advertised name / Name + type when there is no advertised name and no useful decode. On the subtitle the Bluetooth icon already marks LE, so the body is unnamed (not “unnamed LE” twice). Title Advertised name still shows unnamed LE. The title is the MAC unless you change it."],
             ["AI Export", "Three buttons. Reports sit: onboard Debrief + compact rates / Extra attention / Observer notes (addendum, not a roster). Reports Compare: overlap + exclusive Extra attention / Named / Observer notes. Device detail: that one radio (dump + registry decode). All paste into a chat, all open with the experimental disclaimer, all are hypotheses — not identity. Treat as sensitive."],
@@ -5660,7 +5790,7 @@ def story():
             ["Places", "Settings switch, on by default. A stable tracker heard at two or more places in the last 7 days, and a return after a quiet stretch. Lines on the radio page and in the sit report, with where this phone was. Each radio keeps the latest 8 stops. A ninth confirmed stop drops the oldest. Many hears at one stop are still one stop. A single jumped fix does not erase an older stop. A stop from another day includes the date. Online place names adds the street. Filters → Seen at more than one place limits Live to the ones you can hear now. A changing address is skipped. Ordinary Wi-Fi and Bluetooth stay off. No beep, no TAK marker. Not in Export settings. §5.5, §5.7, §5.10, §8."],
             ["Share as text", "Device-detail button. Plain dump of the open radio (identity, signal, decode, session). Not the sit report and not the rotating log."],
             ["Voice (watchlist)", "Settings → Voice on watched signature, on by default. What to say (signature watches): Class, Signature, or Class + signature. Default Class + signature. A named radio speaks its watch name instead, including a custom name from Named radios. Independent of Beep. Not Hunt. Overlapping speech is dropped. On-device TTS. Test alert plays the signature mix. Jump works with voice alone. §5.7, §10.2.1."],
-            ["Hunt", "Device-detail, BLE only. Full-screen closer/further from smoothed RSSI. Rings around YOU contract on Closer and expand on Further. Very Close at about −45 dBm or louder (look around; still not meters). 127 is ignored. Loudest-this-hunt + hunt sparkline. Beep / Vibrate at the bottom (off by default; faster as RSSI gets louder; silent when Quiet/Gone; not the watchlist chirp, never speaks). Optional body-block turn for a crude heading (§12.13). Walls, metal, people, and floors change RSSI without a change in range. Not distance, not DF. Wi-Fi omitted (OS scan throttle; Faster Wi-Fi AP scans still batch, not Hunt)."],
+            ["Hunt", "Device-detail, BLE only. Full-screen heat cloud of where this phone heard that radio, with the big RSSI number and a sparkline. The map stays close on you. Leaving the page keeps the cloud until Reset, or until a different radio is hunted. Steps fill short moves between GPS fixes. While GPS is moving, steps follow that direction. The top of the phone is used when GPS is stuck. A turn in place does not move the dot. A tight GPS fix still recenters the walk. The lower-left reading matches the dot. The color runs from blue (weak) through cyan, green, yellow, and orange to red (powerful, about −45 dBm or louder). Hold it upright, top pointing the way you walk, and walk slowly in a pattern so the cloud can build. The brightest patch is where it was loudest. Search there. The radio is usually near that spot. Night mode leaves the cloud in its own colors. 127 is ignored. Loudest-this-hunt + hunt sparkline. Beep / Vibrate at the bottom (off by default; faster as RSSI gets louder; quiet when there is no packet or the radio has left; not the watchlist chirp, never speaks). Optional body-block turn for a crude heading (§12.13). Walls, metal, people, and floors change RSSI without a change in range. Not distance, not a pin on the other radio, not DF. The button where N was switches north up and direction of travel. The hunt map stays close on you either way. A double-tap flips the Show live path zoom. It does not point at the radio. §5.3.4. Wi-Fi omitted (OS scan throttle; Faster Wi-Fi AP scans still batch, not Hunt)."],
             ["lat / lon (log)", "CSV columns and JSON fields on each new log row when Tag detections with GPS is on and a fix exists. Operator phone at hear-time, not the other radio. Empty/null otherwise. In CSV these columns sit before vendor_ie so older files still parse."],
             ["Where you were", "Debrief / AI Export section. Operator path split into stays (~40 m) and transits. Lat/lon once per stay, optional street name, loud radios heard there. Not lat/lon on every inventory line."],
             ["Fast Pair", "Google tap-to-pair. Service UUID 0xFE2C. Catalog signature (on): Android phones and many buds. Three-byte model ID in pairing mode (Live display chip Fast Pair pairing); longer payloads are an account-key filter. Filters → Hide Fast Pair account-key drops account-key-only chips. Hide selected Fast Pair drops both. §8.1, §9.5."],
@@ -6052,9 +6182,9 @@ def story():
             ["No vendor-IE families (Roku-class hidden APs)", "Older log rows have no vendor_ie column.", "Expected until new Wi-Fi packets are written after this build. Name globs and stable OUIs still mine from old parts. Log export of a new sit if you need IEs off-phone."],
             ["I Saved a candidate but it is still on the list", "The draft did not match those radios (rule too tight, or you changed it), or Save did not finish.", "Open Signatures and confirm the row is there. Save from a candidate draft returns to the list and re-runs it; that family should drop if the new rule hits. Cancel leaves the list unchanged."],
             ["Detail AI Export vs Reports AI Export", "Two different prompts.", "Detail = this radio (what is it?). Reports = onboard Debrief plus working data, asking for a statistical addendum (not a rewrite). Do not treat a one-radio decode as a following test."],
-            ["Hunt Reset / Back to detail are hard to reach", "The cue text grew and pushed the buttons off screen.", "Reset, Back, then Beep / Vibrate sit at the bottom of Hunt. Cue and hint stay a fixed height so the dBm number does not jump."],
-            ["Hunt says Further but I am walking toward it", "A wall, car, crowd, or floor is in the path; or the phone grip changed.", "Open a doorway or walk around metal and watch whether Closer returns. Reset this hunt after a body-block turn. Do not convert dBm to feet. §12.13."],
-            ["Hunt went Quiet / Gone", "No ads for ~8 s, or the BLE address rotated off the Live display.", "Wait. If Gone, back to the Live display and pick the new row if it is still the same family. Randomized MACs do not stitch."],
+            ["Hunt Reset / Back to detail are hard to reach", "The page used to put a tall cue above the number.", "Reset, Back, then Beep / Vibrate sit at the bottom of Hunt. The map uses the space above the number."],
+            ["The number dropped but I am walking toward it", "A wall, car, crowd, or floor is in the path; or the phone grip changed.", "Open a doorway or walk around metal and watch whether the number climbs again. Reset this hunt after a body-block turn. Do not convert dBm to feet. §12.13."],
+            ["Hunt went quiet, or the radio left", "No packet for a few seconds, or the BLE address rotated off the Live display.", "Wait. If it left the Live display, pick the new row if it is still the same family. Randomized MACs do not stitch."],
             ["Where you were has coords but no street", "Online place names is off, or on with no internet / no geocoder.", "Expected. Stays still print lat/lon. Distance does not need internet. Turn the switch off if you want no lookup attempt."],
             ["Last fix or Debrief shows “masked” instead of lat/lon", "Privacy mode is on.", "Expected. Settings → Privacy mode hides GPS coordinates on the screen and in sit reports. Street names are omitted too. The log still has lat/lon. A TAK / CoT feed is paused. Turn Privacy mode off when you need the pin or the overlay."],
             ["The whole UI went red / I want green chips back", "Night mode is on.", "Settings → Appearance → Night mode Off. Restore defaults also turns Night mode off. Fig. 9."],
@@ -6106,9 +6236,9 @@ def story():
                 ["X", "@OGridPete"],
                 ["Document", "User Manual and Technical Documentation"],
                 ["Application ID", "app.fieldwatch"],
-                ["Software version", "1.1.30 (versionCode 40), field build of 22 October 2026"],
-                ["Document version", "1.1.30"],
-                ["Document date", "22 October 2026"],
+                ["Software version", "1.1.31 (versionCode 41), field build of 23 October 2026"],
+                ["Document version", "1.1.31"],
+                ["Document date", "23 October 2026"],
                 ["License", "MIT License (see LICENSE); third-party: NOTICE"],
                 ["Platform", "Android 10+ (minSdk 29), targetSdk 35"],
                 ["Classification", "Unclassified. Operationally sensitive if filled with site logs."],

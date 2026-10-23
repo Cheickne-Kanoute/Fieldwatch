@@ -911,9 +911,172 @@ class SitPathPlotTest {
     }
 
     @Test
+    fun headingEastPutsEastAboveTheCenter() {
+        val model = SitPathPlot.Model(
+            samples = listOf(
+                GpsSample(1L, 36.0, -115.0),
+                GpsSample(2L, 36.0, -114.99),
+            ),
+            dots = emptyList(),
+            lengthM = 900.0,
+            spanM = 900.0,
+            title = "east",
+        )
+        val lay = SitPathPlot.layout(model, 400f, 700f, courseDeg = 90.0)!!
+        val here = lay.project(36.0, -115.0)
+        val east = lay.project(36.0, -114.99)
+        assertTrue(east.y < here.y - 20f)
+        assertTrue(kotlin.math.abs(east.x - here.x) < kotlin.math.abs(here.y - east.y) / 4f)
+        val north = lay.project(36.002, -115.0)
+        assertTrue(north.x < here.x - 20f)
+    }
+
+    @Test
+    fun aMissingCourseStaysNorthUp() {
+        val model = SitPathPlot.Model(
+            samples = listOf(
+                GpsSample(1L, 28.7800, -81.3700),
+                GpsSample(2L, 28.7810, -81.3700),
+            ),
+            dots = emptyList(),
+            lengthM = 110.0,
+            spanM = 110.0,
+            title = "north",
+        )
+        val plain = SitPathPlot.layout(model, 400f, 300f)!!
+        val missing = SitPathPlot.layout(model, 400f, 300f, courseDeg = Double.NaN)!!
+        val zero = SitPathPlot.layout(model, 400f, 300f, courseDeg = 0.0)!!
+        assertEquals(plain.path[1].x, missing.path[1].x, 0.05f)
+        assertEquals(plain.path[1].y, missing.path[1].y, 0.05f)
+        assertEquals(plain.path[1].x, zero.path[1].x, 0.05f)
+        assertTrue(missing.path[1].y < missing.path[0].y)
+    }
+
+    @Test
+    fun unprojectRoundTripsARotatedPoint() {
+        val model = SitPathPlot.Model(
+            samples = listOf(
+                GpsSample(1L, 36.0, -115.0),
+                GpsSample(2L, 36.0, -114.99),
+            ),
+            dots = emptyList(),
+            lengthM = 900.0,
+            spanM = 900.0,
+            title = "east",
+        )
+        val lay = SitPathPlot.layout(model, 400f, 700f, courseDeg = 90.0)!!
+        val pt = lay.project(36.001, -114.999)
+        val (lat, lon) = lay.unproject(pt.x, pt.y)
+        assertEquals(36.001, lat, 1e-6)
+        assertEquals(-114.999, lon, 1e-6)
+    }
+
+    @Test
+    fun aHeldViewStaysNorthUp() {
+        val model = SitPathPlot.Model(
+            samples = listOf(GpsSample(1L, 36.0, -115.0)),
+            dots = emptyList(),
+            lengthM = 0.0,
+            spanM = 0.0,
+            title = "held",
+        )
+        val held = SitPathPlot.Viewport(36.0, -115.0, 400f, 400f)
+        val lay = SitPathPlot.layout(model, 400f, 400f, viewport = held, courseDeg = 90.0)!!
+        val here = lay.project(36.0, -115.0)
+        val north = lay.project(36.001, -115.0)
+        assertTrue(north.y < here.y)
+        assertTrue(kotlin.math.abs(north.x - here.x) < 3f)
+    }
+
+    @Test
+    fun closeFollowSitsOnYouABitPastANearbyRadio() {
+        assertEquals(120f, MapFrame.CLOSE_HALF_M, 0.01f)
+        assertTrue(MapFrame.CLOSE_HALF_M > CoTravel.NEAR_M.toFloat())
+        val start = GpsSample(1L, 36.0, -115.0)
+        val here = GpsSample(2L, 36.01, -115.0)
+        val model = SitPathPlot.Model(listOf(start, here), emptyList(), 1100.0, 1100.0, "close")
+        val lay = SitPathPlot.layout(
+            model,
+            400f,
+            220f,
+            followHalfM = MapFrame.CLOSE_HALF_M,
+            courseDeg = 0.0,
+        )!!
+        val you = lay.project(here.lat, here.lon)
+        val cx = (lay.plotLeft + lay.plotRight) / 2f
+        val cy = (lay.plotTop + lay.plotBottom) / 2f
+        assertEquals(cx, you.x, 2f)
+        assertEquals(cy, you.y, 2f)
+        val edge = lay.project(here.lat + MapFrame.CLOSE_HALF_M / 110_540.0, here.lon)
+        assertEquals(you.x, edge.x, 2f)
+        assertEquals(lay.plotTop, edge.y, 3f)
+        val tail = lay.project(start.lat, start.lon)
+        assertTrue(tail.y > lay.plotBottom)
+    }
+
+    @Test
+    fun closeFollowPutsTravelUp() {
+        val here = GpsSample(1L, 36.0, -115.0)
+        val model = SitPathPlot.Model(listOf(here), emptyList(), 0.0, 0.0, "east")
+        val lay = SitPathPlot.layout(
+            model,
+            400f,
+            300f,
+            followHalfM = MapFrame.CLOSE_HALF_M,
+            courseDeg = 90.0,
+        )!!
+        val you = lay.project(here.lat, here.lon)
+        val cosLat = kotlin.math.cos(Math.toRadians(here.lat))
+        val east = lay.project(here.lat, here.lon + 40.0 / (111_320.0 * cosLat))
+        assertTrue(east.y < you.y - 10f)
+        assertTrue(kotlin.math.abs(east.x - you.x) < kotlin.math.abs(you.y - east.y) / 3f)
+    }
+
+    @Test
+    fun aHeldCloseViewStaysNorthUp() {
+        val here = GpsSample(1L, 36.0, -115.0)
+        val model = SitPathPlot.Model(listOf(here), emptyList(), 0.0, 0.0, "held")
+        val held = SitPathPlot.Viewport(36.0, -115.0, 400f, 400f)
+        val lay = SitPathPlot.layout(
+            model,
+            400f,
+            400f,
+            viewport = held,
+            followHalfM = MapFrame.CLOSE_HALF_M,
+            courseDeg = 90.0,
+        )!!
+        val you = lay.project(36.0, -115.0)
+        val north = lay.project(36.001, -115.0)
+        assertTrue(north.y < you.y)
+        assertTrue(kotlin.math.abs(north.x - you.x) < 3f)
+    }
+
+    @Test
+    fun theButtonSwitchesBearingAndADoubleTapSwitchesZoom() {
+        assertEquals(MapFrame.NORTH, MapFrame.resolved(-1, false))
+        assertEquals(MapFrame.TRAVEL, MapFrame.resolved(-1, true))
+        assertEquals(MapFrame.CLOSE, MapFrame.resolved(MapFrame.CLOSE, false))
+        assertEquals(MapFrame.CLOSE_NORTH, MapFrame.resolved(MapFrame.CLOSE_NORTH, true))
+        assertEquals(MapFrame.TRAVEL, MapFrame.bearingToggled(MapFrame.NORTH))
+        assertEquals(MapFrame.NORTH, MapFrame.bearingToggled(MapFrame.TRAVEL))
+        assertEquals(MapFrame.CLOSE_NORTH, MapFrame.bearingToggled(MapFrame.CLOSE))
+        assertEquals(MapFrame.CLOSE, MapFrame.bearingToggled(MapFrame.CLOSE_NORTH))
+        assertEquals(MapFrame.CLOSE_NORTH, MapFrame.zoomToggled(MapFrame.NORTH))
+        assertEquals(MapFrame.NORTH, MapFrame.zoomToggled(MapFrame.CLOSE_NORTH))
+        assertEquals(MapFrame.CLOSE, MapFrame.zoomToggled(MapFrame.TRAVEL))
+        assertEquals(MapFrame.TRAVEL, MapFrame.zoomToggled(MapFrame.CLOSE))
+        assertTrue(MapFrame.zoomed(MapFrame.CLOSE))
+        assertTrue(MapFrame.zoomed(MapFrame.CLOSE_NORTH))
+        assertFalse(MapFrame.zoomed(MapFrame.NORTH))
+        assertTrue(MapFrame.turns(MapFrame.CLOSE))
+        assertFalse(MapFrame.turns(MapFrame.CLOSE_NORTH))
+    }
+
+    @Test
     fun livePathStaysOffOnRadar() {
         val stock = AppSettings()
         assertFalse(stock.showLivePath)
+        assertFalse(stock.mapRotate)
         assertFalse(stock.copy(showLivePath = true, viewMode = ViewMode.RADAR).livePathOnScreen())
         assertTrue(stock.copy(showLivePath = true, viewMode = ViewMode.BY_CLASS).livePathOnScreen())
         assertFalse(stock.copy(showLivePath = false, viewMode = ViewMode.LIST).livePathOnScreen())

@@ -432,6 +432,26 @@ class SitTest {
     }
 
     @Test
+    fun oldSitRadioJsonLeavesTheReadStampOff() {
+        val json = Json { ignoreUnknownKeys = true }
+        val row = json.decodeFromString<SitRadio>(
+            """{"key":"BLE:AA:BB:CC:DD:EE:02","kind":"BLE","mac":"AA:BB:CC:DD:EE:02","name":"","fleetIds":[],"firstSeen":1,"lastSeen":2,"hitCount":1,"rssi":-50,"rssiMin":-50,"rssiMax":-50,"payloadLat":40.0,"payloadLon":-74.0}""",
+        )
+        assertEquals(40.0, row.payloadLat!!, 0.0)
+        assertNull(row.payloadAt)
+        assertNull(row.payloadPhoneLat)
+        assertNull(row.payloadOpAt)
+        val writing = Json { encodeDefaults = true }
+        val encoded = writing.encodeToString(row)
+        assertFalse(encoded.contains("payloadAt"))
+        val stamped = row.copy(payloadAt = 9L, payloadPhoneLat = 36.1, payloadPhoneLon = -115.1)
+        val back = json.decodeFromString<SitRadio>(json.encodeToString(stamped))
+        assertEquals(9L, back.payloadAt)
+        assertEquals(36.1, back.payloadPhoneLat!!, 0.0)
+        assertEquals(-115.1, back.payloadPhoneLon!!, 0.0)
+    }
+
+    @Test
     fun debriefOmitsUnmatchedRandomBleFromListsKeepsCounts() {
         val now = System.currentTimeMillis()
         val rand = radio(
@@ -751,7 +771,7 @@ class SitTest {
             lon = step.second
             session.recordPath(lat, lon, 1_000L + i * 1_000L)
         }
-        assertEquals(2, session.operatorPath.size)
+        assertTrue(session.operatorPath.size > 2)
         val turned = driveOffset(lat, lon, 0.0, 40.0)
         session.recordPath(turned.first, turned.second, 20_000L)
         assertTrue(session.operatorPath.size >= 3)

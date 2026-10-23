@@ -346,5 +346,44 @@ class SettingsExchangeTest {
         assertTrue(missing.gnssVoice)
         assertFalse(missing.gnssShade)
         assertFalse(missing.gnssRawLog)
+        assertEquals(MapBasemap.OSM, missing.mapBasemap)
+        assertEquals(MapFooter.OFF, missing.mapFooter)
+        assertFalse(missing.mapRotate)
+        assertEquals(-1, missing.mapFrame)
+        assertEquals(MapFrame.NORTH, missing.mapHome)
+        assertEquals(MapFrame.NORTH, MapFrame.resolved(missing.mapFrame, missing.mapRotate))
+        val turned = SettingsExchange.json.decodeFromString(
+            AppSettings.serializer(),
+            """{"mapRotate":true}""",
+        )
+        assertEquals(MapFrame.TRAVEL, MapFrame.resolved(turned.mapFrame, turned.mapRotate))
+        val close = SettingsExchange.json.decodeFromString(
+            AppSettings.serializer(),
+            """{"mapFrame":2,"mapHome":1}""",
+        )
+        assertEquals(MapFrame.CLOSE, close.mapFrame)
+        assertEquals(MapFrame.TRAVEL, close.mapHome)
+        val closeNorth = SettingsExchange.json.decodeFromString(
+            AppSettings.serializer(),
+            """{"mapFrame":3}""",
+        )
+        assertEquals(MapFrame.CLOSE_NORTH, closeNorth.mapFrame)
+        assertEquals(MapFrame.CLOSE_NORTH, MapFrame.resolved(closeNorth.mapFrame, closeNorth.mapRotate))
+        val kept = SettingsExchange.json.decodeFromString(
+            AppSettings.serializer(),
+            """{"mapBasemap":"USGS_TOPO"}""",
+        )
+        assertEquals(MapBasemap.USGS_TOPO, kept.mapBasemap)
+        assertEquals(MapFooter.OFF, kept.mapFooter)
+        val footer = SettingsExchange.json.decodeFromString(
+            AppSettings.serializer(),
+            """{"mapFooter":"GPS"}""",
+        )
+        assertEquals(MapFooter.GPS, footer.mapFooter)
+        val round = SettingsExchange.json.decodeFromString(
+            AppSettings.serializer(),
+            SettingsExchange.json.encodeToString(AppSettings.serializer(), footer),
+        )
+        assertEquals(MapFooter.GPS, round.mapFooter)
     }
 }

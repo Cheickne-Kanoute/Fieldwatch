@@ -3,6 +3,7 @@ package app.fieldwatch.domain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -29,6 +30,72 @@ class GeoPrivacyTest {
     fun redactCoordsInLeavesPathMetersAlone() {
         val path = "GPS path so far 123 m. Keep moving (~50 m). Span 45 m."
         assertEquals(path, Geo.redactCoordsIn(path, true))
+    }
+
+    @Test
+    fun screenGridAndRangeFollowPrivacy() {
+        assertEquals("masked", Geo.screenGrid(36.2361322, -115.0820944, true))
+        assertEquals("11S PA 72349 11844", Geo.screenGrid(36.2361322, -115.0820944, false))
+        assertNull(Geo.screenGrid(88.0, 0.0, false))
+        assertNull(Geo.liveRange(36.2, -115.08, 36.2361322, -115.0820944, true))
+        val near = Geo.liveRange(36.2361322, -115.0820944, 36.23616, -115.0820944, false)
+        assertTrue(near!!.matches(Regex("""\d+ m""")))
+        val north = Geo.reportRange(36.0, -115.0, 36.01, -115.0, 1_700_000_000_000L)
+        assertTrue(north!!.startsWith("1.1 km, bearing 000°, from this phone at "))
+        val held = Geo.reportRange(36.2361322, -115.0820944, 36.23616, -115.0820944, 1_700_000_000_000L)
+        assertTrue(held!!.contains(", from this phone at "))
+        assertFalse(held.contains("bearing"))
+        assertNull(Geo.reportRange(36.2, -115.08, 36.2361322, -115.0820944, null))
+        assertNull(Geo.reportRange(36.2, -115.08, 36.2361322, -115.0820944, 0L))
+    }
+
+    @Test
+    fun mapFooterTextFollowsTheChoice() {
+        assertNull(Geo.mapFooterText(MapFooter.OFF, 36.2, -115.0, false))
+        assertNull(Geo.mapFooterText(MapFooter.GPS, null, -115.0, false))
+        assertNull(Geo.mapFooterText(MapFooter.GPS, 0.0, 0.0, false))
+        assertEquals("36.20000, -115.00000", Geo.mapFooterText(MapFooter.GPS, 36.2, -115.0, false))
+        assertEquals("masked", Geo.mapFooterText(MapFooter.GPS, 36.2, -115.0, true))
+        assertEquals("masked", Geo.mapFooterText(MapFooter.GRID, 36.2361322, -115.0820944, true))
+        assertEquals(
+            "11S PA 72349 11844",
+            Geo.mapFooterText(MapFooter.GRID, 36.2361322, -115.0820944, false),
+        )
+        assertNull(Geo.mapFooterText(MapFooter.GRID, 88.0, 0.0, false))
+    }
+
+    @Test
+    fun mapFooterHoldsStillWhileThePhoneWanders() {
+        val first = Geo.settleMapFooter(null, MapFooter.GRID, 36.2361322, -115.0820944, false)
+        assertEquals("11S PA 72349 11844", first!!.text)
+        val jitter = Geo.settleMapFooter(first, MapFooter.GRID, 36.23614, -115.0820944, false)
+        assertSame(first, jitter)
+        val stepped = Geo.settleMapFooter(first, MapFooter.GRID, 36.23640, -115.0820944, false)
+        assertEquals(false, stepped === first)
+        assertTrue(stepped!!.text.isNotEmpty())
+        assertEquals(
+            "36.23613, -115.08209",
+            Geo.settleMapFooter(first, MapFooter.GPS, 36.2361322, -115.0820944, false)!!.text,
+        )
+        assertEquals(
+            "masked",
+            Geo.settleMapFooter(first, MapFooter.GRID, 36.2361322, -115.0820944, true)!!.text,
+        )
+        assertNull(Geo.settleMapFooter(first, MapFooter.GRID, null, null, false))
+        assertNull(Geo.settleMapFooter(first, MapFooter.OFF, 36.2361322, -115.0820944, false))
+    }
+
+    @Test
+    fun redactCoordsInMasksGridAndBearingAndKeepsCourse() {
+        val raw = "Grid 11S PA 72349 11844. 840 m, bearing 045°, from this phone at 14:32. " +
+            "4 m, from this phone at 14:32. course 100°. GPS path so far 123 m."
+        val masked = Geo.redactCoordsIn(raw, true)
+        assertFalse(masked.contains("11S"))
+        assertFalse(masked.contains("bearing"))
+        assertFalse(masked.contains("14:32"))
+        assertTrue(masked.contains("course 100°"))
+        assertTrue(masked.contains("GPS path so far 123 m"))
+        assertEquals(raw, Geo.redactCoordsIn(raw, false))
     }
 
     @Test

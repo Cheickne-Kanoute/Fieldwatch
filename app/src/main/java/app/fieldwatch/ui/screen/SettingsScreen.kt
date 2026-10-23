@@ -11,6 +11,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,14 +32,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
 import app.fieldwatch.ui.component.FieldwatchFilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import app.fieldwatch.ui.component.FieldwatchActionButton
+import app.fieldwatch.ui.component.FieldwatchDropdownField
 import app.fieldwatch.ui.component.FieldwatchOutlinedField
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -58,10 +63,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.fieldwatch.R
@@ -71,6 +78,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import app.fieldwatch.domain.AlertVoiceWhat
 import app.fieldwatch.domain.LanguageText
 import app.fieldwatch.domain.AppSettings
+import app.fieldwatch.domain.MapBasemap
+import app.fieldwatch.domain.MapFooter
+import app.fieldwatch.domain.MapKey
 import app.fieldwatch.domain.GnssAlertFloor
 import app.fieldwatch.domain.GnssSensitivity
 import app.fieldwatch.domain.ScanIntensity
@@ -127,10 +137,15 @@ fun SettingsScreen(
     val gnssRecordings by vm.gnssRecordings.collectAsStateWithLifecycle()
     val gnssReady = gnssProfile != null
     var topicName by rememberSaveable { mutableStateOf<String?>(null) }
+    var mapMenu by rememberSaveable { mutableStateOf(false) }
+    var positionMenu by rememberSaveable { mutableStateOf(false) }
     val topic = topicName?.let { name -> SettingsTopic.entries.firstOrNull { it.name == name } }
     BackHandler(enabled = topic != null) { topicName = null }
     val scroll = rememberScrollState()
     LaunchedEffect(topicName) { scroll.scrollTo(0) }
+    LaunchedEffect(settings.onlineLookup) {
+        if (!settings.onlineLookup) mapMenu = false
+    }
     Scaffold(
         contentWindowInsets = NestedTabInsets,
         topBar = {
@@ -485,6 +500,153 @@ fun SettingsScreen(
                     (LanguageText.text("ui.nothing.sent.fieldwatch.server") + " ") +
                     (LanguageText.text("ui.offline.debrief.keeps.coordinates") + " ") +
                     LanguageText.text("ui.turn.off.leave.streets"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            val mapsOn = settings.onlineLookup
+            val open = mapMenu && mapsOn
+            ExposedDropdownMenuBox(
+                expanded = open,
+                onExpandedChange = { want ->
+                    if (mapsOn) {
+                        mapMenu = want
+                        if (want) positionMenu = false
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                FieldwatchDropdownField(
+                    label = LanguageText.text("settings.map.choice"),
+                    value = LanguageText.text(settings.mapBasemap.labelKey),
+                    expanded = open,
+                    enabled = mapsOn,
+                )
+                ExposedDropdownMenu(open, { mapMenu = false }) {
+                    MapBasemap.entries.forEach { choice ->
+                        val selected = choice == settings.mapBasemap
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 32.dp)
+                                .clickable {
+                                    mapMenu = false
+                                    if (choice != settings.mapBasemap) vm.selectMap(choice)
+                                }
+                                .padding(horizontal = 12.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                LanguageText.text(choice.labelKey),
+                                style = MaterialTheme.typography.labelLarge,
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (choice.needsKey) {
+                                Text(
+                                    LanguageText.text("map.key.mark"),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(start = 8.dp),
+                                )
+                            }
+                            if (selected) {
+                                Icon(Icons.Outlined.Check, contentDescription = null)
+                            }
+                        }
+                    }
+                }
+            }
+            if (mapsOn && settings.mapBasemap.needsKey) {
+                val service = settings.mapBasemap.service
+                val stored = vm.mapKey(settings.mapBasemap)
+                var draft by remember(service) { mutableStateOf(stored) }
+                var skipFirstBlur by remember(service) { mutableStateOf(true) }
+                FieldwatchOutlinedField(
+                    value = draft,
+                    onValueChange = { next ->
+                        if (MapKey.verdict(next) == MapKey.Verdict.DENIED) {
+                            vm.finishMapKey(settings.mapBasemap, next)
+                        } else {
+                            draft = next
+                        }
+                    },
+                    label = LanguageText.text("map.key.label"),
+                    supportingText = LanguageText.text("map.key.hint"),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done,
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = { vm.finishMapKey(settings.mapBasemap, draft) },
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { focus ->
+                            if (focus.isFocused) {
+                                skipFirstBlur = false
+                            } else if (skipFirstBlur) {
+                                skipFirstBlur = false
+                            } else {
+                                vm.finishMapKey(settings.mapBasemap, draft)
+                            }
+                        },
+                )
+            }
+            Text(
+                LanguageText.text("settings.map.about"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (!mapsOn) {
+                Text(
+                    LanguageText.text("settings.map.needs.online"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            ExposedDropdownMenuBox(
+                expanded = positionMenu,
+                onExpandedChange = { want ->
+                    positionMenu = want
+                    if (want) mapMenu = false
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                FieldwatchDropdownField(
+                    label = LanguageText.text("settings.map.position"),
+                    value = LanguageText.text(settings.mapFooter.labelKey),
+                    expanded = positionMenu,
+                )
+                ExposedDropdownMenu(positionMenu, { positionMenu = false }) {
+                    MapFooter.entries.forEach { choice ->
+                        val selected = choice == settings.mapFooter
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 32.dp)
+                                .clickable {
+                                    positionMenu = false
+                                    if (choice != settings.mapFooter) {
+                                        vm.updateSettings { it.copy(mapFooter = choice) }
+                                    }
+                                }
+                                .padding(horizontal = 12.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                LanguageText.text(choice.labelKey),
+                                style = MaterialTheme.typography.labelLarge,
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (selected) {
+                                Icon(Icons.Outlined.Check, contentDescription = null)
+                            }
+                        }
+                    }
+                }
+            }
+            Text(
+                LanguageText.text("settings.map.position.about"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -951,7 +1113,7 @@ private enum class SettingsTopic(val titleKey: String) {
     APPEARANCE("settings.topic.appearance"),
     SCANNING("settings.topic.scanning"),
     WATCHLIST("settings.topic.watchlist"),
-    LOCATION("settings.topic.location"),
+    LOCATION("settings.topic.location.maps"),
     GNSS("settings.topic.gnss"),
     TAK("settings.topic.tak"),
     LOGGING("settings.topic.logging"),

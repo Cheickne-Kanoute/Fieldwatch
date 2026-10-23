@@ -4,6 +4,24 @@ Newest first. This is Fieldwatch (`app.fieldwatch`). Each build below is what Se
 
 Fieldwatch continues the Spectre 1.2.14 field build under a new name, application id, and the MIT License. It does not replace Spectre on a phone.
 
+## 1.1.31 — 23 October 2026
+
+- The Wi-Fi, Bluetooth, and signature counts in the top bar each keep room for 888, so the line does not shift as the numbers change.
+- Hunt no longer shows Very Close, Faint, or Gone. Watch the number, the sparkline, and the cloud. Beep and Vibrate still stay quiet when there is no packet, or the radio has left.
+- Settings → Location and Maps can use world maps from Esri, MapTiler, Stadia, and Thunderforest. Those maps are marked Key. Paste the key from your own account. It stays on this phone, and Export settings leaves it out. OpenStreetMap and the USGS maps do not ask for a key. A bad key or a map that does not load shows a popup.
+- A double-tap on Show live path switches between the whole path and a close view around this phone. The close view keeps this phone in the center, and the short side reaches a little past about 100 m. North up and direction of travel each keep that zoom.
+- The drive line keeps a point every few meters, so it follows the street around a corner. A turn leaves the road already driven where it was. Green is still a real stop.
+- Show live path and Hunt have a compass button where the N mark was. Tap it to switch between north up and direction of travel. The picture shows all four combinations. Zoomed out is a bent path, with N above it when north is up. Direction of travel puts the same compass letters as the close view above a smaller bent path. Zoomed in is those letters, or N above an arrow when north is up. Standing still keeps the last direction. A turn in place does not turn the map. Reports → Path and the saved path figure stay north-up.
+- Show live path follows the road through a turn. A straight stretch still leaves GPS wobble off the line. Green is a real stop: this phone stayed within about 25 m for about 40 seconds. The rest of the drive is the plain line.
+- Hunt leaves the top of the page for the map. Watch the number, the sparkline, and the cloud. The scale starts at Weak. The words beside the number follow the language pack.
+- Hunt draws a heat cloud of where this phone heard that radio. The color runs from blue where it is weak, through cyan, green, yellow, and orange, to red where it is powerful. Walk or drive the area. The brightest patch is where it was loudest. The loudest mark sits in that patch. It is not a distance and not a pin on the other radio.
+- Hunt opens close in, and the cloud is drawn finer. Steps fill in short moves between GPS fixes. A tight GPS fix still recenters the walk.
+- The hunt cloud follows the walk. Hears connect, and the color changes smoothly from one to the next. Close parts of the walk fill in between the lines. A far gap stays open. The edge fades that color out.
+- Hunt stays close on you as the walk gets longer. Leaving the page keeps the cloud until Reset, or until you hunt a different radio. A turn in place does not move the dot. The lower-left reading matches the dot. While GPS is moving, steps follow that direction. The top of the phone is used when GPS is stuck.
+- Settings → Maps chooses the map under Show live path, Reports → Path, and the path figure. OpenStreetMap is the start. USGS Imagery and USGS Topo cover the United States. A small line in the corner of the map names the source.
+- The radio page shows the grid beside the GPS. For an ordinary radio that is where this phone was. A Remote ID aircraft shows the aircraft position and the takeoff, pilot, or fixed point, each with a grid, plus the distance and bearing from this phone. A sit report uses where this phone was when that position was heard and names the time. An older sit shows the grid and leaves the distance and bearing off. Privacy mode masks the grid and leaves the distance and bearing off.
+- Settings → Maps can show where this phone is now on the lower left of the map, as GPS or as a grid. Off leaves that corner empty. Privacy mode masks it. The corner stays put until this phone has moved.
+
 ## 1.1.30 — 22 October 2026
 
 - Places no longer closes the app on Android 10 and 11.

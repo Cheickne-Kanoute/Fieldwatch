@@ -2,6 +2,10 @@ package app.fieldwatch
 
 import android.app.Application
 import android.content.Intent
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
@@ -18,12 +22,15 @@ import app.fieldwatch.data.DeviceStore
 import app.fieldwatch.data.GnssProfileStore
 import app.fieldwatch.data.GnssRawFiles
 import app.fieldwatch.data.LogStore
+import app.fieldwatch.data.MapKeyStore
 import app.fieldwatch.data.PlaceStore
 import app.fieldwatch.data.SitStore
 import app.fieldwatch.domain.CoTravel
 import app.fieldwatch.domain.FilterEngine
 import app.fieldwatch.domain.Geo
 import app.fieldwatch.domain.GpsSample
+import app.fieldwatch.domain.HuntStepDetector
+import app.fieldwatch.domain.HuntTrack
 import app.fieldwatch.domain.FloodBurst
 import app.fieldwatch.domain.PairingFlood
 import app.fieldwatch.domain.WifiBeaconFlood
@@ -47,6 +54,8 @@ import java.util.Locale
 class FieldwatchApp : Application() {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     lateinit var config: ConfigStore
+        private set
+    lateinit var mapKeys: MapKeyStore
         private set
     lateinit var devices: DeviceStore
         private set
@@ -95,6 +104,126 @@ class FieldwatchApp : Application() {
     var lastFix: Pair<Double, Double>? = null
     @Volatile
     var lastFixAt: Long = 0L
+    /** GPS fix good enough for the Hunt cloud. Network fixes stay out. */
+    @Volatile
+    private var lastGpsFix: Pair<Double, Double>? = null
+    @Volatile
+    private var lastGpsFixAt: Long = 0L
+    /** Course for the map button. NaN until GPS has shown a direction. */
+    @Volatile
+    var travelDeg: Double = Double.NaN
+        private set
+    private val travelCourse = Geo.TravelCourse()
+
+    /**
+     * Latest phone fix still young enough to call current. Older than 30 s is left off.
+     * A timestamp a few seconds ahead of [now] still counts. The map reads this between
+     * clock ticks, and a newer Location.time was blanking the corner on every pass.
+     */
+    fun currentFix(now: Long = System.currentTimeMillis()): Pair<Double, Double>? {
+        val fix = lastFix ?: return null
+        if (!phoneFixIsCurrent(lastFixAt, now)) return null
+        return fix
+    }
+
+    /** Latest GPS fix a Hunt cloud can trust. Older than 30 s is left off. */
+    fun huntFix(now: Long = System.currentTimeMillis()): Pair<Double, Double>? {
+        synchronized(motionLock) {
+            if (huntMotion) return huntTrack.position()
+        }
+        val fix = lastGpsFix ?: return null
+        if (!phoneFixIsCurrent(lastGpsFixAt, now)) return null
+        return fix
+    }
+
+    private val motionLock = Any()
+    private val huntTrack = HuntTrack()
+    private val stepDetector = HuntStepDetector()
+    private var huntMotion = false
+    private var huntSensors = false
+    private val _huntPlace = MutableStateFlow<Pair<Double, Double>?>(null)
+    /** Fused hunt position. Null when Hunt is closed or GPS has not anchored it. */
+    val huntPlace: StateFlow<Pair<Double, Double>?> = _huntPlace.asStateFlow()
+
+    private val huntSensorListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent) {
+            val moved = synchronized(motionLock) {
+                if (!huntMotion) return@synchronized false
+                when (event.sensor.type) {
+                    Sensor.TYPE_ROTATION_VECTOR -> {
+                        val rot = FloatArray(9)
+                        val ori = FloatArray(3)
+                        val ok = runCatching {
+                            SensorManager.getRotationMatrixFromVector(rot, event.values)
+                            SensorManager.getOrientation(rot, ori)
+                        }.isSuccess
+                        if (ok) {
+                            huntTrack.heading(
+                                Math.toDegrees(ori[0].toDouble()),
+                                System.currentTimeMillis(),
+                            )
+                        }
+                        false
+                    }
+                    Sensor.TYPE_ACCELEROMETER -> {
+                        val v = event.values
+                        val mag = kotlin.math.sqrt((v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).toDouble()).toFloat()
+                        val stepped = stepDetector.sample(mag, event.timestamp / 1_000_000L)
+                        if (stepped) huntTrack.step(System.currentTimeMillis()) else false
+                    }
+                    else -> false
+                }
+            }
+            if (moved) _huntPlace.value = synchronized(motionLock) { huntTrack.position() }
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+    }
+
+    /** Steps and phone heading, only while Hunt is open. GPS still anchors the walk. */
+    fun beginHuntMotion() {
+        val place = synchronized(motionLock) {
+            huntTrack.clear()
+            stepDetector.reset()
+            huntMotion = true
+            val fix = lastGpsFix
+            val now = System.currentTimeMillis()
+            if (fix != null && phoneFixIsCurrent(lastGpsFixAt, now)) {
+                huntTrack.gps(fix.first, fix.second, 8f, now)
+            }
+            huntTrack.position()
+        }
+        _huntPlace.value = place
+        if (huntSensors) return
+        val sm = getSystemService(SENSOR_SERVICE) as SensorManager
+        val rotation = sm.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+        val accel = sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        var armed = false
+        if (rotation != null) {
+            sm.registerListener(huntSensorListener, rotation, SensorManager.SENSOR_DELAY_GAME)
+            armed = true
+        }
+        if (accel != null) {
+            sm.registerListener(huntSensorListener, accel, SensorManager.SENSOR_DELAY_GAME)
+            armed = true
+        }
+        huntSensors = armed
+    }
+
+    fun endHuntMotion() {
+        if (!huntMotion && !huntSensors) return
+        if (huntSensors) {
+            val sm = getSystemService(SENSOR_SERVICE) as SensorManager
+            sm.unregisterListener(huntSensorListener)
+            huntSensors = false
+        }
+        synchronized(motionLock) {
+            huntMotion = false
+            huntTrack.clear()
+            stepDetector.reset()
+        }
+        _huntPlace.value = null
+    }
     @Volatile
     private var speedMps: Double? = null
     @Volatile
@@ -113,6 +242,7 @@ class FieldwatchApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        mapKeys = MapKeyStore(File(filesDir, "map-keys.json"))
         CrashNotes.install(this)
         pendingCrash = runCatching { CrashNotes.pending(this) }.getOrNull()
         if (pendingCrash != null) return
@@ -417,9 +547,42 @@ class FieldwatchApp : Application() {
                 speedAt = System.currentTimeMillis()
             }
         }
+        if (gps) {
+            val looseSpeed = loc.hasSpeedAccuracy() && loc.speedAccuracyMetersPerSecond > 4f
+            val speed = if (loc.hasSpeed() && loc.speed >= 0f && loc.speed.isFinite() && !looseSpeed) {
+                loc.speed
+            } else {
+                null
+            }
+            val bearing = if (loc.hasBearing() && loc.bearing.isFinite()) loc.bearing else null
+            val bearingAcc = if (loc.hasBearingAccuracy() && loc.bearingAccuracyDegrees.isFinite()) {
+                loc.bearingAccuracyDegrees
+            } else {
+                null
+            }
+            travelDeg = travelCourse.note(loc.latitude, loc.longitude, speed, bearing, bearingAcc)
+        }
         val accuracy = if (loc.hasAccuracy()) loc.accuracy else null
         if (!Geo.acceptDriveFix(gps, accuracy)) return
-        recordOperatorFix(loc.latitude, loc.longitude, loc.time)
+        val lat = loc.latitude
+        val lon = loc.longitude
+        val at = loc.time
+        val plausible = synchronized(pathLock) {
+            val last = operatorPath.lastOrNull()
+            last == null || Geo.hopPlausible(last, lat, lon, at)
+        }
+        if (!plausible) return
+        lastGpsFix = lat to lon
+        lastGpsFixAt = at
+        val paced = synchronized(motionLock) {
+            if (!huntMotion) null
+            else {
+                huntTrack.gps(lat, lon, accuracy ?: 12f, System.currentTimeMillis())
+                huntTrack.position()
+            }
+        }
+        if (paced != null || huntMotion) _huntPlace.value = paced
+        recordOperatorFix(lat, lon, at)
     }
 
     /** GPS speed in m/s, or null when the latest fix has no usable speed. */
@@ -465,3 +628,9 @@ data class ArrivalsState(
     val learningUntil: Long = 0L,
     val bufferStartedAt: Long = 0L,
 )
+
+/** Location.time may lead the clock that painted the last frame. Five seconds covers that. */
+internal fun phoneFixIsCurrent(fixAt: Long, now: Long): Boolean {
+    val age = now - fixAt
+    return age >= -5_000L && age <= 30_000L
+}

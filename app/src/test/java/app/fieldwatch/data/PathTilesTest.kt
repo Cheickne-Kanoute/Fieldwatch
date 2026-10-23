@@ -1,5 +1,6 @@
 package app.fieldwatch.data
 
+import app.fieldwatch.domain.MapBasemap
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -41,6 +42,47 @@ class PathTilesTest {
         val print = PathTiles.plannedZoom(south, north, west, east, forPrint = true)
         assertEquals((screen + 2).coerceAtMost(19), print)
         assertTrue(print <= 19)
+    }
+
+    @Test
+    fun coverageKeyNamesTheMap() {
+        val osm = PathTiles.coverageKey(28.78, 28.79, -81.38, -81.37, MapBasemap.OSM)
+        val imagery = PathTiles.coverageKey(28.78, 28.79, -81.38, -81.37, MapBasemap.USGS_IMAGERY)
+        assertTrue(osm.startsWith("OSM:"))
+        assertTrue(imagery.startsWith("USGS_IMAGERY:"))
+        assertNotEquals(osm, imagery)
+    }
+
+    @Test
+    fun usgsPrintStopsAtTheLastRealZoom() {
+        val south = 28.780
+        val north = 28.784
+        val west = -81.370
+        val east = -81.366
+        val imagery = PathTiles.plannedZoom(
+            south, north, west, east, forPrint = true, basemap = MapBasemap.USGS_IMAGERY,
+        )
+        val topo = PathTiles.plannedZoom(
+            south, north, west, east, forPrint = true, basemap = MapBasemap.USGS_TOPO,
+        )
+        assertTrue(imagery in 8..16)
+        assertTrue(topo in 8..16)
+    }
+
+    @Test
+    fun tileUrlsUseEachServicesOrder() {
+        assertEquals(
+            "https://tile.openstreetmap.org/12/1140/1536.png",
+            MapBasemap.OSM.tileUrl(12, 1140, 1536),
+        )
+        assertEquals(
+            "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/12/1536/1140",
+            MapBasemap.USGS_IMAGERY.tileUrl(12, 1140, 1536),
+        )
+        assertEquals(
+            "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/12/1536/1140",
+            MapBasemap.USGS_TOPO.tileUrl(12, 1140, 1536),
+        )
     }
 
     @Test

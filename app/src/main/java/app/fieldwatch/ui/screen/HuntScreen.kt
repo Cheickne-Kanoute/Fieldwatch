@@ -2,13 +2,6 @@ package app.fieldwatch.ui.screen
 
 import app.fieldwatch.domain.LanguageText
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,17 +24,17 @@ import app.fieldwatch.ui.component.FieldwatchSwitch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -49,16 +42,21 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import app.fieldwatch.domain.DeviceExplain
+import app.fieldwatch.domain.Geo
+import app.fieldwatch.domain.GpsSample
 import app.fieldwatch.domain.MacUtil
 import app.fieldwatch.domain.Hunt
-import app.fieldwatch.domain.HuntCue
+import app.fieldwatch.domain.MapFrame
+import app.fieldwatch.domain.PayloadLocation
 import app.fieldwatch.domain.Palette
+import app.fieldwatch.domain.Rssi
+import app.fieldwatch.domain.SitPathPlot
 import app.fieldwatch.ui.FieldwatchViewModel
+import app.fieldwatch.ui.component.HuntHeatMap
 import app.fieldwatch.ui.component.Sparkline
 import app.fieldwatch.ui.component.rssiColor
 import app.fieldwatch.ui.theme.LocalNightMode
 import app.fieldwatch.ui.theme.nightIf
-import kotlin.math.min
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,6 +68,12 @@ fun HuntScreen(
     huntVibrate: Boolean = false,
 ) {
     val hunt by vm.hunt.collectAsStateWithLifecycle()
+    DisposableEffect(Unit) {
+        onDispose { vm.stopHunt() }
+    }
+    val ui by vm.ui.collectAsStateWithLifecycle()
+    var viewport by remember { mutableStateOf<SitPathPlot.Viewport?>(null) }
+    val tiles by vm.huntTiles.collectAsStateWithLifecycle()
     LaunchedEffect(hunt.active, huntBeep, huntVibrate) {
         if (!hunt.active || (!huntBeep && !huntVibrate)) return@LaunchedEffect
         var lastTick = 0L
@@ -89,6 +93,25 @@ fun HuntScreen(
             lastTick = System.currentTimeMillis()
         }
     }
+    val cover = remember(hunt.trail, hunt.hereLat, hunt.hereLon) {
+        if (PayloadLocation.validCoord(hunt.hereLat, hunt.hereLon)) {
+            hunt.trail + GpsSample(0L, hunt.hereLat!!, hunt.hereLon!!)
+        } else {
+            hunt.trail
+        }
+    }
+    val online = ui.settings.onlineLookup
+    val basemap = ui.settings.mapBasemap
+    val mapKeyRev by vm.mapKeyRevision.collectAsStateWithLifecycle()
+    LaunchedEffect(cover, online, basemap, viewport, mapKeyRev) {
+        val held = viewport
+        if (held == null) {
+            vm.refreshHuntTiles(cover, online, basemap)
+        } else {
+            delay(350)
+            vm.refreshHuntViewport(held, online, basemap)
+        }
+    }
     val device = hunt.device
     val rssi = device?.rssi
     val night = LocalNightMode.current
@@ -97,17 +120,25 @@ fun HuntScreen(
         ?: rssi?.let { rssiColor(it) }
         ?: MaterialTheme.colorScheme.primary)
         .nightIf(night)
-    val cueColor = when (hunt.cue) {
-        HuntCue.VERY_CLOSE -> Color(0xFF7CFF3D).nightIf(night)
-        HuntCue.CLOSER -> Color(0xFF3DFF9A).nightIf(night)
-        HuntCue.FURTHER -> Color(0xFFFF3D5A).nightIf(night)
-        HuntCue.SAME -> MaterialTheme.colorScheme.onSurface
-        HuntCue.WAITING -> MaterialTheme.colorScheme.onSurfaceVariant
-        HuntCue.QUIET -> Color(0xFFFFB020).nightIf(night)
-        HuntCue.GONE -> Color(0xFFFF3D5A).nightIf(night)
+    val hasHere = PayloadLocation.validCoord(hunt.hereLat, hunt.hereLon)
+    val showMap = hunt.trail.isNotEmpty() || hasHere
+    val footer = Geo.mapFooterText(
+        ui.settings.mapFooter,
+        if (hasHere) hunt.hereLat else ui.phoneLat,
+        if (hasHere) hunt.hereLon else ui.phoneLon,
+        demoMode,
+    )
+    val hint = when {
+        showMap && hunt.trail.isEmpty() -> LanguageText.text("hunt.heat.empty")
+        !showMap && !ui.settings.tagLocation -> LanguageText.text("ui.turn.tag.detections.gps.2")
+        !showMap -> LanguageText.text("ui.waiting.gps.fix")
+        else -> null
     }
-    val now = System.currentTimeMillis()
-    val heardAgo = if (hunt.lastSeen > 0L) ((now - hunt.lastSeen) / 1000L).coerceAtLeast(0L) else null
+    val loudest = if (hunt.peakRssi > -127 && Rssi.measured(hunt.peakRssi)) {
+        LanguageText.text("ui.loudest.hunt") + " ${hunt.peakRssi} dBm"
+    } else {
+        LanguageText.text("ui.loudest.hunt")
+    }
 
     Scaffold(
         topBar = {
@@ -183,173 +214,71 @@ fun HuntScreen(
             Modifier
                 .padding(pad)
                 .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .padding(horizontal = 12.dp),
         ) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(44.dp),
-                contentAlignment = Alignment.Center,
+            Row(
+                Modifier.fillMaxWidth().height(44.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    Hunt.label(hunt.cue),
-                    color = cueColor,
+                    rssi?.toString() ?: "—",
+                    fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 32.sp,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth(),
+                    fontSize = 36.sp,
+                    color = accent,
                 )
+                Column(Modifier.padding(start = 12.dp).weight(1f)) {
+                    Text(
+                        rssi?.let { DeviceExplain.rssiExplain(it) } ?: LanguageText.text("ui.no.live.rssi"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        loudest,
+                        fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                contentAlignment = Alignment.TopCenter,
-            ) {
-                Text(
-                    Hunt.hint(hunt.cue),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                rssi?.toString() ?: "—",
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                fontSize = 72.sp,
-                color = accent,
-            )
-            Text(
-                rssi?.let { DeviceExplain.rssiExplain(it) } ?: LanguageText.text("ui.no.live.rssi"),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                if (hunt.peakRssi > -127) {
-                    "Loudest this hunt  ${hunt.peakRssi} dBm"
+            Box(Modifier.fillMaxWidth().weight(1f)) {
+                if (showMap) {
+                    HuntHeatMap(
+                        trail = hunt.trail,
+                        hereLat = hunt.hereLat,
+                        hereLon = hunt.hereLon,
+                        tiles = tiles,
+                        position = footer,
+                        hint = hint,
+                        viewport = viewport,
+                        onViewport = { viewport = it },
+                        courseDeg = ui.travelDeg,
+                        mapFrame = MapFrame.resolved(ui.settings.mapFrame, ui.settings.mapRotate),
+                        onRotate = { vm.cycleMapFrame() },
+                        onToggleClose = { vm.toggleMapClose() },
+                    )
                 } else {
-                    LanguageText.text("ui.loudest.hunt")
-                },
-                fontFamily = FontFamily.Monospace,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                when {
-                    heardAgo == null -> LanguageText.text("ui.last.heard")
-                    heardAgo < 60L -> "last heard ${heardAgo}s ago"
-                    else -> "last heard ${heardAgo / 60L}m ago"
-                },
-                fontFamily = FontFamily.Monospace,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(8.dp))
-            HuntNeedle(
-                cue = hunt.cue,
-                color = cueColor,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-            )
-            Spacer(Modifier.height(8.dp))
+                    Text(
+                        hint.orEmpty(),
+                        modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+            Spacer(Modifier.height(4.dp))
             Sparkline(
                 hunt.samples,
                 accent,
                 Modifier
                     .fillMaxWidth()
-                    .height(72.dp),
+                    .height(48.dp),
             )
+            Spacer(Modifier.height(4.dp))
         }
-    }
-}
-
-@Composable
-private fun HuntNeedle(
-    cue: HuntCue,
-    color: Color,
-    modifier: Modifier = Modifier,
-) {
-    val period = when (cue) {
-        HuntCue.VERY_CLOSE -> 700
-        HuntCue.CLOSER -> 900
-        HuntCue.FURTHER -> 1100
-        HuntCue.SAME -> 2200
-        HuntCue.WAITING -> 1800
-        HuntCue.QUIET, HuntCue.GONE -> 2400
-    }
-    val t by rememberInfiniteTransition(label = "huntNeedle").animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(period, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "huntNeedleT",
-    )
-    val youColor = MaterialTheme.colorScheme.onSurface
-    val ringIdle = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
-    val measurer = rememberTextMeasurer()
-    val youStyle = androidx.compose.ui.text.TextStyle(
-        color = youColor,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.Bold,
-        fontFamily = FontFamily.Monospace,
-    )
-    Canvas(modifier.fillMaxWidth()) {
-        val c = Offset(size.width / 2f, size.height / 2f)
-        val maxR = min(size.width, size.height) * 0.42f
-        if (maxR < 8f) return@Canvas
-        for (i in 1..3) {
-            drawCircle(
-                color = ringIdle,
-                radius = maxR * i / 3f,
-                center = c,
-                style = Stroke(width = 1.4f),
-            )
-        }
-        fun pulse(frac: Float, alpha: Float, width: Float) {
-            val r = (maxR * frac).coerceAtLeast(2f)
-            drawCircle(
-                color = color.copy(alpha = alpha.coerceIn(0f, 1f)),
-                radius = r,
-                center = c,
-                style = Stroke(width = width),
-            )
-        }
-        when (cue) {
-            HuntCue.CLOSER, HuntCue.VERY_CLOSE -> {
-                repeat(3) { i ->
-                    val frac = ((1f - t) + i / 3f).mod(1f)
-                    pulse(frac, (1f - frac) * 0.85f, if (cue == HuntCue.VERY_CLOSE) 5.5f else 4f)
-                }
-                if (cue == HuntCue.VERY_CLOSE) {
-                    drawCircle(color.copy(alpha = 0.22f + 0.18f * (1f - t)), radius = maxR * 0.22f, center = c)
-                }
-            }
-            HuntCue.FURTHER -> {
-                repeat(3) { i ->
-                    val frac = (t + i / 3f).mod(1f)
-                    pulse(frac, (1f - frac) * 0.85f, 4f)
-                }
-            }
-            HuntCue.SAME -> pulse(0.55f, 0.55f, 3.2f)
-            HuntCue.WAITING -> pulse(0.4f + 0.2f * t, 0.35f, 2.6f)
-            HuntCue.QUIET -> pulse(0.72f, 0.4f, 2.8f)
-            HuntCue.GONE -> pulse(0.88f, 0.28f, 2.2f)
-        }
-        drawCircle(color.copy(alpha = 0.95f), radius = 5.5f, center = c)
-        val you = measurer.measure("YOU", youStyle)
-        drawText(
-            you,
-            topLeft = Offset(c.x - you.size.width / 2f, c.y + 10f),
-        )
     }
 }
