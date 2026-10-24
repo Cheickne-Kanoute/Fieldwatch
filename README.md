@@ -42,6 +42,7 @@ Do not rename the APK. Open `Fieldwatch.apk` from Files (or My Files). Allow ins
 | `dist/Fieldwatch.apk` | Sideload APK |
 | `dist/fieldwatch-signatures.json` | Stock catalog for 1.1.11 GitHub update (catalog 77) |
 | `dist/fieldwatch-signatures-v2.json` | Stock catalog for 1.1.12+ GitHub update |
+| `dist/fieldwatch-sensors.geojson.gz` | Other sensors list. OpenStreetMap contributors, ODbL 1.0. See `dist/fieldwatch-sensors.txt` |
 | `dist/instruction.txt` | Permissions, first launch |
 | `dist/Fieldwatch_User_Manual.pdf` | User manual |
 | [`CHANGELOG.md`](CHANGELOG.md) | What’s new in each build |

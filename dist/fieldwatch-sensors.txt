@@ -1,0 +1,8 @@
+fieldwatch-sensors.geojson.gz is the Other sensors list in Fieldwatch.
+It holds speed cameras, red lights, gunshot detectors, and other cameras in the United States.
+Plate readers are not in this file.
+
+© OpenStreetMap contributors
+https://www.openstreetmap.org/copyright
+License: Open Database License 1.0
+https://opendatacommons.org/licenses/odbl/1-0/
